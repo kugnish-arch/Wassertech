@@ -1,0 +1,12 @@
+<resources>
+    <!-- Кастомная тема приложения -->
+    <style name="Theme.Wassertech" parent="Theme.Material3.DayNight">
+        <!-- Отключаем системный ActionBar -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+        <!-- Кастомизация системных панелей (опционально) -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
