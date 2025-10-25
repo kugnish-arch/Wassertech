@@ -1,0 +1,70 @@
+package com.example.wassertech.ui.hierarchy
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.wassertech.viewmodel.HierarchyViewModel
+import com.example.wassertech.data.entities.SiteEntity
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SitesScreen(
+    clientId: String,
+    onOpenSite: (String) -> Unit,
+    vm: HierarchyViewModel = viewModel()
+) {
+    val sites by vm.sites(clientId).collectAsState(initial = emptyList())
+    var showAdd by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(TextFieldValue("")) }
+    var addr by remember { mutableStateOf(TextFieldValue("")) }
+
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAdd = true }) { Text("+") }
+        }
+    ) { padding ->
+        Column(Modifier.padding(padding)) {
+            LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(sites, key = { it.id }) { s ->
+                    ElevatedCard(onClick = { onOpenSite(s.id) }) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(s.name, style = MaterialTheme.typography.titleMedium)
+                            if (!s.address.isNullOrBlank()) Text(s.address!!, style = MaterialTheme.typography.bodyMedium)
+                            Row { TextButton(onClick = { vm.deleteSite(s.id) }) { Text("Удалить") } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAdd) {
+        AlertDialog(
+            onDismissRequest = { showAdd = false },
+            title = { Text("Новый объект") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true)
+                    OutlinedTextField(value = addr, onValueChange = { addr = it }, label = { Text("Адрес (опц.)") })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val n = name.text.trim()
+                    if (n.isNotEmpty()) {
+                        vm.addSite(clientId, n, addr.text.trim().ifEmpty { null })
+                        name = TextFieldValue(""); addr = TextFieldValue("")
+                        showAdd = false
+                    }
+                }) { Text("Сохранить") }
+            },
+            dismissButton = { TextButton(onClick = { showAdd = false }) { Text("Отмена") } }
+        )
+    }
+}
