@@ -12,7 +12,7 @@ import com.example.wassertech.data.entities.*
 import com.example.wassertech.data.types.Converters
 
 @Database(
-    version = 4,
+    version = 5,
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -52,8 +52,14 @@ abstract class AppDatabase : RoomDatabase() {
                     dbx.execSQL("ALTER TABLE clients ADD COLUMN isCorporate INTEGER NOT NULL DEFAULT 0")
                 }
             }
+            val MIGRATION_4_5 = object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE sites ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE installations ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+                }
+            }
             return Room.databaseBuilder(context, AppDatabase::class.java, "wassertech.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
     }

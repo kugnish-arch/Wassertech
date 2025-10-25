@@ -10,8 +10,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
-import androidx.compose.material3.Icon
 import com.example.wassertech.ui.icons.AppIcons
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,7 +27,9 @@ fun ClientsScreen(
     var newCorporate by remember { mutableStateOf(false) }
 
     Scaffold(
-        floatingActionButton = { FloatingActionButton(onClick = { showAdd = true }) { Text("+") } }
+        floatingActionButton = {
+            ExtendedFloatingActionButton(onClick = { showAdd = true }) { Text("+ Клиент") }
+        }
     ) { padding ->
         Column(Modifier.padding(padding)) {
             LazyColumn(
@@ -52,7 +55,7 @@ fun ClientsScreen(
             title = { Text("Новый клиент") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("Название/имя") }, singleLine = true)
+                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("Имя/название") }, singleLine = true)
                     OutlinedTextField(value = newNotes, onValueChange = { newNotes = it }, label = { Text("Адрес/заметки (временно)") })
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Checkbox(checked = newCorporate, onCheckedChange = { newCorporate = it })

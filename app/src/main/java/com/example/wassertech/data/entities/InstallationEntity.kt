@@ -7,5 +7,6 @@ import androidx.room.PrimaryKey
 data class InstallationEntity(
     @PrimaryKey val id: String,
     val siteId: String,
-    val name: String
+    val name: String,
+    val position: Int = 0
 )

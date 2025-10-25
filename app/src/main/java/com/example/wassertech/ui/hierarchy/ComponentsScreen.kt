@@ -18,6 +18,7 @@ import com.example.wassertech.viewmodel.HierarchyViewModel
 import com.example.wassertech.data.types.ComponentType
 import androidx.compose.ui.text.input.TextFieldValue
 import com.example.wassertech.ui.icons.AppIcons
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +54,7 @@ fun ComponentsScreen(
     val types = ComponentType.values()
 
     Scaffold(
-        floatingActionButton = { if (!reorderMode) { FloatingActionButton(onClick = { showAdd = true }) { Text("+") } } }
+        floatingActionButton = { if (!reorderMode) { ExtendedFloatingActionButton(onClick = { showAdd = true }) { Text("+ Компонент") } } }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ElevatedCard(Modifier.fillMaxWidth()) {
@@ -99,13 +100,11 @@ fun ComponentsScreen(
                                     }, enabled = index > 0) { Icon(Icons.Filled.ArrowUpward, contentDescription = null) }
                                     IconButton(onClick = {
                                         val pos = localOrder.indexOf(c.id)
-
-                                        if (pos >= 0 && pos < localOrder.lastIndex) {
+                                        if (pos >= 0 && pos < orderedComponents.lastIndex) {
                                             val newList = localOrder.toMutableList()
                                             val tmp = newList[pos+1]; newList[pos+1] = newList[pos]; newList[pos] = tmp
                                             localOrder = newList
                                         }
-
                                     }, enabled = index < orderedComponents.lastIndex) { Icon(Icons.Filled.ArrowDownward, contentDescription = null) }
                                 }
                             }

@@ -8,5 +8,6 @@ data class SiteEntity(
     @PrimaryKey val id: String,
     val clientId: String,
     val name: String,
-    val address: String? = null
+    val address: String? = null,
+    val position: Int = 0
 )

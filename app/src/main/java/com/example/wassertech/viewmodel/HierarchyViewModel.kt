@@ -16,9 +16,7 @@ class HierarchyViewModel(app: Application): AndroidViewModel(app) {
     private val dao by lazy { db.hierarchyDao() }
 
     init {
-        viewModelScope.launch {
-            try { TemplateSeeder.seedOnce(db) } catch (_: Throwable) {}
-        }
+        viewModelScope.launch { try { TemplateSeeder.seedOnce(db) } catch (_: Throwable) {} }
     }
 
     fun clients(): Flow<List<ClientEntity>> = dao.observeClients()
@@ -26,9 +24,9 @@ class HierarchyViewModel(app: Application): AndroidViewModel(app) {
     fun installations(siteId: String): Flow<List<InstallationEntity>> = dao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = dao.observeComponents(installationId)
 
-    suspend fun getClient(id: String): ClientEntity? = dao.getClient(id)
-    suspend fun getSite(id: String): SiteEntity? = dao.getSite(id)
-    suspend fun getInstallation(id: String): InstallationEntity? = dao.getInstallation(id)
+    suspend fun getClient(id: String) = dao.getClient(id)
+    suspend fun getSite(id: String) = dao.getSite(id)
+    suspend fun getInstallation(id: String) = dao.getInstallation(id)
 
     fun addClient(name: String, notes: String?, isCorporate: Boolean) = viewModelScope.launch {
         dao.upsertClient(ClientEntity(UUID.randomUUID().toString(), name, null, notes, isCorporate))
@@ -37,41 +35,44 @@ class HierarchyViewModel(app: Application): AndroidViewModel(app) {
     fun deleteClient(id: String) = viewModelScope.launch { dao.deleteClient(id) }
 
     fun addSite(clientId: String, name: String, address: String?) = viewModelScope.launch {
-        dao.upsertSite(SiteEntity(UUID.randomUUID().toString(), clientId, name, address))
+        val pos = dao.maxSitePosition(clientId) + 1
+        dao.upsertSite(SiteEntity(UUID.randomUUID().toString(), clientId, name, address, position = pos))
     }
     fun editSite(entity: SiteEntity) = viewModelScope.launch { dao.upsertSite(entity) }
     fun deleteSite(id: String) = viewModelScope.launch { dao.deleteSite(id) }
+    fun reorderSites(clientId: String, orderedIds: List<String>) = viewModelScope.launch {
+        orderedIds.forEachIndexed { index, id -> dao.updateSitePosition(id, index) }
+    }
 
     fun addInstallation(siteId: String, name: String) = viewModelScope.launch {
-        dao.upsertInstallation(InstallationEntity(UUID.randomUUID().toString(), siteId, name))
+        val pos = dao.maxInstallationPosition(siteId) + 1
+        dao.upsertInstallation(InstallationEntity(UUID.randomUUID().toString(), siteId, name, position = pos))
     }
+    fun addInstallationToMain(clientId: String, name: String) = viewModelScope.launch {
+        val mainSiteId = getMainSiteIdForClient(clientId)
+        addInstallation(mainSiteId, name)
+    }
+    fun addInstallationToSite(siteId: String, name: String) = viewModelScope.launch { addInstallation(siteId, name) }
     fun editInstallation(entity: InstallationEntity) = viewModelScope.launch { dao.upsertInstallation(entity) }
     fun deleteInstallation(id: String) = viewModelScope.launch { dao.deleteInstallation(id) }
+    fun reorderInstallations(siteId: String, orderedIds: List<String>) = viewModelScope.launch {
+        orderedIds.forEachIndexed { index, id -> dao.updateInstallationPosition(id, index) }
+    }
 
     fun addComponent(installationId: String, name: String, type: ComponentType) = viewModelScope.launch {
         val next = dao.maxPosition(installationId) + 1
         dao.upsertComponent(ComponentEntity(UUID.randomUUID().toString(), installationId, name, type, position = next))
     }
     fun deleteComponent(id: String) = viewModelScope.launch { dao.deleteComponent(id) }
+    fun reorderComponents(installationId: String, orderedIds: List<String>) = viewModelScope.launch {
+        orderedIds.forEachIndexed { index, id -> dao.updateComponentPosition(id, index) }
+    }
 
     suspend fun getMainSiteIdForClient(clientId: String): String {
         val existing = dao.findSiteByName(clientId, "Главный")
         if (existing != null) return existing.id
-        val newSite = SiteEntity(UUID.randomUUID().toString(), clientId, "Главный", null)
+        val newSite = SiteEntity(UUID.randomUUID().toString(), clientId, "Главный", null, position = 0)
         dao.upsertSite(newSite)
         return newSite.id
-    }
-
-    fun addInstallationToMain(clientId: String, name: String) = viewModelScope.launch {
-        val mainSiteId = getMainSiteIdForClient(clientId)
-        dao.upsertInstallation(InstallationEntity(UUID.randomUUID().toString(), mainSiteId, name))
-    }
-
-    suspend fun getInstallationName(installationId: String): String? {
-        return dao.getInstallation(installationId)?.name
-    }
-
-    fun reorderComponents(installationId: String, orderedIds: List<String>) = viewModelScope.launch {
-        orderedIds.forEachIndexed { index, id -> dao.updateComponentPosition(id, index) }
     }
 }
