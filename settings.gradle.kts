@@ -9,11 +9,6 @@ pluginManagement {
         id("org.jetbrains.kotlin.android") version "1.9.25"
         id("com.google.devtools.ksp") version "1.9.25-1.0.20"
     }
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.id.startsWith("org.jetbrains.kotlin")) useVersion("1.9.25")
-        }
-    }
 }
 
 dependencyResolutionManagement {

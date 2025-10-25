@@ -3,38 +3,38 @@ package com.example.wassertech.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.Room
 import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.ClientEntity
-import com.example.wassertech.data.ClientRepository
+import com.example.wassertech.data.entities.ClientEntity
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
 
-class ClientsViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = Room.databaseBuilder(
-        application,
-        AppDatabase::class.java,
-        "clients.db"
-    ).fallbackToDestructiveMigration().build()
+/**
+ * Legacy-compatible ClientsViewModel placed under package com.example.wassertech.ui
+ * to satisfy old imports. It mirrors the API used by the new UI.
+ * Prefer using com.example.wassertech.viewmodel.HierarchyViewModel going forward.
+ */
+class ClientsViewModel(app: Application): AndroidViewModel(app) {
+    private val db by lazy { AppDatabase.get(app) }
+    private val dao by lazy { db.hierarchyDao() }
 
-    private val repo = ClientRepository(db.clientDao())
+    val clients = dao.observeClients()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val clients = repo.observeAll().stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        emptyList()
-    )
-
-    fun addClient(name: String, phone: String, address: String, notes: String) {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
+    fun addClient(name: String, notes: String?) {
         viewModelScope.launch {
-            repo.add(ClientEntity(name = trimmed, phone = phone.trim().ifEmpty { null }, address = address.trim().ifEmpty { null }, notes = notes.trim().ifEmpty { null }))
+            dao.upsertClient(ClientEntity(id = UUID.randomUUID().toString(), name = name, phone = null, notes = notes))
         }
     }
 
-    fun deleteClient(client: ClientEntity) {
-        viewModelScope.launch { repo.remove(client) }
+    // New style: delete by id (used by patched ClientsScreen)
+    fun deleteClient(id: String) {
+        viewModelScope.launch { dao.deleteClient(id) }
+    }
+
+    // Legacy compatibility: delete by entity
+    fun deleteClient(c: ClientEntity) {
+        deleteClient(c.id)
     }
 }

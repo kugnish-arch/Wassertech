@@ -1,13 +1,16 @@
 package com.example.wassertech.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "clients")
+@Entity(
+    tableName = "clients",
+    indices = [Index("name", unique = false)]
+)
 data class ClientEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey val id: String, // UUID
     val name: String,
     val phone: String? = null,
-    val address: String? = null,
     val notes: String? = null
 )
