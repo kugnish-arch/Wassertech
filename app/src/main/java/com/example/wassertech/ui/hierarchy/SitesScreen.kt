@@ -10,7 +10,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.data.entities.SiteEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,11 +31,10 @@ fun SitesScreen(
         Column(Modifier.padding(padding)) {
             LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(sites, key = { it.id }) { s ->
-                    ElevatedCard(onClick = { onOpenSite(s.id) }) {
+                    ElevatedCard(onClick = { onOpenSite(s.id) }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(s.name, style = MaterialTheme.typography.titleMedium)
                             if (!s.address.isNullOrBlank()) Text(s.address!!, style = MaterialTheme.typography.bodyMedium)
-                            Row { TextButton(onClick = { vm.deleteSite(s.id) }) { Text("Удалить") } }
                         }
                     }
                 }

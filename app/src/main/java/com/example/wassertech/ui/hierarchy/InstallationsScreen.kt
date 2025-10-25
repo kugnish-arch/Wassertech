@@ -10,7 +10,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.data.entities.InstallationEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,10 +33,9 @@ fun InstallationsScreen(
         Column(Modifier.padding(padding)) {
             LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(list, key = { it.id }) { itn ->
-                    ElevatedCard(onClick = { onOpenInstallation(itn.id) }) {
+                    ElevatedCard(onClick = { onOpenInstallation(itn.id) }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(itn.name, style = MaterialTheme.typography.titleMedium)
-                            Row { TextButton(onClick = { vm.deleteInstallation(itn.id) }) { Text("Удалить") } }
                         }
                     }
                 }

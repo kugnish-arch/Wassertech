@@ -54,7 +54,7 @@ app/
 1. Установи **Android Studio Koala+ (или Flamingo+)**
 2. Клонируй проект:
    ```bash
-   git clone https://github.com/DmitryShulski/Wassertech.git
+   git clone https://github.com/kugnish-arch/Wassertech.git
 3. Открой в Android Studio → File → Open → Wassertech
 4. Дождись завершения Gradle Sync
 5. Запусти ▶ на устройстве или эмуляторе   

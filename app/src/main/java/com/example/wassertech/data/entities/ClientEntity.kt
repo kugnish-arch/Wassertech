@@ -8,5 +8,6 @@ data class ClientEntity(
     @PrimaryKey val id: String,
     val name: String,
     val phone: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val isCorporate: Boolean = false
 )

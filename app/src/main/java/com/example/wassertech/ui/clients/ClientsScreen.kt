@@ -10,7 +10,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.data.entities.ClientEntity
+import androidx.compose.material3.Icon
+import com.example.wassertech.ui.icons.AppIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,32 +23,23 @@ fun ClientsScreen(
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
     var newNotes by remember { mutableStateOf(TextFieldValue("")) }
+    var newCorporate by remember { mutableStateOf(false) }
 
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }) {
-                Text("+")
-            }
-        }
+        floatingActionButton = { FloatingActionButton(onClick = { showAdd = true }) { Text("+") } }
     ) { padding ->
         Column(Modifier.padding(padding)) {
-            if (clients.isEmpty()) {
-                Text(
-                    "Нет клиентов. Нажми + чтобы добавить.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(clients, key = { it.id }) { c ->
-                        ClientCard(
-                            c,
-                            onDelete = { vm.deleteClient(c.id) },
-                            onOpen = { onOpenClient(c.id) }
-                        )
+            LazyColumn(
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(clients, key = { it.id }) { c ->
+                    ElevatedCard(onClick = { onOpenClient(c.id) }, modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val icon = if (c.isCorporate) AppIcons.ClientCorporate else AppIcons.ClientPrivate
+                            Icon(imageVector = icon, contentDescription = null)
+                            Text(c.name, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
@@ -60,49 +52,26 @@ fun ClientsScreen(
             title = { Text("Новый клиент") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = newName,
-                        onValueChange = { newName = it },
-                        label = { Text("Название/имя") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = newNotes,
-                        onValueChange = { newNotes = it },
-                        label = { Text("Адрес/заметки (временно)") },
-                        singleLine = false,
-                        minLines = 2
-                    )
+                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("Название/имя") }, singleLine = true)
+                    OutlinedTextField(value = newNotes, onValueChange = { newNotes = it }, label = { Text("Адрес/заметки (временно)") })
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Checkbox(checked = newCorporate, onCheckedChange = { newCorporate = it })
+                        Spacer(Modifier.width(8.dp))
+                        Text("Корпоративный клиент")
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     val name = newName.text.trim()
                     if (name.isNotEmpty()) {
-                        vm.addClient(name, newNotes.text.trim().ifEmpty { null })
+                        vm.addClient(name, newNotes.text.trim().ifEmpty { null }, newCorporate)
                         showAdd = false
-                        newName = TextFieldValue("")
-                        newNotes = TextFieldValue("")
+                        newName = TextFieldValue(""); newNotes = TextFieldValue(""); newCorporate = false
                     }
                 }) { Text("Сохранить") }
             },
             dismissButton = { TextButton(onClick = { showAdd = false }) { Text("Отмена") } }
         )
-    }
-}
-
-@Composable
-private fun ClientCard(c: ClientEntity, onDelete: () -> Unit, onOpen: () -> Unit) {
-    ElevatedCard(onClick = onOpen) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(c.name, style = MaterialTheme.typography.titleMedium)
-            if (!c.notes.isNullOrBlank()) {
-                Text(c.notes!!, style = MaterialTheme.typography.bodyMedium)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onDelete) { Text("Удалить") }
-                TextButton(onClick = onOpen) { Text("Открыть") }
-            }
-        }
     }
 }

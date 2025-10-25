@@ -1,5 +1,6 @@
 package com.example.wassertech.data.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.wassertech.data.types.ComponentType
@@ -9,5 +10,6 @@ data class ComponentEntity(
     @PrimaryKey val id: String,
     val installationId: String,
     val name: String,
-    val type: ComponentType
+    val type: ComponentType,
+    @ColumnInfo(defaultValue = "0") val position: Int = 0
 )

@@ -5,101 +5,82 @@ import com.example.wassertech.data.entities.ChecklistFieldEntity
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
 import com.example.wassertech.data.types.FieldType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 object TemplateSeeder {
-    private var done = false
 
-    suspend fun seedOnce(db: AppDatabase) {
-        if (done) return
-        done = true
+    suspend fun seedOnce(db: AppDatabase) = withContext(Dispatchers.IO) {
+        val dao = db.templatesDao()
+        for (type in ComponentType.values()) {
+            val existing = dao.getTemplateByType(type)
+            if (existing == null) {
+                val templateId = UUID.randomUUID().toString()
+                val title = when (type) {
+                    ComponentType.FILTER -> "Чек-лист: фильтр"
+                    ComponentType.RO -> "Чек-лист: обратный осмос"
+                    ComponentType.COMPRESSOR -> "Чек-лист: компрессор"
+                    ComponentType.AERATION -> "Чек-лист: аэрация"
+                    ComponentType.DOSING -> "Чек-лист: дозирование"
+                    ComponentType.SOFTENER -> "Чек-лист: умягчитель"
+                }
+                val t = ChecklistTemplateEntity(id = templateId, title = title, componentType = type)
+                dao.upsertTemplate(t)
 
-        suspend fun seed(type: ComponentType, title: String, fields: List<ChecklistFieldEntity>) {
-            val t = ChecklistTemplateEntity(id = UUID.randomUUID().toString(), title = title, componentType = type)
-            db.templatesDao().upsertTemplate(t)
-            val actual = fields.map { it.copy(templateId = t.id) }
-            db.templatesDao().upsertFields(actual)
+                val fields = when (type) {
+                    ComponentType.FILTER -> listOf(
+                        cb("power_ok", "Питание присутствует"),
+                        cb("leaks_absent", "Нет протечек"),
+                        num("pressure_in", "Давление до", "бар", 0.0, 10.0),
+                        num("pressure_out", "Давление после", "бар", 0.0, 10.0),
+                        text("notes", "Примечания")
+                    )
+                    ComponentType.SOFTENER -> listOf(
+                        cb("power_ok", "Питание присутствует"),
+                        cb("valve_ok", "Клапан исправен"),
+                        num("hardness_out", "Жёсткость на выходе", "°dH", 0.0, 30.0),
+                        num("brine_draw_rate", "Скорость забора рассола", "л/мин", 0.0, 5.0),
+                        text("notes", "Примечания")
+                    )
+                    ComponentType.RO -> listOf(
+                        cb("power_ok", "Питание присутствует"),
+                        num("permeate_flow", "Производительность пермеата", "л/ч", 0.0, 5000.0),
+                        num("recovery", "Степень извлечения", "%", 0.0, 100.0),
+                        num("pressure_feed", "Давление подачи", "бар", 0.0, 20.0),
+                        text("notes", "Примечания")
+                    )
+                    ComponentType.DOSING -> listOf(
+                        cb("pump_ok", "Насос исправен"),
+                        num("dose_rate", "Расход реагента", "л/ч", 0.0, 10.0),
+                        cb("suction_ok", "Подсос воздуха отсутствует"),
+                        text("notes", "Примечания")
+                    )
+                    ComponentType.AERATION -> listOf(
+                        cb("compressor_ok", "Компрессор исправен"),
+                        num("air_flow", "Расход воздуха", "л/мин", 0.0, 1000.0),
+                        num("pressure", "Давление", "бар", 0.0, 5.0),
+                        text("notes", "Примечания")
+                    )
+                    ComponentType.COMPRESSOR -> listOf(
+                        cb("power_ok", "Питание присутствует"),
+                        num("pressure", "Давление", "бар", 0.0, 10.0),
+                        num("temperature", "Температура", "°C", -20.0, 120.0),
+                        text("notes", "Примечания")
+                    )
+                }
+
+                fields.forEach { f -> dao.upsertField(f.copy(id = UUID.randomUUID().toString(), templateId = templateId)) }
+            }
         }
-
-        seed(
-            ComponentType.DOSING,
-            "Дозирование — чек-лист",
-            listOf(
-                field("concentration", "Концентрация реагента", FieldType.NUMBER, unit = "г/л", min = 0.0),
-                field("flow_rate", "Расход", FieldType.NUMBER, unit = "л/ч", min = 0.0),
-                field("level", "Уровень в баке", FieldType.NUMBER, unit = "%", min = 0.0, max = 100.0),
-                field("injector_ok", "Инжектор OK", FieldType.CHECKBOX),
-                field("backflow", "Подпор", FieldType.CHECKBOX),
-                field("suction", "Подсос воздуха", FieldType.CHECKBOX),
-                field("pulsation", "Пульсации", FieldType.CHECKBOX),
-                field("unexpected_drain", "Неожиданный слив", FieldType.CHECKBOX),
-                field("damage", "Повреждения", FieldType.TEXT)
-            )
-        )
-
-        seed(
-            ComponentType.AERATION,
-            "Аэрация/компрессор — чек-лист",
-            listOf(
-                field("pressure", "Давление", FieldType.NUMBER, unit = "бар", min = 0.0),
-                field("air_flow", "Расход воздуха", FieldType.NUMBER, unit = "л/мин", min = 0.0),
-                field("temperature", "Температура", FieldType.NUMBER, unit = "°C"),
-                field("noise_vibration", "Шум/вибрация", FieldType.CHECKBOX),
-                field("check_valve", "Обратный клапан", FieldType.CHECKBOX),
-                field("delta_p", "Перепад", FieldType.NUMBER, unit = "бар", min = 0.0),
-                field("drain", "Слив", FieldType.CHECKBOX),
-                field("damage", "Повреждения", FieldType.TEXT)
-            )
-        )
-
-        seed(
-            ComponentType.FILTER,
-            "Обезжелезиватель — чек-лист",
-            listOf(
-                field("p_before", "Давление ДО", FieldType.NUMBER, unit = "бар", min = 0.0),
-                field("p_after", "Давление ПОСЛЕ", FieldType.NUMBER, unit = "бар", min = 0.0),
-                field("turbidity", "Мутность", FieldType.NUMBER, unit = "NTU", min = 0.0),
-                field("media_level", "Уровень загрузки", FieldType.NUMBER, unit = "%", min = 0.0, max = 100.0),
-                field("rinse_schedule", "График промывок", FieldType.TEXT),
-                field("color_odor", "Цвет/запах", FieldType.TEXT),
-                field("drain", "Слив", FieldType.CHECKBOX),
-                field("damage", "Повреждения", FieldType.TEXT)
-            )
-        )
-
-        seed(
-            ComponentType.SOFTENER,
-            "Умягчитель — чек-лист",
-            listOf(
-                field("brine_draw_rate", "Скорость забора соли", FieldType.NUMBER, unit = "л/мин", min = 0.0),
-                field("brine_level", "Уровень рассола", FieldType.NUMBER, unit = "%", min = 0.0, max = 100.0),
-                field("resin_expansion", "Расширение смолы", FieldType.NUMBER, unit = "%", min = 0.0, max = 100.0),
-                field("hardness_out", "Жёсткость на выходе", FieldType.NUMBER, unit = "мг-экв/л", min = 0.0),
-                field("p_before", "Давление ДО", FieldType.NUMBER, unit = "бар", min = 0.0),
-                field("p_after", "Давление ПОСЛЕ", FieldType.NUMBER, unit = "бар", min = 0.0),
-                field("vacuum", "Вакуум", FieldType.CHECKBOX),
-                field("valve_leaks", "Течи клапана", FieldType.CHECKBOX),
-                field("drain", "Слив", FieldType.CHECKBOX),
-                field("damage", "Повреждения", FieldType.TEXT)
-            )
-        )
     }
 
-    private fun field(
-        key: String,
-        label: String,
-        type: FieldType,
-        unit: String? = null,
-        min: Double? = null,
-        max: Double? = null
-    ): ChecklistFieldEntity = ChecklistFieldEntity(
-        id = UUID.randomUUID().toString(),
-        templateId = "", // will be replaced during seed
-        key = key,
-        label = label,
-        type = type,
-        unit = unit,
-        min = min,
-        max = max
-    )
+    private fun cb(key: String, label: String) =
+        ChecklistFieldEntity(id = "", templateId = "", key = key, label = label, type = FieldType.CHECKBOX, unit = null, min = null, max = null)
+
+    private fun num(key: String, label: String, unit: String, min: Double, max: Double) =
+        ChecklistFieldEntity(id = "", templateId = "", key = key, label = label, type = FieldType.NUMBER, unit = unit, min = min, max = max)
+
+    private fun text(key: String, label: String) =
+        ChecklistFieldEntity(id = "", templateId = "", key = key, label = label, type = FieldType.TEXT, unit = null, min = null, max = null)
 }
