@@ -8,5 +8,10 @@ import com.example.wassertech.data.types.ComponentType
 data class ChecklistTemplateEntity(
     @PrimaryKey val id: String,
     val title: String,
-    val componentType: ComponentType
+
+    /** Legacy binding by enum type (kept for compatibility) */
+    val componentType: ComponentType,
+
+    /** NEW: bind checklist to a specific ComponentTemplateEntity when available */
+    val componentTemplateId: String? = null
 )

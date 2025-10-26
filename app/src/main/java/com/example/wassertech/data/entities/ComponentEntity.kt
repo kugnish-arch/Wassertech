@@ -9,6 +9,11 @@ data class ComponentEntity(
     @PrimaryKey val id: String,
     val installationId: String,
     val name: String,
-    val type: ComponentType,
-    val orderIndex: Int = 0
+    val type: ComponentType,          // kept for backward compatibility
+    val orderIndex: Int = 0,
+
+    // NEW: dynamic templates support
+    val templateId: String? = null,   // FK to component_templates.id (logical; FK not enforced yet)
+    val paramsJson: String? = null,   // instance-level parameters (override defaults)
+    val nameOverride: String? = null  // local display name overriding template.name (optional)
 )
