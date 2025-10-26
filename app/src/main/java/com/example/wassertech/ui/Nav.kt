@@ -4,9 +4,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -23,6 +23,7 @@ import com.example.wassertech.ui.clients.ClientsScreen
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
+import com.example.wassertech.ui.templates.TemplatesScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +31,8 @@ fun AppTopBar(navController: NavHostController) {
     val backEntry by navController.currentBackStackEntryAsState()
     val route = backEntry?.destination?.route ?: "clients"
     val canNavigateBack = route != "clients" || navController.previousBackStackEntry != null
+
+    var menuOpen by remember { mutableStateOf(false) }
 
     CenterAlignedTopAppBar(
         navigationIcon = {
@@ -41,6 +44,32 @@ fun AppTopBar(navController: NavHostController) {
         },
         title = {
             Image(painter = painterResource(id = R.drawable.logo_wassertech), contentDescription = "Wassertech")
+        },
+        actions = {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "Меню")
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Клиенты") },
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate("clients") {
+                            popUpTo("clients") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Шаблоны") },
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate("templates") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
         }
     )
 }
@@ -120,6 +149,13 @@ private fun AppScaffold(navController: NavHostController) {
                 Column {
                     SectionHeader("ТО установки")
                     MaintenanceAllScreen(installationId = installationId, onDone = { navController.navigateUp() })
+                }
+            }
+            // NEW: Templates editor route
+            composable("templates") {
+                Column {
+                    SectionHeader("Шаблоны компонентов")
+                    TemplatesScreen()
                 }
             }
         }
