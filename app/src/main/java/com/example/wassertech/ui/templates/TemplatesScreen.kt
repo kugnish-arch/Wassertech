@@ -1,6 +1,7 @@
 
 package com.example.wassertech.ui.templates
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -21,7 +22,10 @@ import com.example.wassertech.viewmodel.TemplatesViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TemplatesScreen(vm: TemplatesViewModel = viewModel()) {
+fun TemplatesScreen(
+    vm: TemplatesViewModel = viewModel(),
+    onOpenTemplate: (String) -> Unit = {},
+) {
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val items by vm.templates.collectAsState()
 
@@ -39,9 +43,11 @@ fun TemplatesScreen(vm: TemplatesViewModel = viewModel()) {
     Scaffold(
         topBar = { CenterAlignedTopAppBar(title = { Text("Шаблоны компонентов") }) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { editing = null; dialogOpen = true }) {
-                Icon(Icons.Default.Add, contentDescription = null)
-            }
+            ExtendedFloatingActionButton(
+                onClick = { editing = null; dialogOpen = true },
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Шаблон") }
+            )
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -63,7 +69,11 @@ fun TemplatesScreen(vm: TemplatesViewModel = viewModel()) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(filtered, key = { _, it -> it.id }) { index, item ->
-                        ElevatedCard(Modifier.fillMaxWidth()) {
+                        ElevatedCard(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenTemplate(item.id) }
+                        ) {
                             ListItem(
                                 headlineContent = { Text(item.name) },
                                 supportingContent = { Text(item.category ?: "Без категории") },
@@ -133,7 +143,7 @@ private fun TemplateEditDialog(
                     value = defaults,
                     onValueChange = { defaults = it },
                     label = { Text("Параметры по умолчанию (JSON)") },
-                    placeholder = { Text("{\"size\":\"4040\",\"brand\":\"Filmtec\"}") },
+                    placeholder = { Text("""{"size":"4040","brand":"Filmtec"}""") },
                     minLines = 3
                 )
             }

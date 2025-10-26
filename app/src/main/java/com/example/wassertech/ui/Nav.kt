@@ -24,6 +24,7 @@ import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
+import com.example.wassertech.ui.templates.TemplateEditorScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +44,10 @@ fun AppTopBar(navController: NavHostController) {
             }
         },
         title = {
-            Image(painter = painterResource(id = R.drawable.logo_wassertech), contentDescription = "Wassertech")
+            Image(
+                painter = painterResource(id = R.drawable.logo_wassertech),
+                contentDescription = "Wassertech"
+            )
         },
         actions = {
             IconButton(onClick = { menuOpen = true }) {
@@ -100,6 +104,24 @@ private fun AppScaffold(navController: NavHostController) {
                     ClientsScreen(onOpenClient = { clientId -> navController.navigate("client/$clientId") })
                 }
             }
+
+            composable("templates") {
+                Column {
+                    SectionHeader("Шаблоны компонентов")
+                    TemplatesScreen(onOpenTemplate = { id ->
+                        navController.navigate("template_editor/$id")
+                    })
+                }
+            }
+
+            composable(
+                "template_editor/{templateId}",
+                arguments = listOf(navArgument("templateId") { type = NavType.StringType })
+            ) { bse ->
+                val id = bse.arguments?.getString("templateId") ?: return@composable
+                TemplateEditorScreen(templateId = id)
+            }
+
             composable(
                 "client/{clientId}",
                 arguments = listOf(navArgument("clientId") { type = NavType.StringType })
@@ -114,6 +136,7 @@ private fun AppScaffold(navController: NavHostController) {
                     )
                 }
             }
+
             composable(
                 "site/{siteId}",
                 arguments = listOf(navArgument("siteId") { type = NavType.StringType })
@@ -127,6 +150,7 @@ private fun AppScaffold(navController: NavHostController) {
                     )
                 }
             }
+
             composable(
                 "installation/{installationId}",
                 arguments = listOf(navArgument("installationId") { type = NavType.StringType })
@@ -141,6 +165,7 @@ private fun AppScaffold(navController: NavHostController) {
                     )
                 }
             }
+
             composable(
                 "maintenance_all/{installationId}",
                 arguments = listOf(navArgument("installationId") { type = NavType.StringType })
@@ -148,14 +173,10 @@ private fun AppScaffold(navController: NavHostController) {
                 val installationId = bse.arguments?.getString("installationId") ?: return@composable
                 Column {
                     SectionHeader("ТО установки")
-                    MaintenanceAllScreen(installationId = installationId, onDone = { navController.navigateUp() })
-                }
-            }
-            // NEW: Templates editor route
-            composable("templates") {
-                Column {
-                    SectionHeader("Шаблоны компонентов")
-                    TemplatesScreen()
+                    MaintenanceAllScreen(
+                        installationId = installationId,
+                        onDone = { navController.navigateUp() }
+                    )
                 }
             }
         }
