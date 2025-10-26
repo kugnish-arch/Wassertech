@@ -1,51 +1,20 @@
-# Gradle
+# Android / Gradle
 .gradle/
 build/
 */build/
 !gradle/wrapper/gradle-wrapper.jar
+/local.properties
 
 # Android Studio
 .idea/
 *.iml
-.idea/caches
-.idea/libraries
-.idea/modules.xml
-.idea/workspace.xml
-.idea/navEditor.xml
-.idea/assetWizardSettings.xml
+/.settings/
+captures/
 
-# Local configuration
-local.properties
-*.keystore
-*.jks
+# KSP/Room caches
+**/ksp/
+**/schemas/*.tmp
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
-
-# Generated files
-captures/
-outputs/
-*.apk
-*.ap_
-*.aab
-
-# Jetpack Compose / Kotlin
-*.log
-*.lock
-*.hprof
-
-# KSP / Room generated schemas
-app/schemas/
-
-# Kotlin compile cache
-.kotlinc/
-ksp/
-
-# Misc
-*.orig
-*.bak
-*.tmp
-
-# Heap dumps
-*.hprof

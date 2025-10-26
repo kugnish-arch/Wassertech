@@ -1,0 +1,2 @@
+# Скопируйте этот файл как local.properties и пропишите путь к SDK
+sdk.dir=/absolute/path/to/Android/Sdk

@@ -8,5 +8,5 @@ data class InstallationEntity(
     @PrimaryKey val id: String,
     val siteId: String,
     val name: String,
-    val position: Int = 0
+    val orderIndex: Int = 0
 )

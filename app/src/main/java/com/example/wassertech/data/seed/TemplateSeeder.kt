@@ -4,7 +4,6 @@ import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.ChecklistFieldEntity
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
-import com.example.wassertech.data.types.FieldType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -12,75 +11,71 @@ import java.util.UUID
 object TemplateSeeder {
 
     suspend fun seedOnce(db: AppDatabase) = withContext(Dispatchers.IO) {
-        val dao = db.templatesDao()
-        for (type in ComponentType.values()) {
-            val existing = dao.getTemplateByType(type)
-            if (existing == null) {
-                val templateId = UUID.randomUUID().toString()
-                val title = when (type) {
-                    ComponentType.FILTER -> "Чек-лист: фильтр"
-                    ComponentType.RO -> "Чек-лист: обратный осмос"
-                    ComponentType.COMPRESSOR -> "Чек-лист: компрессор"
-                    ComponentType.AERATION -> "Чек-лист: аэрация"
-                    ComponentType.DOSING -> "Чек-лист: дозирование"
-                    ComponentType.SOFTENER -> "Чек-лист: умягчитель"
-                }
-                val t = ChecklistTemplateEntity(id = templateId, title = title, componentType = type)
-                dao.upsertTemplate(t)
+        val templatesDao = db.templatesDao()
 
-                val fields = when (type) {
+        for (type in ComponentType.values()) {
+            val existing = templatesDao.getTemplateByType(type)
+            if (existing == null) {
+                val template = ChecklistTemplateEntity(
+                    id = UUID.randomUUID().toString(),
+                    title = when (type) {
+                        ComponentType.DOSING -> "Дозирование — базовый"
+                        ComponentType.AERATION -> "Аэрация — базовый"
+                        ComponentType.COMPRESSOR -> "Компрессор — базовый"
+                        ComponentType.FILTER -> "Фильтр — базовый"
+                        ComponentType.SOFTENER -> "Умягчитель — базовый"
+                        ComponentType.RO -> "Обратный осмос — базовый"
+                    },
+                    componentType = type
+                )
+                templatesDao.upsertTemplate(template)
+
+                val fields: List<ChecklistFieldEntity> = when (type) {
+                    ComponentType.DOSING -> listOf(
+                        field(template.id, "concentration", "Концентрация", "TEXT"),
+                        field(template.id, "flow", "Расход", "NUMBER"),
+                        field(template.id, "level", "Уровень", "NUMBER"),
+                        field(template.id, "injector", "Инжектор", "CHECKBOX")
+                    )
+                    ComponentType.AERATION, ComponentType.COMPRESSOR -> listOf(
+                        field(template.id, "pressure", "Давление", "NUMBER"),
+                        field(template.id, "air_flow", "Расход воздуха", "NUMBER"),
+                        field(template.id, "temperature", "Температура", "NUMBER")
+                    )
                     ComponentType.FILTER -> listOf(
-                        cb("power_ok", "Питание присутствует"),
-                        cb("leaks_absent", "Нет протечек"),
-                        num("pressure_in", "Давление до", "бар", 0.0, 10.0),
-                        num("pressure_out", "Давление после", "бар", 0.0, 10.0),
-                        text("notes", "Примечания")
+                        field(template.id, "pressure_in", "Давление до", "NUMBER"),
+                        field(template.id, "pressure_out", "Давление после", "NUMBER"),
+                        field(template.id, "turbidity", "Мутность", "NUMBER")
                     )
                     ComponentType.SOFTENER -> listOf(
-                        cb("power_ok", "Питание присутствует"),
-                        cb("valve_ok", "Клапан исправен"),
-                        num("hardness_out", "Жёсткость на выходе", "°dH", 0.0, 30.0),
-                        num("brine_draw_rate", "Скорость забора рассола", "л/мин", 0.0, 5.0),
-                        text("notes", "Примечания")
+                        field(template.id, "brine_level", "Уровень рассола", "NUMBER"),
+                        field(template.id, "hardness_out", "Жёсткость на выходе", "NUMBER"),
+                        field(template.id, "valve_leak", "Течи клапана", "CHECKBOX")
                     )
                     ComponentType.RO -> listOf(
-                        cb("power_ok", "Питание присутствует"),
-                        num("permeate_flow", "Производительность пермеата", "л/ч", 0.0, 5000.0),
-                        num("recovery", "Степень извлечения", "%", 0.0, 100.0),
-                        num("pressure_feed", "Давление подачи", "бар", 0.0, 20.0),
-                        text("notes", "Примечания")
-                    )
-                    ComponentType.DOSING -> listOf(
-                        cb("pump_ok", "Насос исправен"),
-                        num("dose_rate", "Расход реагента", "л/ч", 0.0, 10.0),
-                        cb("suction_ok", "Подсос воздуха отсутствует"),
-                        text("notes", "Примечания")
-                    )
-                    ComponentType.AERATION -> listOf(
-                        cb("compressor_ok", "Компрессор исправен"),
-                        num("air_flow", "Расход воздуха", "л/мин", 0.0, 1000.0),
-                        num("pressure", "Давление", "бар", 0.0, 5.0),
-                        text("notes", "Примечания")
-                    )
-                    ComponentType.COMPRESSOR -> listOf(
-                        cb("power_ok", "Питание присутствует"),
-                        num("pressure", "Давление", "бар", 0.0, 10.0),
-                        num("temperature", "Температура", "°C", -20.0, 120.0),
-                        text("notes", "Примечания")
+                        field(template.id, "pressure_in", "Давление до", "NUMBER"),
+                        field(template.id, "pressure_out", "Давление после", "NUMBER"),
+                        field(template.id, "permeate", "Производительность", "NUMBER")
                     )
                 }
-
-                fields.forEach { f -> dao.upsertField(f.copy(id = UUID.randomUUID().toString(), templateId = templateId)) }
+                fields.forEach { templatesDao.upsertField(it) }
             }
         }
     }
 
-    private fun cb(key: String, label: String) =
-        ChecklistFieldEntity(id = "", templateId = "", key = key, label = label, type = FieldType.CHECKBOX, unit = null, min = null, max = null)
-
-    private fun num(key: String, label: String, unit: String, min: Double, max: Double) =
-        ChecklistFieldEntity(id = "", templateId = "", key = key, label = label, type = FieldType.NUMBER, unit = unit, min = min, max = max)
-
-    private fun text(key: String, label: String) =
-        ChecklistFieldEntity(id = "", templateId = "", key = key, label = label, type = FieldType.TEXT, unit = null, min = null, max = null)
+    private fun field(templateId: String, key: String, label: String, type: String) =
+        ChecklistFieldEntity(
+            id = UUID.randomUUID().toString(),
+            templateId = templateId,
+            key = key,
+            label = label,
+            type = when (type) {
+                "CHECKBOX" -> com.example.wassertech.data.types.FieldType.CHECKBOX
+                "NUMBER" -> com.example.wassertech.data.types.FieldType.NUMBER
+                else -> com.example.wassertech.data.types.FieldType.TEXT
+            },
+            unit = null,
+            min = null,
+            max = null
+        )
 }

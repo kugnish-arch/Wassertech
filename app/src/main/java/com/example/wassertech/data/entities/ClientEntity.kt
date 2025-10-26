@@ -9,5 +9,7 @@ data class ClientEntity(
     val name: String,
     val phone: String? = null,
     val notes: String? = null,
-    val isCorporate: Boolean = false
+    val isCorporate: Boolean = false,
+    val isArchived: Boolean = false,
+    val archivedAtEpoch: Long? = null
 )

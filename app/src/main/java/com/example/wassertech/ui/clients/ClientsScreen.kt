@@ -28,7 +28,7 @@ fun ClientsScreen(
 
     Scaffold(
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { showAdd = true }) { Text("+ Клиент") }
+            ExtendedFloatingActionButton(onClick = { showAdd = true })  { Text("+ Клиент") }
         }
     ) { padding ->
         Column(Modifier.padding(padding)) {

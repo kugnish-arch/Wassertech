@@ -8,16 +8,17 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.types.FieldType
-import com.example.wassertech.viewmodel.HierarchyViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import com.example.wassertech.viewmodel.HierarchyViewModel
 
 data class UiField(
     val key: String,
@@ -46,7 +47,7 @@ fun MaintenanceAllScreen(
     vm: HierarchyViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val db = remember(context) { AppDatabase.get(context) }
+    val db = remember(context) { AppDatabase.getInstance(context) }
 
     var installationName by remember { mutableStateOf("Установка") }
     var groups by remember { mutableStateOf(listOf<ComponentGroup>()) }
@@ -81,7 +82,7 @@ fun MaintenanceAllScreen(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (groups.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Нет компонентов или шаблонов для этой установки.")
                 }
             } else {

@@ -5,74 +5,94 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.*
-import com.example.wassertech.data.seed.TemplateSeeder
 import com.example.wassertech.data.types.ComponentType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-class HierarchyViewModel(app: Application): AndroidViewModel(app) {
-    private val db by lazy { AppDatabase.get(app) }
-    private val dao by lazy { db.hierarchyDao() }
+class HierarchyViewModel(application: Application) : AndroidViewModel(application) {
+    private val db = AppDatabase.getInstance(application)
+    private val hierarchyDao = db.hierarchyDao()
 
-    init {
-        viewModelScope.launch { try { TemplateSeeder.seedOnce(db) } catch (_: Throwable) {} }
-    }
+    // Streams
+    fun clients(): Flow<List<ClientEntity>> = hierarchyDao.observeClients()
+    fun sites(clientId: String): Flow<List<SiteEntity>> = hierarchyDao.observeSites(clientId)
+    fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
+    fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
 
-    fun clients(): Flow<List<ClientEntity>> = dao.observeClients()
-    fun sites(clientId: String): Flow<List<SiteEntity>> = dao.observeSites(clientId)
-    fun installations(siteId: String): Flow<List<InstallationEntity>> = dao.observeInstallations(siteId)
-    fun components(installationId: String): Flow<List<ComponentEntity>> = dao.observeComponents(installationId)
+    // Getters
+    suspend fun getClient(id: String): ClientEntity? = hierarchyDao.getClient(id)
+    suspend fun getSite(id: String): SiteEntity? = hierarchyDao.getSite(id)
+    suspend fun getInstallation(id: String): InstallationEntity? = hierarchyDao.getInstallation(id)
 
-    suspend fun getClient(id: String) = dao.getClient(id)
-    suspend fun getSite(id: String) = dao.getSite(id)
-    suspend fun getInstallation(id: String) = dao.getInstallation(id)
+    // Edit entities
+    fun editClient(client: ClientEntity) { viewModelScope.launch { hierarchyDao.upsertClient(client) } }
+    fun editSite(site: SiteEntity) { viewModelScope.launch { hierarchyDao.upsertSite(site) } }
+    fun editInstallation(installation: InstallationEntity) { viewModelScope.launch { hierarchyDao.upsertInstallation(installation) } }
 
-    fun addClient(name: String, notes: String?, isCorporate: Boolean) = viewModelScope.launch {
-        dao.upsertClient(ClientEntity(UUID.randomUUID().toString(), name, null, notes, isCorporate))
+    // Add entities
+    fun addClient(name: String, notes: String?, isCorporate: Boolean) {
+        viewModelScope.launch {
+            val id = UUID.randomUUID().toString()
+            hierarchyDao.upsertClient(ClientEntity(id, name, phone = null, notes = notes, isCorporate = isCorporate))
+        }
     }
-    fun editClient(entity: ClientEntity) = viewModelScope.launch { dao.upsertClient(entity) }
-    fun deleteClient(id: String) = viewModelScope.launch { dao.deleteClient(id) }
-
-    fun addSite(clientId: String, name: String, address: String?) = viewModelScope.launch {
-        val pos = dao.maxSitePosition(clientId) + 1
-        dao.upsertSite(SiteEntity(UUID.randomUUID().toString(), clientId, name, address, position = pos))
+    fun addSite(clientId: String, name: String, address: String?) {
+        viewModelScope.launch {
+            val id = UUID.randomUUID().toString()
+            hierarchyDao.upsertSite(SiteEntity(id, clientId, name, address, orderIndex = 0))
+        }
     }
-    fun editSite(entity: SiteEntity) = viewModelScope.launch { dao.upsertSite(entity) }
-    fun deleteSite(id: String) = viewModelScope.launch { dao.deleteSite(id) }
-    fun reorderSites(clientId: String, orderedIds: List<String>) = viewModelScope.launch {
-        orderedIds.forEachIndexed { index, id -> dao.updateSitePosition(id, index) }
+    fun addInstallation(siteId: String, name: String) {
+        viewModelScope.launch {
+            val id = UUID.randomUUID().toString()
+            hierarchyDao.upsertInstallation(InstallationEntity(id, siteId, name, orderIndex = 0))
+        }
     }
-
-    fun addInstallation(siteId: String, name: String) = viewModelScope.launch {
-        val pos = dao.maxInstallationPosition(siteId) + 1
-        dao.upsertInstallation(InstallationEntity(UUID.randomUUID().toString(), siteId, name, position = pos))
-    }
-    fun addInstallationToMain(clientId: String, name: String) = viewModelScope.launch {
-        val mainSiteId = getMainSiteIdForClient(clientId)
-        addInstallation(mainSiteId, name)
-    }
-    fun addInstallationToSite(siteId: String, name: String) = viewModelScope.launch { addInstallation(siteId, name) }
-    fun editInstallation(entity: InstallationEntity) = viewModelScope.launch { dao.upsertInstallation(entity) }
-    fun deleteInstallation(id: String) = viewModelScope.launch { dao.deleteInstallation(id) }
-    fun reorderInstallations(siteId: String, orderedIds: List<String>) = viewModelScope.launch {
-        orderedIds.forEachIndexed { index, id -> dao.updateInstallationPosition(id, index) }
-    }
-
-    fun addComponent(installationId: String, name: String, type: ComponentType) = viewModelScope.launch {
-        val next = dao.maxPosition(installationId) + 1
-        dao.upsertComponent(ComponentEntity(UUID.randomUUID().toString(), installationId, name, type, position = next))
-    }
-    fun deleteComponent(id: String) = viewModelScope.launch { dao.deleteComponent(id) }
-    fun reorderComponents(installationId: String, orderedIds: List<String>) = viewModelScope.launch {
-        orderedIds.forEachIndexed { index, id -> dao.updateComponentPosition(id, index) }
+    fun addInstallationToSite(siteId: String, name: String) = addInstallation(siteId, name)
+    fun addInstallationToMain(clientId: String, name: String) {
+        viewModelScope.launch {
+            val currentSites = hierarchyDao.observeSites(clientId).first()
+            val main = currentSites.firstOrNull { it.name.equals("Главный", ignoreCase = true) }
+                ?: run {
+                    val newId = UUID.randomUUID().toString()
+                    val site = SiteEntity(id = newId, clientId = clientId, name = "Главный", address = null, orderIndex = 0)
+                    hierarchyDao.upsertSite(site); site
+                }
+            addInstallation(main.id, name)
+        }
     }
 
-    suspend fun getMainSiteIdForClient(clientId: String): String {
-        val existing = dao.findSiteByName(clientId, "Главный")
-        if (existing != null) return existing.id
-        val newSite = SiteEntity(UUID.randomUUID().toString(), clientId, "Главный", null, position = 0)
-        dao.upsertSite(newSite)
-        return newSite.id
+    // Reorder (entities list overloads)
+    fun reorderSites(sites: List<SiteEntity>) { viewModelScope.launch { hierarchyDao.reorderSites(sites) } }
+    fun reorderInstallations(list: List<InstallationEntity>) { viewModelScope.launch { hierarchyDao.reorderInstallations(list) } }
+    fun reorderComponents(list: List<ComponentEntity>) { viewModelScope.launch { hierarchyDao.reorderComponents(list) } }
+
+    // Reorder (List<String> ids overloads) — to match UI that passes ids
+    fun reorderSites(clientId: String, orderIds: List<String>) {
+        viewModelScope.launch {
+            val current = hierarchyDao.observeSites(clientId).first()
+            val ordered = orderIds.mapIndexedNotNull { idx, id ->
+                current.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+            }
+            hierarchyDao.reorderSites(ordered)
+        }
+    }
+    fun reorderComponents(installationId: String, orderIds: List<String>) {
+        viewModelScope.launch {
+            val current = hierarchyDao.observeComponents(installationId).first()
+            val ordered = orderIds.mapIndexedNotNull { idx, id ->
+                current.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+            }
+            hierarchyDao.reorderComponents(ordered)
+        }
+    }
+
+    fun addComponent(installationId: String, name: String, type: ComponentType) {
+        viewModelScope.launch {
+            val id = UUID.randomUUID().toString()
+            hierarchyDao.upsertComponent(ComponentEntity(id, installationId, name, type, orderIndex = 0))
+        }
     }
 }

@@ -14,10 +14,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.viewmodel.HierarchyViewModel
+
 import androidx.compose.ui.text.input.TextFieldValue
 import com.example.wassertech.ui.icons.AppIcons
 import kotlinx.coroutines.launch
+import com.example.wassertech.data.types.ComponentType
+import com.example.wassertech.viewmodel.ClientsViewModel
+import com.example.wassertech.viewmodel.HierarchyViewModel
+import com.example.wassertech.viewmodel.MaintenanceViewModel
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +56,7 @@ fun ComponentsScreen(
     var showAdd by remember { mutableStateOf(false) }
     var addName by remember { mutableStateOf(TextFieldValue("")) }
     var addTypeIdx by remember { mutableStateOf(0) }
-    val types = com.example.wassertech.data.types.ComponentType.values()
+    val types = ComponentType.values()
 
     Scaffold(
         floatingActionButton = { if (!reorderMode) ExtendedFloatingActionButton(onClick = { showAdd = true }) { Text("+ Компонент") } }

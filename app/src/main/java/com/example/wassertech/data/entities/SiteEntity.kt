@@ -9,5 +9,5 @@ data class SiteEntity(
     val clientId: String,
     val name: String,
     val address: String? = null,
-    val position: Int = 0
+    val orderIndex: Int = 0
 )

@@ -7,24 +7,50 @@ import androidx.room.Query
 import com.example.wassertech.data.entities.ChecklistFieldEntity
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TemplatesDao {
 
-    @Query("SELECT * FROM checklist_templates WHERE componentType = :type LIMIT 1")
+    @Query(
+        """
+        SELECT * FROM checklist_templates
+        WHERE componentType = :type
+        ORDER BY title COLLATE NOCASE
+        """
+    )
+    fun observeTemplatesByType(type: ComponentType): Flow<List<ChecklistTemplateEntity>>
+
+    @Query(
+        """
+        SELECT * FROM checklist_templates
+        WHERE componentType = :type
+        LIMIT 1
+        """
+    )
     suspend fun getTemplateByType(type: ComponentType): ChecklistTemplateEntity?
 
-    @Query("SELECT * FROM checklist_fields WHERE templateId = :templateId ORDER BY id")
+    @Query(
+        """
+        SELECT * FROM checklist_fields
+        WHERE templateId = :templateId
+        ORDER BY rowid
+        """
+    )
+    fun observeFields(templateId: String): Flow<List<ChecklistFieldEntity>>
+
+    @Query(
+        """
+        SELECT * FROM checklist_fields
+        WHERE templateId = :templateId
+        ORDER BY rowid
+        """
+    )
     suspend fun getFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertTemplate(t: ChecklistTemplateEntity)
+    suspend fun upsertTemplate(template: ChecklistTemplateEntity)
 
-    // ⬇️ добавлено: чтобы сидер мог по одному писать поля
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertField(f: ChecklistFieldEntity)
-
-    // опционально — если захочется батчем:
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertFields(list: List<ChecklistFieldEntity>)
+    suspend fun upsertField(field: ChecklistFieldEntity)
 }
