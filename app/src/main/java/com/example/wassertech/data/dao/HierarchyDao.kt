@@ -11,6 +11,14 @@ interface HierarchyDao {
     @Query("SELECT * FROM clients WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
     fun observeClients(): Flow<List<ClientEntity>>
 
+    @Query("""
+        SELECT * FROM clients
+        WHERE (:includeArchived = 1) OR (isArchived = 0)
+        ORDER BY name COLLATE NOCASE
+    """)
+    fun observeClients(includeArchived: Boolean): Flow<List<ClientEntity>>
+    
+
     @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
     suspend fun getClient(id: String): ClientEntity?
 

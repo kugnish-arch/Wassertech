@@ -1,4 +1,3 @@
-
 package com.example.wassertech.ui.clients
 
 import androidx.compose.foundation.clickable
@@ -8,9 +7,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,7 +59,7 @@ fun ClientDetailScreen(
     // expand/collapse per site
     var expandedSites by remember { mutableStateOf(setOf<String>()) }
 
-    // (optional) reorder mode for sites preserved
+    // reorder mode for sites
     var reorderMode by remember { mutableStateOf(false) }
     var localOrder by remember(clientId) { mutableStateOf(sites.map { it.id }) }
     LaunchedEffect(sites) { if (!reorderMode) localOrder = sites.map { it.id } }
@@ -84,12 +86,20 @@ fun ClientDetailScreen(
             }
         }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             // Header
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row {
-                        Icon(imageVector = if (isCorporate) AppIcons.ClientCorporate else AppIcons.ClientPrivate, contentDescription = null)
+                        Icon(
+                            imageVector = if (isCorporate) AppIcons.ClientCorporate else AppIcons.ClientPrivate,
+                            contentDescription = null
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(clientName, style = MaterialTheme.typography.titleLarge)
                         Spacer(Modifier.weight(1f))
@@ -99,14 +109,23 @@ fun ClientDetailScreen(
                 }
             }
 
-            // Reorder toolbar (kept as before)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 12.dp)) {
+            // Reorder toolbar
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 12.dp)
+            ) {
                 OutlinedButton(onClick = {
                     reorderMode = !reorderMode
                     if (!reorderMode) localOrder = sites.map { it.id }
                 }) { Text(if (reorderMode) "Отмена сортировки" else "Изменить порядок") }
+
                 if (reorderMode) {
-                    Button(onClick = { vm.reorderSites(clientId, localOrder); reorderMode = false }) { Text("✔") }
+                    Button(
+                        onClick = { vm.reorderSites(clientId, localOrder); reorderMode = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) // зелёная "Сохранить"
+                    ) {
+                        Text("Сохранить")
+                    }
                 }
             }
 
@@ -120,25 +139,50 @@ fun ClientDetailScreen(
                     items(sites, key = { it.id }) { s ->
                         val index = localOrder.indexOf(s.id)
                         ElevatedCard(Modifier.fillMaxWidth()) {
-                            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("${index + 1}. ${s.name}", style = MaterialTheme.typography.titleMedium)
+                            Row(
+                                Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "${index + 1}. ${s.name}",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
                                 Row {
-                                    TextButton(onClick = {
-                                        val pos = localOrder.indexOf(s.id)
-                                        if (pos > 0) {
-                                            val list = localOrder.toMutableList()
-                                            val tmp = list[pos-1]; list[pos-1] = list[pos]; list[pos] = tmp
-                                            localOrder = list
-                                        }
-                                    }, enabled = index > 0) { Text("↑") }
-                                    TextButton(onClick = {
-                                        val pos = localOrder.indexOf(s.id)
-                                        if (pos >= 0 && pos < localOrder.lastIndex) {
-                                            val list = localOrder.toMutableList()
-                                            val tmp = list[pos+1]; list[pos+1] = list[pos]; list[pos] = tmp
-                                            localOrder = list
-                                        }
-                                    }, enabled = index < localOrder.lastIndex) { Text("↓") }
+                                    // Крупные стрелки
+                                    IconButton(
+                                        onClick = {
+                                            val pos = localOrder.indexOf(s.id)
+                                            if (pos > 0) {
+                                                val list = localOrder.toMutableList()
+                                                val tmp = list[pos - 1]; list[pos - 1] = list[pos]; list[pos] = tmp
+                                                localOrder = list
+                                            }
+                                        },
+                                        enabled = index > 0
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.KeyboardArrowUp,
+                                            contentDescription = "Вверх",
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val pos = localOrder.indexOf(s.id)
+                                            if (pos >= 0 && pos < localOrder.lastIndex) {
+                                                val list = localOrder.toMutableList()
+                                                val tmp = list[pos + 1]; list[pos + 1] = list[pos]; list[pos] = tmp
+                                                localOrder = list
+                                            }
+                                        },
+                                        enabled = index < localOrder.lastIndex
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.KeyboardArrowDown,
+                                            contentDescription = "Вниз",
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -165,7 +209,10 @@ fun ClientDetailScreen(
                                 )
                                 if (isExpanded) {
                                     val installations by vm.installations(s.id).collectAsState(initial = emptyList())
-                                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Column(
+                                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
                                         if (installations.isEmpty()) {
                                             Text("Нет установок", style = MaterialTheme.typography.bodyMedium)
                                         } else {
@@ -282,11 +329,13 @@ fun ClientDetailScreen(
                     scope.launch {
                         val c = vm.getClient(clientId)
                         if (c != null) {
-                            vm.editClient(c.copy(
-                                name = editClientName.text.trim(),
-                                notes = editClientNotes.text.trim().ifEmpty { null },
-                                isCorporate = editClientCorporate
-                            ))
+                            vm.editClient(
+                                c.copy(
+                                    name = editClientName.text.trim(),
+                                    notes = editClientNotes.text.trim().ifEmpty { null },
+                                    isCorporate = editClientCorporate
+                                )
+                            )
                             clientName = editClientName.text.trim()
                             isCorporate = editClientCorporate
                         }

@@ -12,11 +12,14 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class HierarchyViewModel(application: Application) : AndroidViewModel(application) {
+
     private val db = AppDatabase.getInstance(application)
     private val hierarchyDao = db.hierarchyDao()
 
     // Streams
-    fun clients(): Flow<List<ClientEntity>> = hierarchyDao.observeClients()
+    fun clients(includeArchived: Boolean = false): Flow<List<ClientEntity>> =
+        if (includeArchived) hierarchyDao.observeClients(true) else hierarchyDao.observeClients()
+
     fun sites(clientId: String): Flow<List<SiteEntity>> = hierarchyDao.observeSites(clientId)
     fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
@@ -30,6 +33,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun editClient(client: ClientEntity) { viewModelScope.launch { hierarchyDao.upsertClient(client) } }
     fun editSite(site: SiteEntity) { viewModelScope.launch { hierarchyDao.upsertSite(site) } }
     fun editInstallation(installation: InstallationEntity) { viewModelScope.launch { hierarchyDao.upsertInstallation(installation) } }
+    fun editComponent(component: ComponentEntity) { viewModelScope.launch { hierarchyDao.upsertComponent(component) } }
 
     // Add entities
     fun addClient(name: String, notes: String?, isCorporate: Boolean) {
@@ -65,9 +69,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // Reorder (entities list overloads)
-    fun reorderSites(sites: List<SiteEntity>) { viewModelScope.launch { hierarchyDao.reorderSites(sites) } }
-    fun reorderInstallations(list: List<InstallationEntity>) { viewModelScope.launch { hierarchyDao.reorderInstallations(list) } }
-    fun reorderComponents(list: List<ComponentEntity>) { viewModelScope.launch { hierarchyDao.reorderComponents(list) } }
+    fun reorderSites(sites: List<SiteEntity>) { viewModelScope.launch { hierarchyDao.updateSites(sites) } }
+    fun reorderInstallations(list: List<InstallationEntity>) { viewModelScope.launch { hierarchyDao.updateInstallations(list) } }
+    fun reorderComponents(list: List<ComponentEntity>) { viewModelScope.launch { hierarchyDao.updateComponents(list) } }
 
     // Reorder (List<String> ids overloads) — to match UI that passes ids
     fun reorderSites(clientId: String, orderIds: List<String>) {
@@ -76,7 +80,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
             val ordered = orderIds.mapIndexedNotNull { idx, id ->
                 current.firstOrNull { it.id == id }?.copy(orderIndex = idx)
             }
-            hierarchyDao.reorderSites(ordered)
+            hierarchyDao.updateSites(ordered)
         }
     }
     fun reorderComponents(installationId: String, orderIds: List<String>) {
@@ -85,7 +89,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
             val ordered = orderIds.mapIndexedNotNull { idx, id ->
                 current.firstOrNull { it.id == id }?.copy(orderIndex = idx)
             }
-            hierarchyDao.reorderComponents(ordered)
+            hierarchyDao.updateComponents(ordered)
         }
     }
 
@@ -94,5 +98,15 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
             val id = UUID.randomUUID().toString()
             hierarchyDao.upsertComponent(ComponentEntity(id, installationId, name, type, orderIndex = 0))
         }
+    }
+
+    // Archive / Restore
+    fun archiveClient(clientId: String) = viewModelScope.launch {
+        val c = getClient(clientId) ?: return@launch
+        editClient(c.copy(isArchived = true, archivedAtEpoch = System.currentTimeMillis()))
+    }
+    fun restoreClient(clientId: String) = viewModelScope.launch {
+        val c = getClient(clientId) ?: return@launch
+        editClient(c.copy(isArchived = false, archivedAtEpoch = null))
     }
 }
