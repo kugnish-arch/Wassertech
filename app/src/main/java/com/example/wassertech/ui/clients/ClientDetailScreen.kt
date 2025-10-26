@@ -1,3 +1,4 @@
+
 package com.example.wassertech.ui.clients
 
 import androidx.compose.foundation.clickable
@@ -27,20 +28,36 @@ fun ClientDetailScreen(
 ) {
     val scope = rememberCoroutineScope()
 
+    // sites for list & selector
     val sites by vm.sites(clientId).collectAsState(initial = emptyList())
+
+    // header state
     var clientName by remember { mutableStateOf("Клиент") }
     var isCorporate by remember { mutableStateOf(false) }
 
+    // edit client
     var showEditClient by remember { mutableStateOf(false) }
     var editClientName by remember { mutableStateOf(TextFieldValue("")) }
     var editClientNotes by remember { mutableStateOf(TextFieldValue("")) }
     var editClientCorporate by remember { mutableStateOf(false) }
 
-    var expandedSites by remember { mutableStateOf(setOf<String>()) }
-
+    // FAB dialogs
     var showAddSite by remember { mutableStateOf(false) }
     var showAddInstallation by remember { mutableStateOf(false) }
 
+    // add site
+    var addSiteName by remember { mutableStateOf(TextFieldValue("")) }
+    var addSiteAddr by remember { mutableStateOf(TextFieldValue("")) }
+
+    // add installation
+    var addInstallationName by remember { mutableStateOf(TextFieldValue("")) }
+    var sitePickerExpanded by remember { mutableStateOf(false) }
+    var selectedSiteIndex by remember { mutableStateOf(0) }
+
+    // expand/collapse per site
+    var expandedSites by remember { mutableStateOf(setOf<String>()) }
+
+    // (optional) reorder mode for sites preserved
     var reorderMode by remember { mutableStateOf(false) }
     var localOrder by remember(clientId) { mutableStateOf(sites.map { it.id }) }
     LaunchedEffect(sites) { if (!reorderMode) localOrder = sites.map { it.id } }
@@ -68,7 +85,7 @@ fun ClientDetailScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
+            // Header
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row {
@@ -76,11 +93,13 @@ fun ClientDetailScreen(
                         Spacer(Modifier.width(8.dp))
                         Text(clientName, style = MaterialTheme.typography.titleLarge)
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = { showEditClient = true }) { Text("Редактировать") }
                     }
+                    // edit under the name
+                    TextButton(onClick = { showEditClient = true }) { Text("Редактировать") }
                 }
             }
 
+            // Reorder toolbar (kept as before)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 12.dp)) {
                 OutlinedButton(onClick = {
                     reorderMode = !reorderMode
@@ -91,7 +110,12 @@ fun ClientDetailScreen(
                 }
             }
 
-            LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+            // Expandable list of Sites -> Installations
+            LazyColumn(
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
                 if (reorderMode) {
                     items(sites, key = { it.id }) { s ->
                         val index = localOrder.indexOf(s.id)
@@ -132,7 +156,10 @@ fun ClientDetailScreen(
                                         IconButton(onClick = {
                                             expandedSites = if (isExpanded) expandedSites - s.id else expandedSites + s.id
                                         }) {
-                                            Icon(imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+                                            Icon(
+                                                imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                                contentDescription = null
+                                            )
                                         }
                                     }
                                 )
@@ -165,9 +192,7 @@ fun ClientDetailScreen(
         }
     }
 
-    // dialogs
-    var addSiteName by remember { mutableStateOf(TextFieldValue("")) }
-    var addSiteAddr by remember { mutableStateOf(TextFieldValue("")) }
+    // ---- Dialogs ----
 
     if (showAddSite) {
         AlertDialog(
@@ -184,7 +209,8 @@ fun ClientDetailScreen(
                     val n = addSiteName.text.trim()
                     if (n.isNotEmpty()) {
                         vm.addSite(clientId, n, addSiteAddr.text.trim().ifEmpty { null })
-                        addSiteName = TextFieldValue(""); addSiteAddr = TextFieldValue("")
+                        addSiteName = TextFieldValue("")
+                        addSiteAddr = TextFieldValue("")
                         showAddSite = false
                     }
                 }) { Text("Добавить") }
@@ -193,23 +219,40 @@ fun ClientDetailScreen(
         )
     }
 
-    var addInstallationName by remember { mutableStateOf(TextFieldValue("")) }
-
     if (showAddInstallation) {
         AlertDialog(
             onDismissRequest = { showAddInstallation = false },
             title = { Text("Добавить установку") },
             text = {
-                Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = addInstallationName, onValueChange = { addInstallationName = it }, label = { Text("Название установки") })
-                    Text(text = "Объект: Главный (по умолчанию)")
+                    ExposedDropdownMenuBox(expanded = sitePickerExpanded, onExpandedChange = { sitePickerExpanded = it }) {
+                        OutlinedTextField(
+                            value = sites.getOrNull(selectedSiteIndex)?.name ?: "Выберите объект",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Объект") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sitePickerExpanded) },
+                            modifier = androidx.compose.ui.Modifier.menuAnchor()
+                        )
+                        ExposedDropdownMenu(expanded = sitePickerExpanded, onDismissRequest = { sitePickerExpanded = false }) {
+                            sites.forEachIndexed { index, s ->
+                                DropdownMenuItem(text = { Text(s.name) }, onClick = {
+                                    selectedSiteIndex = index
+                                    sitePickerExpanded = false
+                                })
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     val n = addInstallationName.text.trim()
                     if (n.isNotEmpty()) {
-                        vm.addInstallationToMain(clientId, n)
+                        val selectedSiteId = sites.getOrNull(selectedSiteIndex)?.id
+                        if (selectedSiteId != null) vm.addInstallationToSite(selectedSiteId, n)
+                        else vm.addInstallationToMain(clientId, n)
                         addInstallationName = TextFieldValue("")
                         showAddInstallation = false
                     }

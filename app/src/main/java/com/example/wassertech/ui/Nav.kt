@@ -22,6 +22,7 @@ import com.example.wassertech.ui.clients.ClientDetailScreen
 import com.example.wassertech.ui.clients.ClientsScreen
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
+import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +68,7 @@ private fun AppScaffold(navController: NavHostController) {
             composable("clients") {
                 Column {
                     SectionHeader("Клиенты")
-                    ClientsScreen(onOpenClient = { clientId -> navController.navigate("client/" + clientId) })
+                    ClientsScreen(onOpenClient = { clientId -> navController.navigate("client/$clientId") })
                 }
             }
             composable(
@@ -79,8 +80,8 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("Клиент")
                     ClientDetailScreen(
                         clientId = clientId,
-                        onOpenSite = { siteId -> navController.navigate("site/" + siteId) },
-                        onOpenInstallation = { installationId -> navController.navigate("installation/" + installationId) }
+                        onOpenSite = { siteId -> navController.navigate("site/$siteId") },
+                        onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
                     )
                 }
             }
@@ -93,7 +94,7 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("Объект")
                     SiteDetailScreen(
                         siteId = siteId,
-                        onOpenInstallation = { installationId -> navController.navigate("installation/" + installationId) }
+                        onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
                     )
                 }
             }
@@ -106,9 +107,19 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("Установка")
                     ComponentsScreen(
                         installationId = installationId,
-                        onStartMaintenance = { /* TODO */ },
-                        onStartMaintenanceAll = { /* TODO */ }
+                        onStartMaintenance = { /* unused single component */ },
+                        onStartMaintenanceAll = { navController.navigate("maintenance_all/$installationId") }
                     )
+                }
+            }
+            composable(
+                "maintenance_all/{installationId}",
+                arguments = listOf(navArgument("installationId") { type = NavType.StringType })
+            ) { bse ->
+                val installationId = bse.arguments?.getString("installationId") ?: return@composable
+                Column {
+                    SectionHeader("ТО установки")
+                    MaintenanceAllScreen(installationId = installationId, onDone = { navController.navigateUp() })
                 }
             }
         }
@@ -122,7 +133,7 @@ private fun SectionHeader(title: String) {
             text = title,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = androidx.compose.ui.Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )

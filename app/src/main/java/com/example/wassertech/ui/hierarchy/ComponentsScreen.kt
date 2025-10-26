@@ -15,10 +15,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.data.types.ComponentType
 import androidx.compose.ui.text.input.TextFieldValue
 import com.example.wassertech.ui.icons.AppIcons
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,41 +29,43 @@ fun ComponentsScreen(
 ) {
     val scope = rememberCoroutineScope()
 
-    var installationName by remember { mutableStateOf<String?>(null) }
+    val components by vm.components(installationId).collectAsState(initial = emptyList())
+
     var showEdit by remember { mutableStateOf(false) }
+    var installationName by remember { mutableStateOf("Установка") }
     var editName by remember { mutableStateOf(TextFieldValue("")) }
 
     LaunchedEffect(installationId) {
         val inst = vm.getInstallation(installationId)
-        installationName = inst?.name
-        editName = TextFieldValue(inst?.name ?: "")
+        if (inst != null) {
+            installationName = inst.name
+            editName = TextFieldValue(inst.name)
+        }
     }
-
-    val components by vm.components(installationId).collectAsState(initial = emptyList())
 
     var reorderMode by remember { mutableStateOf(false) }
     var localOrder by remember(installationId) { mutableStateOf(components.map { it.id }) }
     LaunchedEffect(components) { if (!reorderMode) localOrder = components.map { it.id } }
-    val orderedComponents = remember(localOrder, components) { localOrder.mapNotNull { id -> components.find { it.id == id } } }
+    val ordered = remember(localOrder, components) { localOrder.mapNotNull { id -> components.find { it.id == id } } }
 
     var showAdd by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf(TextFieldValue("")) }
-    var typeIdx by remember { mutableStateOf(0) }
-    val types = ComponentType.values()
+    var addName by remember { mutableStateOf(TextFieldValue("")) }
+    var addTypeIdx by remember { mutableStateOf(0) }
+    val types = com.example.wassertech.data.types.ComponentType.values()
 
     Scaffold(
-        floatingActionButton = { if (!reorderMode) { ExtendedFloatingActionButton(onClick = { showAdd = true }) { Text("+ Компонент") } } }
+        floatingActionButton = { if (!reorderMode) ExtendedFloatingActionButton(onClick = { showAdd = true }) { Text("+ Компонент") } }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row {
                         Icon(imageVector = AppIcons.Installation, contentDescription = null)
-                        Text(installationName ?: "Установка", style = MaterialTheme.typography.titleLarge)
+                        Spacer(Modifier.width(8.dp))
+                        Text(installationName, style = MaterialTheme.typography.titleLarge)
                         Spacer(Modifier.weight(1f))
                         IconButton(onClick = { showEdit = true }) { Icon(Icons.Filled.Edit, contentDescription = null) }
                     }
-                    Text("Состав: ${components.size} компонент(ов)", style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { onStartMaintenanceAll(installationId) }) { Text("Провести ТО") }
                         OutlinedButton(onClick = { 
@@ -82,30 +82,29 @@ fun ComponentsScreen(
                 }
             }
 
-            LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+            LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
                 if (reorderMode) {
-                    itemsIndexed(orderedComponents, key = { _, it -> it.id }) { index, c ->
+                    itemsIndexed(ordered, key = { _, it -> it.id }) { index, c ->
                         ElevatedCard(Modifier.fillMaxWidth()) {
-                            Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("${index + 1}. ${c.name} • ${c.type}", style = MaterialTheme.typography.titleMedium)
                                 Row {
                                     IconButton(onClick = {
                                         val pos = localOrder.indexOf(c.id)
                                         if (pos > 0) {
-                                            val newList = localOrder.toMutableList()
-                                            val tmp = newList[pos-1]; newList[pos-1] = newList[pos]; newList[pos] = tmp
-                                            localOrder = newList
+                                            val list = localOrder.toMutableList()
+                                            val tmp = list[pos-1]; list[pos-1] = list[pos]; list[pos] = tmp
+                                            localOrder = list
                                         }
                                     }, enabled = index > 0) { Icon(Icons.Filled.ArrowUpward, contentDescription = null) }
                                     IconButton(onClick = {
                                         val pos = localOrder.indexOf(c.id)
-                                        if (pos >= 0 && pos < orderedComponents.lastIndex) {
-                                            val newList = localOrder.toMutableList()
-                                            val tmp = newList[pos+1]; newList[pos+1] = newList[pos]; newList[pos] = tmp
-                                            localOrder = newList
+                                        if (pos >= 0 && pos < localOrder.lastIndex) {
+                                            val list = localOrder.toMutableList()
+                                            val tmp = list[pos+1]; list[pos+1] = list[pos]; list[pos] = tmp
+                                            localOrder = list
                                         }
-                                    }, enabled = index < orderedComponents.lastIndex) { Icon(Icons.Filled.ArrowDownward, contentDescription = null) }
+                                    }, enabled = index < localOrder.lastIndex) { Icon(Icons.Filled.ArrowDownward, contentDescription = null) }
                                 }
                             }
                         }
@@ -116,7 +115,7 @@ fun ComponentsScreen(
                             Row(Modifier.padding(12.dp)) {
                                 Icon(imageVector = AppIcons.Component, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(text = "${index + 1}. ${c.name} • ${c.type}", style = MaterialTheme.typography.titleMedium)
+                                Text("${index + 1}. ${c.name} • ${c.type}", style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
@@ -136,14 +135,16 @@ fun ComponentsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    scope.launch {
-                        val inst = vm.getInstallation(installationId)
-                        if (inst != null) {
-                            vm.editInstallation(inst.copy(name = editName.text.trim()))
-                            installationName = editName.text.trim()
+                    val newName = editName.text.trim()
+                    if (newName.isNotEmpty()) {
+                        scope.launch {
+                            val inst = vm.getInstallation(installationId)
+                            if (inst != null) {
+                                vm.editInstallation(inst.copy(name = newName))
+                            }
+                            showEdit = false
                         }
-                        showEdit = false
-                    }
+                    } else showEdit = false
                 }) { Text("Сохранить") }
             },
             dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Отмена") } }
@@ -156,15 +157,15 @@ fun ComponentsScreen(
             title = { Text("Новый компонент") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true)
+                    OutlinedTextField(value = addName, onValueChange = { addName = it }, label = { Text("Название") }, singleLine = true)
                     var expanded by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                        OutlinedTextField(value = types[typeIdx].name, onValueChange = {}, readOnly = true, label = { Text("Тип") },
+                        OutlinedTextField(value = types[addTypeIdx].name, onValueChange = {}, readOnly = true, label = { Text("Тип") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                             modifier = androidx.compose.ui.Modifier.menuAnchor())
                         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                             types.forEachIndexed { index, t ->
-                                DropdownMenuItem(text = { Text(t.name) }, onClick = { typeIdx = index; expanded = false })
+                                DropdownMenuItem(text = { Text(t.name) }, onClick = { addTypeIdx = index; expanded = false })
                             }
                         }
                     }
@@ -172,10 +173,10 @@ fun ComponentsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val n = name.text.trim()
+                    val n = addName.text.trim()
                     if (n.isNotEmpty()) {
-                        vm.addComponent(installationId, n, types[typeIdx])
-                        name = TextFieldValue(""); typeIdx = 0; showAdd = false
+                        vm.addComponent(installationId, n, types[addTypeIdx])
+                        addName = TextFieldValue(""); addTypeIdx = 0; showAdd = false
                     }
                 }) { Text("Сохранить") }
             },
