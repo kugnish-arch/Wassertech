@@ -16,7 +16,6 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     private val db = AppDatabase.getInstance(application)
     private val hierarchyDao = db.hierarchyDao()
 
-    // Streams
     fun clients(includeArchived: Boolean = false): Flow<List<ClientEntity>> =
         if (includeArchived) hierarchyDao.observeClients(true) else hierarchyDao.observeClients()
 
@@ -24,18 +23,15 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
 
-    // Getters
     suspend fun getClient(id: String): ClientEntity? = hierarchyDao.getClient(id)
     suspend fun getSite(id: String): SiteEntity? = hierarchyDao.getSite(id)
     suspend fun getInstallation(id: String): InstallationEntity? = hierarchyDao.getInstallation(id)
 
-    // Edit entities
     fun editClient(client: ClientEntity) { viewModelScope.launch { hierarchyDao.upsertClient(client) } }
     fun editSite(site: SiteEntity) { viewModelScope.launch { hierarchyDao.upsertSite(site) } }
     fun editInstallation(installation: InstallationEntity) { viewModelScope.launch { hierarchyDao.upsertInstallation(installation) } }
     fun editComponent(component: ComponentEntity) { viewModelScope.launch { hierarchyDao.upsertComponent(component) } }
 
-    // Add entities
     fun addClient(name: String, notes: String?, isCorporate: Boolean) {
         viewModelScope.launch {
             val id = UUID.randomUUID().toString()
@@ -55,6 +51,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
     fun addInstallationToSite(siteId: String, name: String) = addInstallation(siteId, name)
+
     fun addInstallationToMain(clientId: String, name: String) {
         viewModelScope.launch {
             val currentSites = hierarchyDao.observeSites(clientId).first()
@@ -68,12 +65,19 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Reorder (entities list overloads)
+    fun addComponentFromTemplate(installationId: String, name: String, type: ComponentType, templateId: String?) {
+        viewModelScope.launch {
+            val id = UUID.randomUUID().toString()
+            hierarchyDao.upsertComponent(
+                ComponentEntity(id, installationId, name, type, orderIndex = 0, templateId = templateId)
+            )
+        }
+    }
+
     fun reorderSites(sites: List<SiteEntity>) { viewModelScope.launch { hierarchyDao.updateSites(sites) } }
     fun reorderInstallations(list: List<InstallationEntity>) { viewModelScope.launch { hierarchyDao.updateInstallations(list) } }
     fun reorderComponents(list: List<ComponentEntity>) { viewModelScope.launch { hierarchyDao.updateComponents(list) } }
 
-    // Reorder (List<String> ids overloads) — to match UI that passes ids
     fun reorderSites(clientId: String, orderIds: List<String>) {
         viewModelScope.launch {
             val current = hierarchyDao.observeSites(clientId).first()
@@ -93,14 +97,6 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addComponent(installationId: String, name: String, type: ComponentType) {
-        viewModelScope.launch {
-            val id = UUID.randomUUID().toString()
-            hierarchyDao.upsertComponent(ComponentEntity(id, installationId, name, type, orderIndex = 0))
-        }
-    }
-
-    // Archive / Restore
     fun archiveClient(clientId: String) = viewModelScope.launch {
         val c = getClient(clientId) ?: return@launch
         editClient(c.copy(isArchived = true, archivedAtEpoch = System.currentTimeMillis()))

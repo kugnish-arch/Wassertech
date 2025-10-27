@@ -1,4 +1,3 @@
-
 package com.example.wassertech.data
 
 import android.content.Context
@@ -10,9 +9,10 @@ import com.example.wassertech.data.dao.*
 import com.example.wassertech.data.entities.*
 import com.example.wassertech.data.migrations.MIGRATION_2_3
 import com.example.wassertech.data.migrations.MIGRATION_5_6
+import com.example.wassertech.data.migrations.MIGRATION_6_7
 
 @Database(
-    version = 6,
+    version = 7,
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -23,8 +23,7 @@ import com.example.wassertech.data.migrations.MIGRATION_5_6
         ChecklistFieldEntity::class,
         MaintenanceSessionEntity::class,
         ObservationEntity::class,
-        IssueEntity::class,
-        ComponentTemplateEntity::class
+        IssueEntity::class
     ]
 )
 @TypeConverters(Converters::class)
@@ -33,7 +32,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun hierarchyDao(): HierarchyDao
     abstract fun templatesDao(): TemplatesDao
     abstract fun sessionsDao(): SessionsDao
-    abstract fun componentTemplatesDao(): ComponentTemplatesDao
     abstract fun checklistDao(): ChecklistDao
 
     companion object {
@@ -46,9 +44,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "wassertech.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_5_6)
+                    // Known migrations; if some links are missing, we'll fall back to destructive (dev only)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_5_6, MIGRATION_6_7)
+                    .fallbackToDestructiveMigration() // <-- drop & recreate if no full path from current to 7
                     .fallbackToDestructiveMigrationOnDowngrade()
-                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = db
                 db

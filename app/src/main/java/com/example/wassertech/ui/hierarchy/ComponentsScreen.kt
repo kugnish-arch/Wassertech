@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -18,10 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
 import com.example.wassertech.viewmodel.TemplatesViewModel
-import com.example.wassertech.data.entities.ComponentTemplateEntity
+import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
-import com.example.wassertech.ui.util.TemplateTypeMapper
-import kotlinx.coroutines.launch
 
 @Composable
 fun ComponentsScreen(
@@ -32,25 +29,12 @@ fun ComponentsScreen(
     templatesVm: TemplatesViewModel = viewModel()
 ) {
     val components by vm.components(installationId).collectAsState(initial = emptyList())
-    val templates by templatesVm.templates.collectAsState(initial = emptyList())
-
-    // Header state: installation name + edit dialog
-    val scope = rememberCoroutineScope()
-    var installName by remember { mutableStateOf("Установка") }
-    var showEdit by remember { mutableStateOf(false) }
-    var editName by remember { mutableStateOf(TextFieldValue("")) }
-
-    LaunchedEffect(installationId) {
-        val inst = vm.getInstallation(installationId)
-        if (inst != null) {
-            installName = inst.name
-            editName = TextFieldValue(inst.name)
-        }
-    }
+    val templates by templatesVm.templates.collectAsState()
 
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
-    var selectedTemplate by remember { mutableStateOf<ComponentTemplateEntity?>(null) }
+    var selectedTemplate by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
+    var templateMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         floatingActionButton = {
@@ -62,30 +46,16 @@ fun ComponentsScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-
-            // Header with name + edit
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp)) {
-                    Text(installName, style = MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { showEdit = true }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Редактировать установку")
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
             if (components.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    Text("Нет компонентов. Нажмите кнопку «Компонент»." )
+                    Text("Нет компонентов. Нажмите «Компонент»." )
                 }
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(components, key = { _, it -> it.id }) { index, item ->
+                    itemsIndexed(components, key = { _, it -> it.id }) { _, item ->
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             ListItem(
                                 headlineContent = { Text(item.name) },
@@ -105,17 +75,15 @@ fun ComponentsScreen(
     }
 
     if (showAdd) {
-        var templateMenu by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { showAdd = false },
             confirmButton = {
                 TextButton(onClick = {
                     val tmpl = selectedTemplate
                     val compName = if (newName.text.isNotBlank()) newName.text.trim()
-                                   else tmpl?.name ?: "Компонент"
-                    val ctype: ComponentType = TemplateTypeMapper.map(tmpl?.category, tmpl?.name ?: compName)
-
-                    vm.addComponent(installationId, compName, ctype)
+                                   else tmpl?.title ?: "Компонент"
+                    val ctype: ComponentType = tmpl?.componentType ?: ComponentType.FILTER
+                    vm.addComponentFromTemplate(installationId, compName, ctype, tmpl?.id)
                     showAdd = false
                 }) { Text("Добавить") }
             },
@@ -129,10 +97,9 @@ fun ComponentsScreen(
                         label = { Text("Название (опц.)") },
                         singleLine = true
                     )
-                    // Templates dropdown
                     ExposedDropdownMenuBox(expanded = templateMenu, onExpandedChange = { templateMenu = it }) {
                         OutlinedTextField(
-                            value = selectedTemplate?.let { it.name + (it.category?.let { c -> " • $c" } ?: "") } ?: "Нет шаблонов",
+                            value = selectedTemplate?.let { t -> t.title + " • " + t.componentType.name } ?: "Нет шаблонов",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Шаблон") },
@@ -143,41 +110,17 @@ fun ComponentsScreen(
                             if (templates.isEmpty()) {
                                 DropdownMenuItem(text = { Text("Шаблонов нет") }, onClick = { templateMenu = false })
                             } else {
-                                templates.filter { !it.isArchived }.forEach { tmpl ->
+                                templates.forEach { tmpl ->
                                     DropdownMenuItem(
-                                        text = { Text(tmpl.name + (tmpl.category?.let { " • " + it } ?: "")) },
+                                        text = { Text(tmpl.title + " • " + tmpl.componentType.name) },
                                         onClick = { selectedTemplate = tmpl; templateMenu = false }
                                     )
                                 }
                             }
                         }
                     }
-                    if (templates.isEmpty()) {
-                        Text("Создайте шаблон в меню «Шаблоны», чтобы выбирать тип компонента.", style = MaterialTheme.typography.bodySmall)
-                    }
                 }
             }
-        )
-    }
-
-    if (showEdit) {
-        AlertDialog(
-            onDismissRequest = { showEdit = false },
-            title = { Text("Переименовать установку") },
-            text = {
-                OutlinedTextField(value = editName, onValueChange = { editName = it }, label = { Text("Название установки") })
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    scope.launch {
-                        val inst = vm.getInstallation(installationId) ?: return@launch
-                        vm.editInstallation(inst.copy(name = editName.text.trim()))
-                        installName = editName.text.trim()
-                        showEdit = false
-                    }
-                }) { Text("Сохранить") }
-            },
-            dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Отмена") } }
         )
     }
 }

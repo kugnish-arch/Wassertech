@@ -24,6 +24,14 @@ interface TemplatesDao {
     @Query(
         """
         SELECT * FROM checklist_templates
+        ORDER BY title COLLATE NOCASE
+        """
+    )
+    fun observeAllTemplates(): Flow<List<ChecklistTemplateEntity>>
+
+    @Query(
+        """
+        SELECT * FROM checklist_templates
         WHERE componentType = :type
         LIMIT 1
         """
