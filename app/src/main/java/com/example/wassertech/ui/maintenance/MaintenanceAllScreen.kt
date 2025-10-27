@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +34,9 @@ fun MaintenanceAllScreen(
     val uiState by vm.uiFields.collectAsState()
     val names by vm.componentNames.collectAsState()
 
+    // Validation state: map fieldId -> invalid
+    val invalidMap = remember { mutableStateMapOf<String, Boolean>() }
+
     // Date picker state
     val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     var dateText by remember { mutableStateOf(sdf.format(Date())) }
@@ -43,6 +47,7 @@ fun MaintenanceAllScreen(
     // Expanded cards state
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
     var firstOpenApplied by remember { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(false) }
     LaunchedEffect(uiState) {
         if (!firstOpenApplied && uiState.isNotEmpty()) {
             expanded[uiState.keys.first()] = true
@@ -50,7 +55,11 @@ fun MaintenanceAllScreen(
         }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             Row(
                 Modifier
@@ -63,6 +72,7 @@ fun MaintenanceAllScreen(
                     modifier = Modifier.weight(1f)
                 ) { Text("Отмена") }
                 Button(
+                    enabled = !saved && invalidMap.values.none { it },
                     onClick = {
                         val millis = runCatching { sdf.parse(dateText)?.time ?: System.currentTimeMillis() }.getOrDefault(System.currentTimeMillis())
                         vm.saveSession(
@@ -71,10 +81,19 @@ fun MaintenanceAllScreen(
                             valuesByComponent = uiState,
                             notes = notes.text.ifBlank { null }
                         )
-                        onDone()
+                        saved = true
+                        scope.launch {
+                            val res = snackbarHostState.showSnackbar(
+                                message = "ТО сохранено",
+                                actionLabel = "К истории"
+                            )
+                            if (res == SnackbarResult.ActionPerformed) {
+                                onDone()
+                            }
+                        }
                     },
                     modifier = Modifier.weight(1f)
-                ) { Text("Сохранить") }
+                ) { Text(if (saved) "Сохранено" else "Сохранить") }
             }
         }
     ) { padding ->

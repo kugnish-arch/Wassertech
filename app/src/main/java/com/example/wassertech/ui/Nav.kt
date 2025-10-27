@@ -25,6 +25,8 @@ import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
+import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,6 +122,14 @@ private fun AppScaffold(navController: NavHostController) {
             ) { bse ->
                 val id = bse.arguments?.getString("templateId") ?: return@composable
                 TemplateEditorScreen(templateId = id)
+            }
+
+            composable("maintenance_history/{installationId}") { backStackEntry ->
+                val installationId = backStackEntry.arguments?.getString("installationId")!!
+                MaintenanceHistoryScreen(
+                    installationId = installationId,
+                    onBack = { navController.popBackStack() }
+                )
             }
 
             composable(

@@ -13,7 +13,9 @@ fun AppTopBar(
     showBack: Boolean = false,
     onBack: (() -> Unit)? = null,
     onOpenClients: () -> Unit,
-    onOpenTemplates: () -> Unit
+    onOpenTemplates: () -> Unit,
+    onOpenMaintenanceHistory: ((String) -> Unit)? = null,
+    currentInstallationId: String? = null
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -48,6 +50,15 @@ fun AppTopBar(
                         onOpenTemplates()
                     }
                 )
+                if (onOpenMaintenanceHistory != null && currentInstallationId != null) {
+                    DropdownMenuItem(
+                        text = { Text("История ТО") },
+                        onClick = {
+                            menuOpen = false
+                            onOpenMaintenanceHistory(currentInstallationId)
+                        }
+                    )
+                }
             }
         }
     )
