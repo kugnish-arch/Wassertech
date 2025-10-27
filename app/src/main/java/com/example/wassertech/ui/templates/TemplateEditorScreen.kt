@@ -1,4 +1,3 @@
-// Opt-in once for the whole file to avoid ExperimentalMaterial3Api warnings-as-errors
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.wassertech.ui.templates
@@ -25,7 +24,6 @@ import com.example.wassertech.viewmodel.TemplateEditorViewModel
 
 @Composable
 fun TemplateEditorScreen(templateId: String) {
-    // Read LocalContext in @Composable scope and capture Application
     val app = LocalContext.current.applicationContext as Application
 
     val vm: TemplateEditorViewModel = viewModel(
@@ -45,14 +43,14 @@ fun TemplateEditorScreen(templateId: String) {
             ExtendedFloatingActionButton(
                 onClick = { editing = null; dialogOpen = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("+ Поле") }
+                text = { Text("Поле") }
             )
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (fields.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    Text("Нет полей. Нажми «+ Поле».")
+                    Text("Нет полей. Нажми «Поле».")
                 }
             } else {
                 LazyColumn(
@@ -65,7 +63,7 @@ fun TemplateEditorScreen(templateId: String) {
                                 headlineContent = { Text(f.label) },
                                 supportingContent = {
                                     val unitSuffix = f.unit?.let { " • $it" } ?: ""
-                                    Text("${f.type} • ключ: ${f.key}" + unitSuffix)
+                                    Text("${'$'}{f.type} • ключ: ${'$'}{f.key}${'$'}unitSuffix")
                                 },
                                 trailingContent = {
                                     Row {
@@ -98,7 +96,7 @@ fun TemplateEditorScreen(templateId: String) {
         FieldEditDialog(
             initial = editing,
             onDismiss = { dialogOpen = false },
-            onSave = { vm.addOrUpdate(it); dialogOpen = false }
+            onSave = { draft -> vm.addOrUpdate(draft); dialogOpen = false }
         )
     }
 }
@@ -111,7 +109,7 @@ private fun FieldEditDialog(
 ) {
     var key by remember { mutableStateOf(initial?.key ?: "") }
     var label by remember { mutableStateOf(initial?.label ?: "") }
-    var type by remember { mutableStateOf(initial?.type ?: FieldType.TEXT) }
+    var type by remember { mutableStateOf(initial?.type ?: com.example.wassertech.data.types.FieldType.TEXT) }
     var unit by remember { mutableStateOf(initial?.unit ?: "") }
     var min by remember { mutableStateOf(initial?.min ?: "") }
     var max by remember { mutableStateOf(initial?.max ?: "") }
@@ -149,14 +147,14 @@ private fun FieldEditDialog(
 }
 
 @Composable
-private fun TypeSelector(type: FieldType, onChange: (FieldType) -> Unit) {
+private fun TypeSelector(type: com.example.wassertech.data.types.FieldType, onChange: (com.example.wassertech.data.types.FieldType) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = when (type) {
-                FieldType.TEXT -> "TEXT"
-                FieldType.NUMBER -> "NUMBER"
-                FieldType.CHECKBOX -> "CHECKBOX"
+                com.example.wassertech.data.types.FieldType.TEXT -> "TEXT"
+                com.example.wassertech.data.types.FieldType.NUMBER -> "NUMBER"
+                com.example.wassertech.data.types.FieldType.CHECKBOX -> "CHECKBOX"
             },
             onValueChange = {},
             readOnly = true,
@@ -165,9 +163,9 @@ private fun TypeSelector(type: FieldType, onChange: (FieldType) -> Unit) {
             modifier = Modifier.menuAnchor().fillMaxWidth()
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("TEXT") }, onClick = { onChange(FieldType.TEXT); expanded = false })
-            DropdownMenuItem(text = { Text("NUMBER") }, onClick = { onChange(FieldType.NUMBER); expanded = false })
-            DropdownMenuItem(text = { Text("CHECKBOX") }, onClick = { onChange(FieldType.CHECKBOX); expanded = false })
+            DropdownMenuItem(text = { Text("TEXT") }, onClick = { onChange(com.example.wassertech.data.types.FieldType.TEXT); expanded = false })
+            DropdownMenuItem(text = { Text("NUMBER") }, onClick = { onChange(com.example.wassertech.data.types.FieldType.NUMBER); expanded = false })
+            DropdownMenuItem(text = { Text("CHECKBOX") }, onClick = { onChange(com.example.wassertech.data.types.FieldType.CHECKBOX); expanded = false })
         }
     }
 }
