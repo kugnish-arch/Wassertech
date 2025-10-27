@@ -177,7 +177,7 @@ fun ComponentsScreen(
                     text = {
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             sessionDetails.forEach { d ->
-                                Text("• ${'$'}{d.componentName}: ${'$'}{d.fieldKey} — ${'$'}{d.valueText}")
+                                Text("• ${d.componentName}: ${d.fieldKey} — ${d.valueText}")
                             }
                         }
                     }

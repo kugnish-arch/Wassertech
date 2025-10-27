@@ -34,12 +34,15 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
     private val _uiFields = MutableStateFlow<Map<String, List<ChecklistUiField>>>(emptyMap())
     val uiFields: StateFlow<Map<String, List<ChecklistUiField>>> = _uiFields
 
+    private val _componentNames = MutableStateFlow<Map<String, String>>(emptyMap())
+    val componentNames: StateFlow<Map<String, String>> = _componentNames
+
     fun load(installationId: String) {
         viewModelScope.launch {
             val inst = hierarchyDao.getInstallation(installationId) ?: return@launch
             _installation.value = inst
             val components: List<ComponentEntity> =
-                hierarchyDao.observeComponents(installationId).first() ?: emptyList()
+                hierarchyDao.observeComponents(installationId).first()
             val byComponent = linkedMapOf<String, List<ChecklistUiField>>()
             for (c in components) {
                 val tmplId = c.templateId ?: continue
@@ -56,6 +59,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 byComponent[c.id] = ui
             }
+            _componentNames.value = components.associate { it.id to it.name }
             _uiFields.value = byComponent
         }
     }
