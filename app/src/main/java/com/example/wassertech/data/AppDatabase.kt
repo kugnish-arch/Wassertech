@@ -12,7 +12,7 @@ import com.example.wassertech.data.migrations.MIGRATION_5_6
 import com.example.wassertech.data.migrations.MIGRATION_6_7
 
 @Database(
-    version = 7,
+    version = 1,
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -45,7 +45,6 @@ abstract class AppDatabase : RoomDatabase() {
                     "wassertech.db"
                 )
                     // Known migrations; if some links are missing, we'll fall back to destructive (dev only)
-                    .addMigrations(MIGRATION_2_3, MIGRATION_5_6, MIGRATION_6_7)
                     .fallbackToDestructiveMigration() // <-- drop & recreate if no full path from current to 7
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

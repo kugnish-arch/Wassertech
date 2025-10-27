@@ -10,8 +10,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,70 @@ fun ComponentsScreen(
     vm: HierarchyViewModel = viewModel(),
     templatesVm: TemplatesViewModel = viewModel()
 ) {
+    // ---- Header: Installation title + edit ----
+    var installation by remember { mutableStateOf<com.example.wassertech.data.entities.InstallationEntity?>(null) }
+    LaunchedEffect(installationId) {
+        installation = vm.getInstallation(installationId)
+    }
+
+    var showEdit by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf(TextFieldValue(installation?.name.orEmpty())) }
+
+    if (installation != null) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (installation!!.name.isBlank()) "Без названия" else installation!!.name,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = {
+                editName = TextFieldValue(installation!!.name)
+                showEdit = true
+            }) {
+                Icon(imageVector = Icons.Default.Edit, contentDescription = "Редактировать установку")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = onStartMaintenanceAll,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth()
+        ) { Text("Провести ТО") }
+    }
+
+    if (showEdit) {
+        AlertDialog(
+            onDismissRequest = { showEdit = false },
+            title = { Text("Редактировать установку") },
+            text = {
+                OutlinedTextField(
+                    value = editName,
+                    onValueChange = { editName = it },
+                    label = { Text("Название установки") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newName = editName.text.trim()
+                    if (newName.isNotEmpty() && installation != null) {
+                        vm.renameInstallation(installationId, newName)
+                        installation = installation!!.copy(name = newName)
+                        showEdit = false
+                    }
+                }) { Text("Сохранить") }
+            },
+            dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Отмена") } }
+        )
+    }
+
     val components by vm.components(installationId).collectAsState(initial = emptyList())
     // список всех шаблонов, чтобы быстро разрешать title по templateId
     val templates by templatesVm.templates.collectAsState()
@@ -53,7 +119,7 @@ fun ComponentsScreen(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (components.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Нет компонентов. Нажмите «Компонент».")
                 }
             } else {

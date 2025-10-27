@@ -105,4 +105,12 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         val c = getClient(clientId) ?: return@launch
         editClient(c.copy(isArchived = false, archivedAtEpoch = null))
     }
+
+fun renameInstallation(installationId: String, newName: String) = viewModelScope.launch {
+    val inst = hierarchyDao.getInstallation(installationId) ?: return@launch
+    if (newName.isNotBlank()) {
+        hierarchyDao.updateInstallations(listOf(inst.copy(name = newName.trim())))
+    }
+}
+
 }
