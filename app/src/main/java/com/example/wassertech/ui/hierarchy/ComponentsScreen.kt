@@ -1,3 +1,4 @@
+
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.wassertech.ui.hierarchy
@@ -18,7 +19,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
 import com.example.wassertech.viewmodel.TemplatesViewModel
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
-import com.example.wassertech.data.types.ComponentType
 
 @Composable
 fun ComponentsScreen(
@@ -29,7 +29,13 @@ fun ComponentsScreen(
     templatesVm: TemplatesViewModel = viewModel()
 ) {
     val components by vm.components(installationId).collectAsState(initial = emptyList())
+    // список всех шаблонов, чтобы быстро разрешать title по templateId
     val templates by templatesVm.templates.collectAsState()
+
+    // Быстрый индекс id -> title
+    val templateTitleById = remember(templates) {
+        templates.associate { it.id to it.title }
+    }
 
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
@@ -48,7 +54,7 @@ fun ComponentsScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (components.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    Text("Нет компонентов. Нажмите «Компонент»." )
+                    Text("Нет компонентов. Нажмите «Компонент».")
                 }
             } else {
                 LazyColumn(
@@ -56,10 +62,11 @@ fun ComponentsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(components, key = { _, it -> it.id }) { _, item ->
+                        val tmplTitle = item.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             ListItem(
                                 headlineContent = { Text(item.name) },
-                                supportingContent = { Text(item.type.name) },
+                                supportingContent = { Text(tmplTitle) },
                                 trailingContent = {
                                     Row {
                                         IconButton(onClick = { /* up */ }) { Icon(Icons.Default.ArrowUpward, contentDescription = null) }
@@ -82,8 +89,8 @@ fun ComponentsScreen(
                     val tmpl = selectedTemplate
                     val compName = if (newName.text.isNotBlank()) newName.text.trim()
                                    else tmpl?.title ?: "Компонент"
-                    val ctype: ComponentType = ComponentType.FILTER
-                    vm.addComponentFromTemplate(installationId, compName, ctype, tmpl?.id)
+                    // тип больше не показываем и не используем в UI; колонка в Entity может остаться для совместимости
+                    vm.addComponentFromTemplate(installationId, compName, /* type ignored */ com.example.wassertech.data.types.ComponentType.FILTER, tmpl?.id)
                     showAdd = false
                 }) { Text("Добавить") }
             },
