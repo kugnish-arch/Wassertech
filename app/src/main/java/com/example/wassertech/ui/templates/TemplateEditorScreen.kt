@@ -63,7 +63,7 @@ fun TemplateEditorScreen(templateId: String) {
                                 headlineContent = { Text(f.label) },
                                 supportingContent = {
                                     val unitSuffix = f.unit?.let { " • $it" } ?: ""
-                                    Text("${'$'}{f.type} • ключ: ${'$'}{f.key}${'$'}unitSuffix")
+                                    Text("${f.type} • ключ: ${f.key}" + (f.unit?.let { " • $it" } ?: ""))
                                 },
                                 trailingContent = {
                                     Row {

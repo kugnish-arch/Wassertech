@@ -82,7 +82,7 @@ fun ComponentsScreen(
                     val tmpl = selectedTemplate
                     val compName = if (newName.text.isNotBlank()) newName.text.trim()
                                    else tmpl?.title ?: "Компонент"
-                    val ctype: ComponentType = tmpl?.componentType ?: ComponentType.FILTER
+                    val ctype: ComponentType = ComponentType.FILTER
                     vm.addComponentFromTemplate(installationId, compName, ctype, tmpl?.id)
                     showAdd = false
                 }) { Text("Добавить") }
@@ -99,7 +99,7 @@ fun ComponentsScreen(
                     )
                     ExposedDropdownMenuBox(expanded = templateMenu, onExpandedChange = { templateMenu = it }) {
                         OutlinedTextField(
-                            value = selectedTemplate?.let { t -> t.title + " • " + t.componentType.name } ?: "Нет шаблонов",
+                            value = selectedTemplate?.title ?: "Нет шаблонов",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Шаблон") },
@@ -112,7 +112,7 @@ fun ComponentsScreen(
                             } else {
                                 templates.forEach { tmpl ->
                                     DropdownMenuItem(
-                                        text = { Text(tmpl.title + " • " + tmpl.componentType.name) },
+                                        text = { Text(tmpl.title) },
                                         onClick = { selectedTemplate = tmpl; templateMenu = false }
                                     )
                                 }

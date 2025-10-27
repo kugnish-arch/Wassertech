@@ -6,13 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.dao.TemplatesDao
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
-import com.example.wassertech.data.types.ComponentType
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlinx.coroutines.flow.map
+import com.example.wassertech.data.types.ComponentType
 
 class TemplatesViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -24,12 +24,12 @@ class TemplatesViewModel(application: Application) : AndroidViewModel(applicatio
             .map { list -> list.sortedBy { it.title.lowercase() } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun createTemplateSimple(title: String, type: ComponentType) {
+    fun createTemplateSimple(title: String) {
         viewModelScope.launch {
             val t = ChecklistTemplateEntity(
                 id = UUID.randomUUID().toString(),
                 title = title,
-                componentType = type
+                componentType = ComponentType.FILTER // скрытый дефолт
             )
             dao.upsertTemplate(t)
         }

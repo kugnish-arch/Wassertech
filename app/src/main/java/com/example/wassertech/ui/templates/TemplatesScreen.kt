@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.viewmodel.TemplatesViewModel
 
 @Composable
@@ -25,7 +24,6 @@ fun TemplatesScreen(
 
     var showAdd by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf<com.example.wassertech.data.types.ComponentType?>(null) }
 
     Scaffold(
         topBar = { CenterAlignedTopAppBar(title = { Text("Шаблоны компонентов") }) },
@@ -51,7 +49,6 @@ fun TemplatesScreen(
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             ListItem(
                                 headlineContent = { Text(t.title) },
-                                supportingContent = { Text(t.componentType.name) },
                                 modifier = Modifier.clickable { onOpenTemplate(t.id) }
                             )
                         }
@@ -62,16 +59,14 @@ fun TemplatesScreen(
     }
 
     if (showAdd) {
-        var menu by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { showAdd = false },
             confirmButton = {
                 TextButton(onClick = {
-                    if (title.isNotBlank() && type != null) {
-                        vm.createTemplateSimple(title.trim(), type!!)
+                    if (title.isNotBlank()) {
+                        vm.createTemplateSimple(title.trim())
                         showAdd = false
                         title = ""
-                        type = null
                     }
                 }) { Text("Создать") }
             },
@@ -79,22 +74,12 @@ fun TemplatesScreen(
             title = { Text("Новый шаблон") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Название") }, singleLine = true)
-                    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
-                        OutlinedTextField(
-                            value = type?.name ?: "Выберите тип",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Тип компонента") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menu) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            com.example.wassertech.data.types.ComponentType.values().forEach { ct ->
-                                DropdownMenuItem(text = { Text(ct.name) }, onClick = { type = ct; menu = false })
-                            }
-                        }
-                    }
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Название") },
+                        singleLine = true
+                    )
                 }
             }
         )
