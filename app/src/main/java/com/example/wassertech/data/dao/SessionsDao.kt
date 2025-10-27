@@ -6,6 +6,12 @@ import com.example.wassertech.data.entities.*
 
 @Dao
 interface SessionsDao {
+    @Query("SELECT * FROM maintenance_sessions WHERE installationId = :installationId ORDER BY startedAtEpoch DESC")
+    fun observeSessionsByInstallation(installationId: String): Flow<List<MaintenanceSessionEntity>>
+
+    @Query("SELECT * FROM observations WHERE sessionId = :sessionId ORDER BY rowid")
+    suspend fun getObservations(sessionId: String): List<ObservationEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSession(s: MaintenanceSessionEntity)
 

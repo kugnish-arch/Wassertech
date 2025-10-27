@@ -6,6 +6,7 @@ package com.example.wassertech.ui.hierarchy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -15,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -95,7 +97,6 @@ fun ComponentsScreen(
     }
 
     val components by vm.components(installationId).collectAsState(initial = emptyList())
-    // список всех шаблонов, чтобы быстро разрешать title по templateId
     val templates by templatesVm.templates.collectAsState()
 
     // Быстрый индекс id -> title
@@ -118,6 +119,72 @@ fun ComponentsScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+
+            // ---- История ТО ----
+            val context = LocalContext.current
+            val db = remember { com.example.wassertech.data.AppDatabase.getInstance(context) }
+            val sessionsFlow = remember(installationId) { db.sessionsDao().observeSessionsByInstallation(installationId) }
+            val sessions by sessionsFlow.collectAsState(initial = emptyList())
+            var showSessionId by remember { mutableStateOf<String?>(null) }
+            var sessionDetails by remember { mutableStateOf<List<com.example.wassertech.ui.maintenance.ObservationDetail>>(emptyList()) }
+
+            if (sessions.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "История ТО",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val subset: List<com.example.wassertech.data.entities.MaintenanceSessionEntity> = sessions.take(5)
+                    itemsIndexed(subset, key = { _, item -> item.id }) { _, s ->
+                        ElevatedCard(Modifier.fillMaxWidth()) {
+                            ListItem(
+                                headlineContent = { Text(java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(s.startedAtEpoch))) },
+                                supportingContent = { Text(s.notes ?: "") },
+                                modifier = Modifier.clickable { showSessionId = s.id }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showSessionId != null) {
+                val sid = showSessionId!!
+                LaunchedEffect(sid) {
+                    val obs = db.sessionsDao().getObservations(sid)
+                    val details = mutableListOf<com.example.wassertech.ui.maintenance.ObservationDetail>()
+                    for (o in obs) {
+                        val comp = db.hierarchyDao().getComponent(o.componentId)
+                        val componentName = comp?.name ?: o.componentId
+                        val value = when {
+                            o.valueText != null -> o.valueText
+                            o.valueNumber != null -> o.valueNumber.toString()
+                            o.valueBool != null -> if (o.valueBool) "Да" else "Нет"
+                            else -> ""
+                        }
+                        details.add(com.example.wassertech.ui.maintenance.ObservationDetail(o.componentId, componentName, o.fieldKey, value))
+                    }
+                    sessionDetails = details
+                }
+                AlertDialog(
+                    onDismissRequest = { showSessionId = null },
+                    confirmButton = { TextButton(onClick = { showSessionId = null }) { Text("Закрыть") } },
+                    title = { Text("Детали ТО") },
+                    text = {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            sessionDetails.forEach { d ->
+                                Text("• ${'$'}{d.componentName}: ${'$'}{d.fieldKey} — ${'$'}{d.valueText}")
+                            }
+                        }
+                    }
+                )
+            }
+
+            // ---- Список компонентов ----
             if (components.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Нет компонентов. Нажмите «Компонент».")
@@ -153,8 +220,7 @@ fun ComponentsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     val tmpl = selectedTemplate
-                    val compName = if (newName.text.isNotBlank()) newName.text.trim()
-                                   else tmpl?.title ?: "Компонент"
+                    val compName = if (newName.text.isNotBlank()) newName.text.trim() else tmpl?.title ?: "Компонент"
                     // тип больше не показываем и не используем в UI; колонка в Entity может остаться для совместимости
                     vm.addComponentFromTemplate(installationId, compName, /* type ignored */ com.example.wassertech.data.types.ComponentType.FILTER, tmpl?.id)
                     showAdd = false
