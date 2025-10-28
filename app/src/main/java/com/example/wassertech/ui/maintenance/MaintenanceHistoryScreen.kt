@@ -1,3 +1,4 @@
+
 package com.example.wassertech.ui.maintenance
 
 import androidx.compose.foundation.clickable
@@ -13,20 +14,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import com.example.wassertech.data.AppDatabase
+import com.example.wassertech.data.entities.MaintenanceSessionEntity
+import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceHistoryScreen(
-    installationId: String,
+    installationId: String?,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
     val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
-    val sessionsFlow = remember(installationId) { db.sessionsDao().observeSessionsByInstallation(installationId) }
+    val sessionsFlow: Flow<List<MaintenanceSessionEntity>> = remember(installationId) {
+        if (installationId == null) db.sessionsDao().observeAllSessions()
+        else db.sessionsDao().observeSessionsByInstallation(installationId)
+    }
     val sessions by sessionsFlow.collectAsState(initial = emptyList())
 
     var selectedSessionId by remember { mutableStateOf<String?>(null) }

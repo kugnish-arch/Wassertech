@@ -3,9 +3,14 @@ package com.example.wassertech.data.dao
 import androidx.room.*
 import com.example.wassertech.data.entities.*
 import kotlinx.coroutines.flow.Flow
+import androidx.room.Update
+
 
 @Dao
 interface HierarchyDao {
+
+    @Update
+    suspend fun updateInstallation(installation: InstallationEntity)
 
     // ---- Clients ----
     @Query("SELECT * FROM clients WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")

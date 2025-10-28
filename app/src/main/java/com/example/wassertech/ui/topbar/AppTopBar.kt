@@ -14,8 +14,7 @@ fun AppTopBar(
     onBack: (() -> Unit)? = null,
     onOpenClients: () -> Unit,
     onOpenTemplates: () -> Unit,
-    onOpenMaintenanceHistory: ((String) -> Unit)? = null,
-    currentInstallationId: String? = null
+    onOpenMaintenanceHistory: (() -> Unit)? = null // ← NEW
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -32,33 +31,16 @@ fun AppTopBar(
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "Меню")
             }
-            DropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { menuOpen = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Клиенты") },
-                    onClick = {
-                        menuOpen = false
-                        onOpenClients()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Шаблоны") },
-                    onClick = {
-                        menuOpen = false
-                        onOpenTemplates()
-                    }
-                )
-                if (onOpenMaintenanceHistory != null && currentInstallationId != null) {
-                    DropdownMenuItem(
-                        text = { Text("История ТО") },
-                        onClick = {
-                            menuOpen = false
-                            onOpenMaintenanceHistory(currentInstallationId)
-                        }
-                    )
-                }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(text = { Text("Клиенты") }, onClick = {
+                    menuOpen = false; onOpenClients()
+                })
+                DropdownMenuItem(text = { Text("Шаблоны") }, onClick = {
+                    menuOpen = false; onOpenTemplates()
+                })
+                DropdownMenuItem(text = { Text("История ТО") }, onClick = {
+                    menuOpen = false; onOpenMaintenanceHistory?.invoke() // ← NEW
+                })
             }
         }
     )

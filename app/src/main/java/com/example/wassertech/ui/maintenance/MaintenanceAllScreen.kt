@@ -1,210 +1,167 @@
-
 package com.example.wassertech.ui.maintenance
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.viewmodel.MaintenanceViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.launch
+import com.example.wassertech.data.AppDatabase
+import com.example.wassertech.data.types.FieldType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import com.example.wassertech.viewmodel.HierarchyViewModel
+
+data class UiField(
+    val key: String,
+    val label: String,
+    val type: FieldType,
+    val unit: String?,
+    val min: Double?,
+    val max: Double?,
+    var boolValue: Boolean = false,
+    var numberValue: String = "",
+    var textValue: String = ""
+)
+
+data class ComponentGroup(
+    val componentId: String,
+    val componentName: String,
+    val fields: List<UiField>,
+    val expanded: Boolean = false
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceAllScreen(
     installationId: String,
     onDone: () -> Unit,
-    vm: MaintenanceViewModel = viewModel()
+    vm: HierarchyViewModel = viewModel()
 ) {
-    // Load UI fields and component names
-    LaunchedEffect(installationId) { vm.load(installationId) }
-    val uiState by vm.uiFields.collectAsState()
-    val names by vm.componentNames.collectAsState()
+    val context = LocalContext.current
+    val db = remember(context) { AppDatabase.getInstance(context) }
 
-    // Validation state: map fieldId -> invalid
-    val invalidMap = remember { mutableStateMapOf<String, Boolean>() }
+    var installationName by remember { mutableStateOf("Установка") }
+    var groups by remember { mutableStateOf(listOf<ComponentGroup>()) }
 
-    // Date picker state
-    val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
-    var dateText by remember { mutableStateOf(sdf.format(Date())) }
-    var notes by remember { mutableStateOf(TextFieldValue("")) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    val dateState = rememberDatePickerState()
-
-    // Expanded cards state
-    val expanded = remember { mutableStateMapOf<String, Boolean>() }
-    var firstOpenApplied by remember { mutableStateOf(false) }
-    var saved by remember { mutableStateOf(false) }
-    LaunchedEffect(uiState) {
-        if (!firstOpenApplied && uiState.isNotEmpty()) {
-            expanded[uiState.keys.first()] = true
-            firstOpenApplied = true
+    LaunchedEffect(installationId) {
+        withContext(Dispatchers.IO) {
+            val inst = db.hierarchyDao().getInstallation(installationId)
+            val comps = db.hierarchyDao().observeComponents(installationId).first()
+            val tdao = db.templatesDao()
+            val built = comps.map { c ->
+                val template = tdao.getTemplateByType(c.type)
+                val fields = if (template != null) tdao.getFieldsForTemplate(template.id) else emptyList()
+                ComponentGroup(
+                    componentId = c.id,
+                    componentName = c.name,
+                    fields = fields.map { f ->
+                        UiField(
+                            key = f.key, label = f.label, type = f.type,
+                            unit = f.unit, min = f.min, max = f.max
+                        )
+                    },
+                    expanded = false
+                )
+            }
+            installationName = inst?.name ?: "Установка"
+            groups = built
         }
     }
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onDone,
-                    modifier = Modifier.weight(1f)
-                ) { Text("Отмена") }
-                Button(
-                    enabled = !saved && invalidMap.values.none { it },
-                    onClick = {
-                        val millis = runCatching { sdf.parse(dateText)?.time ?: System.currentTimeMillis() }.getOrDefault(System.currentTimeMillis())
-                        vm.saveSession(
-                            installationId = installationId,
-                            dateEpochMillis = millis,
-                            valuesByComponent = uiState,
-                            notes = notes.text.ifBlank { null }
-                        )
-                        saved = true
-                        scope.launch {
-                            val res = snackbarHostState.showSnackbar(
-                                message = "ТО сохранено",
-                                actionLabel = "К истории"
-                            )
-                            if (res == SnackbarResult.ActionPerformed) {
-                                onDone()
-                            }
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text(if (saved) "Сохранено" else "Сохранить") }
-            }
-        }
+        topBar = { CenterAlignedTopAppBar(title = { Text("ТО: $installationName") }) }
     ) { padding ->
-        Column(
-            Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedTextField(
-                value = dateText,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Дата ТО") },
-                trailingIcon = {
-                    IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Filled.CalendarMonth, contentDescription = null)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (showDatePicker) {
-                DatePickerDialog(
-                    onDismissRequest = { showDatePicker = false },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            val millis = dateState.selectedDateMillis ?: System.currentTimeMillis()
-                            dateText = sdf.format(Date(millis))
-                            showDatePicker = false
-                        }) { Text("ОК") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDatePicker = false }) { Text("Отмена") }
-                    }
-                ) {
-                    DatePicker(state = dateState)
-                }
-            }
-
-            OutlinedTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text("Примечание (опц.)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            if (uiState.isEmpty()) {
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            if (groups.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Нет компонентов для ТО")
+                    Text("Нет компонентов или шаблонов для этой установки.")
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f, fill = true)
                 ) {
-                    items(uiState.keys.toList()) { componentId ->
-                        val title = names[componentId] ?: "Компонент"
-                        val isExpanded = expanded[componentId] == true
+                    itemsIndexed(groups, key = { _, g -> g.componentId }) { index, g ->
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             Column {
                                 ListItem(
-                                    headlineContent = { Text(title) },
+                                    headlineContent = { Text(g.componentName) },
+                                    trailingContent = {
+                                        IconButton(onClick = {
+                                            groups = groups.toMutableList().also { list ->
+                                                val current = list[index]
+                                                list[index] = current.copy(expanded = !current.expanded)
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = if (g.expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    }
                                 )
-                                if (isExpanded) {
-                                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                                        uiState[componentId]?.forEach { f ->
+                                if (g.expanded) {
+                                    Column(
+                                        Modifier
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                                            .fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        g.fields.forEach { f ->
                                             when (f.type) {
-                                                com.example.wassertech.data.types.FieldType.TEXT -> {
-                                                    OutlinedTextField(
-                                                        value = f.textValue,
-                                                        onValueChange = { f.textValue = it },
-                                                        label = { Text(f.label) },
-                                                        modifier = Modifier.fillMaxWidth()
-                                                    )
-                                                }
-                                                com.example.wassertech.data.types.FieldType.NUMBER -> {
-                                                    OutlinedTextField(
-                                                        value = f.numberValue,
-                                                        onValueChange = { f.numberValue = it },
-                                                        label = { Text(f.label + (f.unit?.let { " ($it)" } ?: "")) },
-                                                        modifier = Modifier.fillMaxWidth()
-                                                    )
-                                                }
-                                                com.example.wassertech.data.types.FieldType.CHECKBOX -> {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        Checkbox(checked = f.boolValue, onCheckedChange = { f.boolValue = it })
+                                                FieldType.CHECKBOX -> {
+                                                    var checked by remember { mutableStateOf(f.boolValue) }
+                                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                         Text(f.label)
+                                                        Checkbox(checked = checked, onCheckedChange = { v -> checked = v; f.boolValue = v })
                                                     }
+                                                }
+                                                FieldType.NUMBER -> {
+                                                    var text by remember { mutableStateOf(f.numberValue) }
+                                                    OutlinedTextField(
+                                                        value = text,
+                                                        onValueChange = { v -> text = v; f.numberValue = v },
+                                                        label = { Text(if (f.unit != null) "${f.label}, ${f.unit}" else f.label) },
+                                                        singleLine = true
+                                                    )
+                                                }
+                                                FieldType.TEXT -> {
+                                                    var text by remember { mutableStateOf(f.textValue) }
+                                                    OutlinedTextField(
+                                                        value = text,
+                                                        onValueChange = { v -> text = v; f.textValue = v },
+                                                        label = { Text(f.label) },
+                                                        singleLine = false,
+                                                        minLines = 2
+                                                    )
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                // Expand/collapse control
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(onClick = { expanded[componentId] = !isExpanded }) {
-                                        Text(if (isExpanded) "Свернуть" else "Развернуть")
-                                    }
-                                }
                             }
                         }
                     }
+                }
+
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(onClick = onDone, modifier = Modifier.weight(1f)) { Text("Отмена") }
+                    Button(onClick = { onDone() }, modifier = Modifier.weight(1f)) { Text("Сохранить") }
                 }
             }
         }

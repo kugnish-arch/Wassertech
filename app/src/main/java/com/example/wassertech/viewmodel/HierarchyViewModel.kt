@@ -32,6 +32,18 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun editInstallation(installation: InstallationEntity) { viewModelScope.launch { hierarchyDao.upsertInstallation(installation) } }
     fun editComponent(component: ComponentEntity) { viewModelScope.launch { hierarchyDao.upsertComponent(component) } }
 
+    fun renameInstallation(installationId: String, newName: String) {
+        viewModelScope.launch {
+            val db = AppDatabase.getInstance(getApplication())
+            val dao = db.hierarchyDao()
+            val inst = dao.getInstallation(installationId)
+            if (inst != null) {
+                val updated = inst.copy(name = newName)
+                dao.updateInstallation(updated)
+            }
+        }
+    }
+
     fun addClient(name: String, notes: String?, isCorporate: Boolean) {
         viewModelScope.launch {
             val id = UUID.randomUUID().toString()
@@ -105,12 +117,4 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         val c = getClient(clientId) ?: return@launch
         editClient(c.copy(isArchived = false, archivedAtEpoch = null))
     }
-
-fun renameInstallation(installationId: String, newName: String) = viewModelScope.launch {
-    val inst = hierarchyDao.getInstallation(installationId) ?: return@launch
-    if (newName.isNotBlank()) {
-        hierarchyDao.updateInstallations(listOf(inst.copy(name = newName.trim())))
-    }
-}
-
 }

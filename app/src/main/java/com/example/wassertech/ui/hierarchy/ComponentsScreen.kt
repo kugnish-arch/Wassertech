@@ -17,102 +17,38 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.viewmodel.HierarchyViewModel
 import com.example.wassertech.viewmodel.TemplatesViewModel
+import com.example.wassertech.data.entities.ChecklistTemplateEntity
 
 @Composable
 fun ComponentsScreen(
     installationId: String,
-    onStartMaintenance: (String) -> Unit,
+    onStartMaintenance: (String) -> Unit, // (пока не используется — оставляем для совместимости)
     onStartMaintenanceAll: () -> Unit,
+    onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {}, // NEW: дефолт — ничего не делает
     vm: HierarchyViewModel = viewModel(),
-    templatesVm: TemplatesViewModel = viewModel(),
-    // новая лямбда для навигации в «Историю ТО»
-    onOpenMaintenanceHistory: (String) -> Unit = {}
+    templatesVm: TemplatesViewModel = viewModel()
 ) {
-    // ---- Заголовок: название установки + редактирование ----
+    // --- Заголовок: название установки + редактирование ---
     var installation by remember { mutableStateOf<com.example.wassertech.data.entities.InstallationEntity?>(null) }
     LaunchedEffect(installationId) {
         installation = vm.getInstallation(installationId)
     }
 
     var showEdit by remember { mutableStateOf(false) }
-    var editName by remember { mutableStateOf(TextFieldValue(installation?.name.orEmpty())) }
+    var editName by remember { mutableStateOf(TextFieldValue("")) }
 
-    if (installation != null) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = if (installation!!.name.isBlank()) "Без названия" else installation!!.name,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = {
-                editName = TextFieldValue(installation!!.name)
-                showEdit = true
-            }) {
-                Icon(imageVector = Icons.Default.Edit, contentDescription = "Редактировать установку")
-            }
-        }
-
-        // Кнопки: Провести ТО / История ТО
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = onStartMaintenanceAll,
-                modifier = Modifier.weight(1f)
-            ) { Text("Провести ТО") }
-
-            OutlinedButton(
-                onClick = { onOpenMaintenanceHistory(installationId) },
-                modifier = Modifier.weight(1f)
-            ) { Text("История ТО") }
-        }
-    }
-
-    if (showEdit) {
-        AlertDialog(
-            onDismissRequest = { showEdit = false },
-            title = { Text("Редактировать установку") },
-            text = {
-                OutlinedTextField(
-                    value = editName,
-                    onValueChange = { editName = it },
-                    label = { Text("Название установки") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newName = editName.text.trim()
-                    if (newName.isNotEmpty() && installation != null) {
-                        vm.renameInstallation(installationId, newName)
-                        installation = installation!!.copy(name = newName)
-                        showEdit = false
-                    }
-                }) { Text("Сохранить") }
-            },
-            dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Отмена") } }
-        )
-    }
-
+    // --- Данные списков ---
     val components by vm.components(installationId).collectAsState(initial = emptyList())
-    val templates by templatesVm.templates.collectAsState()
+    val templates by templatesVm.templates.collectAsState() // список шаблонов (для выпадашки)
 
-    // Быстрый индекс id шаблона -> title
+    // Быстрый индекс id -> title
     val templateTitleById = remember(templates) {
         templates.associate { it.id to it.title }
     }
 
+    // --- Состояния диалога добавления компонента ---
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
     var selectedTemplate by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
@@ -136,6 +72,52 @@ fun ComponentsScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
+
+            // ----- Шапка экрана установки -----
+            if (installation != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (installation!!.name.isBlank()) "Без названия" else installation!!.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            editName = TextFieldValue(installation!!.name)
+                            showEdit = true
+                        }
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Редактировать установку")
+                    }
+                }
+
+                // Кнопки действий под заголовком
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onStartMaintenanceAll,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Провести ТО") }
+
+                    OutlinedButton(
+                        onClick = { onOpenMaintenanceHistoryForInstallation(installationId) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("История ТО") }
+                }
+
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // ----- Список компонентов -----
             if (components.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Нет компонентов. Нажмите «Компонент».")
@@ -153,11 +135,11 @@ fun ComponentsScreen(
                                 supportingContent = { Text(tmplTitle) },
                                 trailingContent = {
                                     Row {
-                                        IconButton(onClick = { /* up */ }) {
-                                            Icon(Icons.Default.ArrowUpward, contentDescription = null)
+                                        IconButton(onClick = { /* TODO: move up */ }) {
+                                            Icon(Icons.Default.ArrowUpward, contentDescription = "Вверх")
                                         }
-                                        IconButton(onClick = { /* down */ }) {
-                                            Icon(Icons.Default.ArrowDownward, contentDescription = null)
+                                        IconButton(onClick = { /* TODO: move down */ }) {
+                                            Icon(Icons.Default.ArrowDownward, contentDescription = "Вниз")
                                         }
                                     }
                                 }
@@ -169,18 +151,50 @@ fun ComponentsScreen(
         }
     }
 
+    // ----- Диалог редактирования названия установки -----
+    if (showEdit && installation != null) {
+        AlertDialog(
+            onDismissRequest = { showEdit = false },
+            title = { Text("Редактировать установку") },
+            text = {
+                OutlinedTextField(
+                    value = editName,
+                    onValueChange = { editName = it },
+                    label = { Text("Название установки") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newTitle = editName.text.trim()
+                    if (newTitle.isNotEmpty()) {
+                        vm.renameInstallation(installationId, newTitle)
+                        installation = installation!!.copy(name = newTitle)
+                    }
+                    showEdit = false
+                }) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEdit = false }) { Text("Отмена") }
+            }
+        )
+    }
+
+    // ----- Диалог добавления компонента -----
     if (showAdd) {
         AlertDialog(
             onDismissRequest = { showAdd = false },
             confirmButton = {
                 TextButton(onClick = {
                     val tmpl = selectedTemplate
-                    val compName = if (newName.text.isNotBlank()) newName.text.trim() else tmpl?.title ?: "Компонент"
-                    // тип не используем в UI; столбец в Entity может оставаться для совместимости
+                    val compName = if (newName.text.isNotBlank()) newName.text.trim()
+                    else tmpl?.title ?: "Компонент"
+
+                    // тип в UI не используется; колонка в Entity может оставаться для совместимости
                     vm.addComponentFromTemplate(
                         installationId = installationId,
                         name = compName,
-                        type = com.example.wassertech.data.types.ComponentType.FILTER, // ignored в логике
+                        type = com.example.wassertech.data.types.ComponentType.FILTER, // игнорим тип в логике
                         templateId = tmpl?.id
                     )
                     showAdd = false
@@ -201,7 +215,7 @@ fun ComponentsScreen(
                         onExpandedChange = { templateMenu = it }
                     ) {
                         OutlinedTextField(
-                            value = selectedTemplate?.title ?: "Нет шаблонов",
+                            value = selectedTemplate?.title ?: if (templates.isEmpty()) "Нет шаблонов" else "Выберите шаблон",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Шаблон") },

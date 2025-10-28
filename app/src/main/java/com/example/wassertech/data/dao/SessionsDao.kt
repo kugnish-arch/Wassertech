@@ -1,3 +1,4 @@
+
 package com.example.wassertech.data.dao
 
 import androidx.room.*
@@ -12,21 +13,27 @@ data class ComponentLastTsRow(
 @Dao
 interface SessionsDao {
 
-    @Query("""
-        SELECT o.componentId AS componentId, MAX(s.startedAtEpoch) AS ts
-        FROM observations o
-        JOIN maintenance_sessions s ON o.sessionId = s.id
-        WHERE s.installationId = :installationId
-        GROUP BY o.componentId
-    """)
-    suspend fun getLastTimestampsByComponent(installationId: String): List<ComponentLastTsRow>
+    // Последнее время ТО по каждому компоненту (если нужно в будущем)
+    @Query("SELECT o.componentId AS componentId, MAX(s.startedAtEpoch) AS ts FROM observations o JOIN maintenance_sessions s ON o.sessionId = s.id GROUP BY o.componentId")
+    fun observeLastTsByComponent(): Flow<List<ComponentLastTsRow>>
 
+    // История по сайту (есть в проекте — оставляем)
+    @Query("SELECT * FROM maintenance_sessions WHERE siteId = :siteId ORDER BY startedAtEpoch DESC")
+    fun observeSessions(siteId: String): Flow<List<MaintenanceSessionEntity>>
+
+    // История по установке
     @Query("SELECT * FROM maintenance_sessions WHERE installationId = :installationId ORDER BY startedAtEpoch DESC")
     fun observeSessionsByInstallation(installationId: String): Flow<List<MaintenanceSessionEntity>>
 
-    @Query("SELECT * FROM observations WHERE sessionId = :sessionId ORDER BY rowid")
+    // Глобальная история
+    @Query("SELECT * FROM maintenance_sessions ORDER BY startedAtEpoch DESC")
+    fun observeAllSessions(): Flow<List<MaintenanceSessionEntity>>
+
+    // Детали сессии
+    @Query("SELECT * FROM observations WHERE sessionId = :sessionId")
     suspend fun getObservations(sessionId: String): List<ObservationEntity>
 
+    // Upserts
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSession(s: MaintenanceSessionEntity)
 
@@ -35,7 +42,4 @@ interface SessionsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertIssues(list: List<IssueEntity>)
-
-    @Query("SELECT * FROM maintenance_sessions WHERE siteId = :siteId ORDER BY startedAtEpoch DESC")
-    fun observeSessions(siteId: String): Flow<List<MaintenanceSessionEntity>>
 }

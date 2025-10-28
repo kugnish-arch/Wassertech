@@ -54,6 +54,7 @@ interface TemplatesDao {
         ORDER BY rowid
         """
     )
+
     suspend fun getFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -61,4 +62,26 @@ interface TemplatesDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertField(field: ChecklistFieldEntity)
+
+    @Query(
+        """
+    SELECT * FROM checklist_fields
+    WHERE templateId = :templateId AND isForMaintenance = 1
+    ORDER BY rowid
+    """
+    )
+    fun observeMaintenanceFields(templateId: String): Flow<List<ChecklistFieldEntity>>
+
+    @Query(
+        """
+    SELECT * FROM checklist_fields
+    WHERE templateId = :templateId AND isForMaintenance = 1
+    ORDER BY rowid
+    """
+    )
+    suspend fun getMaintenanceFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
+
+    @Query("SELECT DISTINCT groupName FROM clients ORDER BY groupName COLLATE NOCASE")
+    fun observeClientGroups(): Flow<List<String>>
+
 }

@@ -23,10 +23,9 @@ import com.example.wassertech.ui.clients.ClientsScreen
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
-import com.example.wassertech.ui.templates.TemplatesScreen
-import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
-
+import com.example.wassertech.ui.templates.TemplateEditorScreen
+import com.example.wassertech.ui.templates.TemplatesScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +74,15 @@ fun AppTopBar(navController: NavHostController) {
                         }
                     }
                 )
+                DropdownMenuItem(
+                    text = { Text("История ТО") },
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate("maintenance_history") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
         }
     )
@@ -94,7 +102,7 @@ fun AppNavHost() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppScaffold(navController: NavHostController) {
-    Scaffold(topBar = { AppTopBar(navController) }) { innerPadding ->
+    Scaffold(topBar = { AppTopBar(navController)}) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = "clients",
@@ -122,14 +130,6 @@ private fun AppScaffold(navController: NavHostController) {
             ) { bse ->
                 val id = bse.arguments?.getString("templateId") ?: return@composable
                 TemplateEditorScreen(templateId = id)
-            }
-
-            composable("maintenance_history/{installationId}") { backStackEntry ->
-                val installationId = backStackEntry.arguments?.getString("installationId")!!
-                MaintenanceHistoryScreen(
-                    installationId = installationId,
-                    onBack = { navController.popBackStack() }
-                )
             }
 
             composable(
@@ -186,6 +186,32 @@ private fun AppScaffold(navController: NavHostController) {
                     MaintenanceAllScreen(
                         installationId = installationId,
                         onDone = { navController.navigateUp() }
+                    )
+                }
+            }
+
+            // --- История ТО: общий экран ---
+            composable("maintenance_history") {
+                Column {
+                    SectionHeader("История ТО")
+                    MaintenanceHistoryScreen(
+                        installationId = null,
+                        onBack = { navController.navigateUp() }
+                    )
+                }
+            }
+
+            // --- История ТО конкретной установки ---
+            composable(
+                "maintenance_history/{installationId}",
+                arguments = listOf(navArgument("installationId") { type = NavType.StringType })
+            ) { bse ->
+                val installationId = bse.arguments?.getString("installationId")
+                Column {
+                    SectionHeader("История ТО")
+                    MaintenanceHistoryScreen(
+                        installationId = installationId,
+                        onBack = { navController.navigateUp() }
                     )
                 }
             }

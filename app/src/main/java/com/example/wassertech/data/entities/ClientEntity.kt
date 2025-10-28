@@ -2,6 +2,7 @@ package com.example.wassertech.data.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 @Entity(tableName = "clients")
 data class ClientEntity(
@@ -11,5 +12,8 @@ data class ClientEntity(
     val notes: String? = null,
     val isCorporate: Boolean = false,
     val isArchived: Boolean = false,
-    val archivedAtEpoch: Long? = null
+    val archivedAtEpoch: Long? = null,
+
+    @ColumnInfo(name = "groupName", defaultValue = "ROOT")
+    val groupName: String = "ROOT"  // ← новое поле, по умолчанию ROOT
 )
