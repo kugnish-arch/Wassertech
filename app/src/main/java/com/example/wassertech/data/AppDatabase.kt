@@ -8,10 +8,6 @@ import androidx.room.TypeConverters
 import com.example.wassertech.data.dao.*
 import com.example.wassertech.data.entities.*
 
-import com.example.wassertech.data.migrations.MIGRATION_5_6
-import com.example.wassertech.data.migrations.MIGRATION_6_7
-import com.example.wassertech.data.migrations.MIGRATION_7_8
-
 
 @Database(
     version = 2,
@@ -55,6 +51,9 @@ abstract class AppDatabase : RoomDatabase() {
 
                     // Разрешаем разрушительную миграцию ТОЛЬКО с очень старых версий,
                     //.fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
+
+                    // Разрешаем разрушить БД при переходе с 1-й версии:
+                    .fallbackToDestructiveMigrationFrom(1)
 
                     //на реальных данных убираем 2 строки ниже, чтобы не убивать базу
                     .fallbackToDestructiveMigration() // <-- drop & recreate if no full path from current to 7
