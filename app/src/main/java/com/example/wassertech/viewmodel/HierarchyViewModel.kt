@@ -15,19 +15,20 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val db = AppDatabase.getInstance(application)
     private val hierarchyDao = db.hierarchyDao()
+    private val clientDao = db.clientDao()
 
     fun clients(includeArchived: Boolean = false): Flow<List<ClientEntity>> =
-        if (includeArchived) hierarchyDao.observeClients(true) else hierarchyDao.observeClients()
+        if (includeArchived) clientDao.observeClients(true) else clientDao.observeClients()
 
     fun sites(clientId: String): Flow<List<SiteEntity>> = hierarchyDao.observeSites(clientId)
     fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
 
-    suspend fun getClient(id: String): ClientEntity? = hierarchyDao.getClient(id)
+    suspend fun getClient(id: String): ClientEntity? = clientDao.getClient(id)
     suspend fun getSite(id: String): SiteEntity? = hierarchyDao.getSite(id)
     suspend fun getInstallation(id: String): InstallationEntity? = hierarchyDao.getInstallation(id)
 
-    fun editClient(client: ClientEntity) { viewModelScope.launch { hierarchyDao.upsertClient(client) } }
+    fun editClient(client: ClientEntity) { viewModelScope.launch { clientDao.upsertClient(client) } }
     fun editSite(site: SiteEntity) { viewModelScope.launch { hierarchyDao.upsertSite(site) } }
     fun editInstallation(installation: InstallationEntity) { viewModelScope.launch { hierarchyDao.upsertInstallation(installation) } }
     fun editComponent(component: ComponentEntity) { viewModelScope.launch { hierarchyDao.upsertComponent(component) } }
@@ -47,7 +48,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun addClient(name: String, notes: String?, isCorporate: Boolean) {
         viewModelScope.launch {
             val id = UUID.randomUUID().toString()
-            hierarchyDao.upsertClient(ClientEntity(id, name, phone = null, notes = notes, isCorporate = isCorporate))
+            clientDao.upsertClient(ClientEntity(id, name, phone = null, notes = notes, isCorporate = isCorporate))
         }
     }
     fun addSite(clientId: String, name: String, address: String?) {

@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 class ClientsViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
-    private val hierarchyDao = db.hierarchyDao()
+    private val clientDao = db.clientDao()
 
-    val clients: Flow<List<ClientEntity>> = hierarchyDao.observeClients()
+    val clients: Flow<List<ClientEntity>> = clientDao.observeActiveClients()
 }

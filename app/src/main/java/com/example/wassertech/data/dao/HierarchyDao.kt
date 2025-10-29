@@ -13,9 +13,12 @@ interface HierarchyDao {
     suspend fun updateInstallation(installation: InstallationEntity)
 
     // ---- Clients ----
+    /*
     @Query("SELECT * FROM clients WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
+
     fun observeClients(): Flow<List<ClientEntity>>
 
+    
     @Query("""
         SELECT * FROM clients
         WHERE (:includeArchived = 1) OR (isArchived = 0)
@@ -29,6 +32,7 @@ interface HierarchyDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertClient(client: ClientEntity)
+*/
 
     // ---- Sites ----
     @Query("SELECT * FROM sites WHERE clientId = :clientId ORDER BY orderIndex ASC, name COLLATE NOCASE")

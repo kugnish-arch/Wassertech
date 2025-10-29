@@ -81,7 +81,7 @@ interface TemplatesDao {
     )
     suspend fun getMaintenanceFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
 
-    @Query("SELECT DISTINCT groupName FROM clients ORDER BY groupName COLLATE NOCASE")
+    @Query("SELECT DISTINCT ClientGroupID FROM clients ORDER BY ClientGroupID COLLATE NOCASE")
     fun observeClientGroups(): Flow<List<String>>
 
 }

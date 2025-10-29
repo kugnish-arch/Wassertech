@@ -14,10 +14,11 @@ import com.example.wassertech.data.migrations.MIGRATION_7_8
 
 
 @Database(
-    version = 8,
+    version = 2,
     exportSchema = true,
     entities = [
         ClientEntity::class,
+        ClientGroupEntity::class,
         SiteEntity::class,
         InstallationEntity::class,
         ComponentEntity::class,
@@ -36,6 +37,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sessionsDao(): SessionsDao
     abstract fun checklistDao(): ChecklistDao
 
+    abstract fun clientDao(): ClientDao
+
+
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
 
@@ -44,17 +48,17 @@ abstract class AppDatabase : RoomDatabase() {
                 val db = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "wassertech.db"
+                    "wassertech_v1.db"
                 )
                     // Known migrations; if some links are missing, we'll fall back to destructive (dev only)
-                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    //.addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 
                     // Разрешаем разрушительную миграцию ТОЛЬКО с очень старых версий,
-                    .fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
+                    //.fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
 
                     //на реальных данных убираем 2 строки ниже, чтобы не убивать базу
-                    //.fallbackToDestructiveMigration() // <-- drop & recreate if no full path from current to 7
-                    //.fallbackToDestructiveMigrationOnDowngrade()
+                    .fallbackToDestructiveMigration() // <-- drop & recreate if no full path from current to 7
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = db
                 db
