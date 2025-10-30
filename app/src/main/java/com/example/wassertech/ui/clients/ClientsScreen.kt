@@ -43,6 +43,15 @@ import androidx.compose.ui.unit.Dp
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
 
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+
+
+
+
+
 const val ALL_GROUP_ID: String = "__ALL__"
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
 
@@ -93,7 +102,7 @@ fun ClientsScreen(
     }
 
     Scaffold(
-        topBar = { /* заголовок скрыт по твоей версии */ },
+        //topBar = { /* если нужен */ },
         bottomBar = {
             Row(
                 modifier = Modifier
@@ -138,9 +147,18 @@ fun ClientsScreen(
             }
         }
     ) { padding ->
+        val layoutDir = LocalLayoutDirection.current
+
         LazyColumn(
             modifier = Modifier
-                .padding(padding)
+                .padding(
+                    // убираем большой верхний отступ от Scaffold
+                    top = 0.dp,
+                    // сохраняем боковые отступы от системных панелей (если будут)
+                    start = padding.calculateStartPadding(layoutDir),
+                    end   = padding.calculateEndPadding(layoutDir),
+                    // низ не трогаем — им управляет contentPadding ниже
+                )
                 .fillMaxSize(),
             contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
         ) {
