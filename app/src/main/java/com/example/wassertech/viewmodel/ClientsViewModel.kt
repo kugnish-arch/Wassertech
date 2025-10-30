@@ -9,6 +9,8 @@ import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.UUID
+
 
 /**
  * ViewModel экрана "Клиенты" с поддержкой групп и архива.
@@ -52,8 +54,19 @@ class ClientsViewModel(application: Application) : AndroidViewModel(application)
             }
         }.distinctUntilChanged()
 
-    // ---- события от UI ----
+    //========== Счетчики для групп клиентов
+    //private val allForCounts: Flow<List<ClientEntity>> =
+    //    combine(includeArchived) { inc -> inc }
+    //        .flatMapLatest { inc -> clientDao.observeClients(includeArchived = inc) }
 
+    //val countsByGroup: Flow<Map<String?, Int>> =
+    //    allForCounts.map { list -> list.groupingBy { it.clientGroupId }.eachCount() }
+
+    //val totalCount: Flow<Int> = allForCounts.map { it.size }
+    //val noGroupCount: Flow<Int> = countsByGroup.map { it[null] ?: 0 }
+
+
+    // ---- события от UI ----
     fun selectAll() {
         _selectedGroupId.value = ALL_GROUP_ID
     }
@@ -127,4 +140,22 @@ class ClientsViewModel(application: Application) : AndroidViewModel(application)
             clientDao.restoreClient(clientId)
         }
     }
+
+    fun createClient(name: String, corporate: Boolean, groupId: String?) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val newClient = ClientEntity(
+                id = UUID.randomUUID().toString(),
+                name = name,
+                isCorporate = corporate,          // <<< ВАЖНО: сохраняем чекбокс
+                clientGroupId = groupId,
+                isArchived = false,
+                sortOrder = 0,
+                createdAtEpoch = now,
+                updatedAtEpoch = now
+            )
+            clientDao.upsertClient(newClient)
+        }
+    }
+
 }

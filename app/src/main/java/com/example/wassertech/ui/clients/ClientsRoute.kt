@@ -22,18 +22,22 @@ import androidx.compose.runtime.collectAsState
 
 @Composable
 fun ClientsRoute(
-    onClientClick: (ClientEntity) -> Unit = {}
+    onClientClick: (String) -> Unit,
+
 ) {
+
     val app = LocalContext.current.applicationContext as Application
+
+    // Создаём VM через твою фабрику (требует Application)
     val vm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(app))
 
-    // «Подписываемся» на потоки VM (Flow -> State)
-    val groups by vm.groups.collectAsState(initial = emptyList())
-    val clients by vm.clients.collectAsState(initial = emptyList())
+    val groups by vm.groups.collectAsState(emptyList())
+    val clients by vm.clients.collectAsState(emptyList())
     val selectedGroupId by vm.selectedGroupId.collectAsState()
     val includeArchived by vm.includeArchived.collectAsState()
 
-    // Передаём данные и методы VM в UI
+
+
     ClientsScreen(
         groups = groups,
         clients = clients,
@@ -48,6 +52,15 @@ fun ClientsRoute(
         onCreateGroup = vm::createGroup,
 
         onAssignClientGroup = vm::assignClientToGroup,
-        onClientClick = onClientClick
+        onClientClick = { client -> onClientClick(client.id) },
+
+        // можно оставить onAddClient пустым — диалог открывается локально в экране
+        onAddClient = {},
+
+        // ВАЖНО: проброс сохранения нового клиента
+        onCreateClient = { name, corporate, groupId ->
+            vm.createClient(name, corporate, groupId)
+        }
     )
 }
+

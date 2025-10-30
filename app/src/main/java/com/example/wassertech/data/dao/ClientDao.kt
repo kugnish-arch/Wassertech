@@ -83,16 +83,19 @@ interface ClientDao {
      */
 
     @Query("""
-        SELECT * FROM clients
-        WHERE (:clientGroupId IS NULL AND clientGroupId IS NULL)
-           OR (clientGroupId = :clientGroupId)
-          AND (:includeArchived OR isArchived = 0)
-        ORDER BY sortOrder ASC, name COLLATE NOCASE ASC
-    """)
+    SELECT * FROM clients
+    WHERE (
+            (:clientGroupId IS NULL AND clientGroupId IS NULL)
+         OR (clientGroupId = :clientGroupId)
+          )
+      AND (:includeArchived OR isArchived = 0)
+    ORDER BY sortOrder ASC, name COLLATE NOCASE ASC
+""")
     fun observeClientsByGroup(
         clientGroupId: String?,
         includeArchived: Boolean = false
     ): Flow<List<ClientEntity>>
+
 
     @Query("UPDATE clients SET clientGroupId = :clientGroupId, updatedAtEpoch = :ts WHERE id = :clientId")
     suspend fun setClientGroup(clientId: String, clientGroupId: String?, ts: Long = System.currentTimeMillis())

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -14,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,7 +31,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExtendedFloatingActionButton
-
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Checkbox
 
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
@@ -57,39 +58,73 @@ fun ClientsScreen(
     onCreateGroup: (String) -> Unit,
 
     onAssignClientGroup: (clientId: String, groupId: String?) -> Unit,
-    onClientClick: (ClientEntity) -> Unit = {}
+    onClientClick: (ClientEntity) -> Unit = {},
+    onAddClient: () -> Unit = {},
+
+    // новый коллбек создания клиента
+    onCreateClient: (name: String, corporate: Boolean, groupId: String?) -> Unit = { _, _, _ -> }
 ) {
     var groupsMenuExpanded by remember { mutableStateOf(false) }
     var createGroupDialog by remember { mutableStateOf(false) }
     var newGroupTitle by remember { mutableStateOf("") }
 
+    // состояние диалога "Новый клиент"
+    var createClientDialog by remember { mutableStateOf(false) }
+    var newClientName by remember { mutableStateOf("") }
+    var newClientCorporate by remember { mutableStateOf(false) }
+    var newClientGroupId by remember { mutableStateOf<String?>(null) }
+    var groupPickerExpanded by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
+            // заголовок скрыт по твоей версии
+            /* CenterAlignedTopAppBar(
                 title = { Text("Клиенты", fontWeight = FontWeight.SemiBold) },
-                actions = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("Архив", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.width(8.dp))
-                        Switch(
-                            checked = includeArchived,
-                            onCheckedChange = { onToggleIncludeArchived() }
-                        )
-                    }
+                actions = { }
+            ) */
+        },
+        bottomBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconToggleButton(
+                    checked = includeArchived,
+                    onCheckedChange = { onToggleIncludeArchived() }
+                ) {
+                    Icon(
+                        imageVector = if (includeArchived) Icons.Filled.Delete else Icons.Outlined.Delete,
+                        contentDescription = "Показать архив"
+                    )
                 }
-            )
+                Text("Корзина")
+            }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { createGroupDialog = true }
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Новая группа")
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        onAddClient()
+                        // локально открываем диалог создания клиента
+                        createClientDialog = true
+                    }
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Клиент")
+                }
+                ExtendedFloatingActionButton(
+                    onClick = { createGroupDialog = true }
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Группа")
+                }
             }
         }
     ) { padding ->
@@ -98,98 +133,31 @@ fun ClientsScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // Фильтры по группам
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilterChipLikeButton(
-                    selected = selectedGroupId == ALL_GROUP_ID,
-                    onClick = onSelectAll,
-                    label = "Все"
-                )
-                Spacer(Modifier.width(8.dp))
-                FilterChipLikeButton(
-                    selected = selectedGroupId == null,
-                    onClick = onSelectNoGroup,
-                    label = "Без группы"
-                )
-                Spacer(Modifier.width(8.dp))
+            // (временно скрыто) фильтры по группам
+            Spacer(Modifier.height(8.dp))
 
-                // Выпадающее меню выбора группы
-                Box {
-                    OutlinedButton(onClick = { groupsMenuExpanded = true }) {
-                        val title = when {
-                            selectedGroupId == ALL_GROUP_ID -> "Группы"
-                            selectedGroupId == null -> "Без группы"
-                            else -> groups.find { it.id == selectedGroupId }?.title ?: "Группы"
-                        }
-                        Text(title)
-                    }
-                    DropdownMenu(
-                        expanded = groupsMenuExpanded,
-                        onDismissRequest = { groupsMenuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Все") },
-                            onClick = {
-                                onSelectAll()
-                                groupsMenuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Без группы") },
-                            onClick = {
-                                onSelectNoGroup()
-                                groupsMenuExpanded = false
-                            }
-                        )
-                        if (groups.isNotEmpty()) {
-                            Divider()
-                        }
-                        groups.forEach { g ->
-                            DropdownMenuItem(
-                                text = { Text(g.title) },
-                                onClick = {
-                                    onSelectGroup(g.id)
-                                    groupsMenuExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Divider()
-
-            // Список клиентов
             if (clients.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 24.dp)
                 ) {
-                    Text("Нет клиентов для выбранного фильтра")
+                    Text(
+                        "Нет клиентов для выбранного фильтра",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 8.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
                 ) {
                     items(clients, key = { it.id }) { client ->
                         ClientRow(
                             client = client,
-                            currentGroup = when (client.clientGroupId) {
-                                null -> "Без группы"
-                                else -> groups.find { it.id == client.clientGroupId }?.title ?: "—"
-                            },
                             groups = groups,
                             onClick = { onClientClick(client) },
-                            onAssignGroup = { gid ->
-                                onAssignClientGroup(client.id, gid)
-                            }
+                            onAssignGroup = { gid -> onAssignClientGroup(client.id, gid) }
                         )
                         Divider()
                     }
@@ -229,52 +197,135 @@ fun ClientsScreen(
             }
         )
     }
+
+    // Диалог создания клиента
+    if (createClientDialog) {
+        AlertDialog(
+            onDismissRequest = { createClientDialog = false },
+            title = { Text("Новый клиент") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newClientName,
+                        onValueChange = { newClientName = it },
+                        singleLine = true,
+                        label = { Text("Имя") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = newClientCorporate,
+                            onCheckedChange = { newClientCorporate = it }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Корпоративный")
+                    }
+
+                    // Комбо-бокс выбора группы (простая кнопка + DropdownMenu)
+                    Box {
+                        OutlinedButton(
+                            onClick = { groupPickerExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val label = when (newClientGroupId) {
+                                null -> "Без группы"
+                                else -> groups.find { it.id == newClientGroupId }?.title ?: "Группа"
+                            }
+                            Text(label)
+                        }
+                        DropdownMenu(
+                            expanded = groupPickerExpanded,
+                            onDismissRequest = { groupPickerExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Без группы") },
+                                onClick = {
+                                    newClientGroupId = null
+                                    groupPickerExpanded = false
+                                }
+                            )
+                            if (groups.isNotEmpty()) Divider()
+                            groups.forEach { g ->
+                                DropdownMenuItem(
+                                    text = { Text(g.title) },
+                                    onClick = {
+                                        newClientGroupId = g.id
+                                        groupPickerExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                val canSave = newClientName.trim().isNotEmpty()
+                TextButton(
+                    onClick = {
+                        if (canSave) {
+                            onCreateClient(newClientName.trim(), newClientCorporate, newClientGroupId)
+                            // reset
+                            newClientName = ""
+                            newClientCorporate = false
+                            newClientGroupId = null
+                            createClientDialog = false
+                        }
+                    },
+                    enabled = canSave
+                ) { Text("Создать") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        createClientDialog = false
+                    }
+                ) { Text("Отмена") }
+            }
+        )
+    }
 }
 
 @Composable
 private fun ClientRow(
     client: ClientEntity,
-    currentGroup: String,
     groups: List<ClientGroupEntity>,
     onClick: () -> Unit,
-    onAssignGroup: (String?) -> Unit
+    onAssignGroup: (String?) -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                client.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (client.isArchived) FontWeight.Normal else FontWeight.SemiBold
-            )
-            val secondary = buildString {
-                client.phone?.takeIf { it.isNotBlank() }?.let { append(it) }
-                client.email?.takeIf { it.isNotBlank() }?.let {
-                    if (isNotEmpty()) append(" • ")
-                    append(it)
-                }
-                if (currentGroup.isNotBlank()) {
-                    if (isNotEmpty()) append(" • ")
-                    append(currentGroup)
-                }
-            }
-            if (secondary.isNotBlank()) {
-                Text(
-                    secondary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+        Text(client.name, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        val secondary = listOfNotNull(
+            client.phone?.takeIf { it.isNotBlank() },
+            client.email?.takeIf { it.isNotBlank() },
+            client.addressFull?.takeIf { it.isNotBlank() }
+        ).joinToString(" · ")
+        if (secondary.isNotBlank()) {
+            Text(secondary, style = MaterialTheme.typography.bodyMedium)
         }
 
-        Box {
-            TextButton(onClick = { menuExpanded = true }) { Text("Группа") }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { menuExpanded = true }) {
+                val label = when (client.clientGroupId) {
+                    null -> "Без группы"
+                    else -> groups.find { it.id == client.clientGroupId }?.title ?: "Группа"
+                }
+                Text(label)
+            }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 DropdownMenuItem(
                     text = { Text("Без группы") },
@@ -283,7 +334,7 @@ private fun ClientRow(
                         menuExpanded = false
                     }
                 )
-                if (groups.isNotEmpty()) Divider()
+                if (true) Divider()
                 groups.forEach { g ->
                     DropdownMenuItem(
                         text = { Text(g.title) },
