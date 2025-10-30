@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 
 class HierarchyViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -24,14 +27,28 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
 
+    /*
     suspend fun getClient(id: String): ClientEntity? = clientDao.getClient(id)
     suspend fun getSite(id: String): SiteEntity? = hierarchyDao.getSite(id)
     suspend fun getInstallation(id: String): InstallationEntity? = hierarchyDao.getInstallation(id)
+    */
+    // ЧТЕНИЕ (были без контекста)
+    suspend fun getClient(id: String): ClientEntity? =
+        withContext(Dispatchers.IO) { clientDao.getClient(id) }
 
+    suspend fun getSite(id: String): SiteEntity? =
+        withContext(Dispatchers.IO) { hierarchyDao.getSite(id) }
+
+    suspend fun getInstallation(id: String): InstallationEntity? =
+        withContext(Dispatchers.IO) { hierarchyDao.getInstallation(id) }
+
+    /*
     fun editClient(client: ClientEntity) { viewModelScope.launch { clientDao.upsertClient(client) } }
+
     fun editSite(site: SiteEntity) { viewModelScope.launch { hierarchyDao.upsertSite(site) } }
     fun editInstallation(installation: InstallationEntity) { viewModelScope.launch { hierarchyDao.upsertInstallation(installation) } }
     fun editComponent(component: ComponentEntity) { viewModelScope.launch { hierarchyDao.upsertComponent(component) } }
+    */
 
     fun renameInstallation(installationId: String, newName: String) {
         viewModelScope.launch {
@@ -43,6 +60,14 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                 dao.updateInstallation(updated)
             }
         }
+    }
+
+    fun editClient(client: ClientEntity) {
+        viewModelScope.launch(Dispatchers.IO) { clientDao.upsertClient(client) }
+    }
+
+    fun editSite(site: SiteEntity) {
+        viewModelScope.launch(Dispatchers.IO) { hierarchyDao.upsertSite(site) }
     }
 
     fun addClient(name: String, notes: String?, isCorporate: Boolean) {
