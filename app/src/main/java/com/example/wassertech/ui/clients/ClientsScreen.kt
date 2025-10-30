@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +37,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.unit.Dp
 
 import com.example.wassertech.data.entities.ClientEntity
@@ -46,6 +46,7 @@ import com.example.wassertech.data.entities.ClientGroupEntity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.ui.graphics.Color
 
 const val ALL_GROUP_ID: String = "__ALL__"
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
@@ -70,7 +71,7 @@ fun ClientsScreen(
     onClientClick: (ClientEntity) -> Unit = {},
     onAddClient: () -> Unit = {},
 
-    // создание клиента (сохраняем в БД во VM)
+    // создание клиента
     onCreateClient: (name: String, corporate: Boolean, groupId: String?) -> Unit = { _, _, _ -> },
 
     // архивация/восстановление
@@ -96,28 +97,14 @@ fun ClientsScreen(
     var isEditMode by remember { mutableStateOf(false) }
     var includeArchivedBeforeEdit by remember { mutableStateOf<Boolean?>(null) }
 
-    // Локальный кеш заархивированных групп, чтобы сразу показывать их в режиме редактирования
-    val archivedGroupsLocal = remember { mutableStateListOf<ClientGroupEntity>() }
-
     // Группировка клиентов по clientGroupId (null = без группы)
     val clientsByGroup = remember(clients) { clients.groupBy { it.clientGroupId } }
     val generalClients = clientsByGroup[null].orEmpty()
 
     // Предрасчёт счётчиков
     val generalCount = generalClients.size
-    val countsByGroup = remember(clientsByGroup, groups, archivedGroupsLocal) {
-        val base = groups.associate { g -> g.id to (clientsByGroup[g.id]?.size ?: 0) }.toMutableMap()
-        archivedGroupsLocal.forEach { g ->
-            base.putIfAbsent(g.id, clientsByGroup[g.id]?.size ?: 0)
-        }
-        base
-    }
-
-    // Итоговый список групп для рендера: активные (из VM) + локально заархивированные (которых ещё нет в списке VM)
-    val groupsForRender = remember(groups, archivedGroupsLocal) {
-        val ids = groups.map { it.id }.toSet()
-        val extraArchived = archivedGroupsLocal.filter { it.id !in ids }
-        groups + extraArchived
+    val countsByGroup = remember(clientsByGroup, groups) {
+        groups.associate { g -> g.id to (clientsByGroup[g.id]?.size ?: 0) }
     }
 
     Scaffold(
@@ -155,15 +142,20 @@ fun ClientsScreen(
             }
         },
         floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Два FAB рядом в строке, "Клиент" зелёный (tertiary)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ExtendedFloatingActionButton(
                     onClick = {
                         onAddClient()
                         createClientDialog = true
-                    }
+                    },
+                    //containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    //contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = Color(0xFF4CAF50), // Material Green 500
+                    contentColor = Color.White
+
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -197,9 +189,10 @@ fun ClientsScreen(
                     title = "Общая",
                     count = generalCount,
                     isExpanded = expandedSectionId == GENERAL_SECTION_ID,
-                    isArchived = false, // "Общая" — это виртуальная секция
+                    isArchived = false, // виртуальная
+                    canArchive = false, // <— НЕЛЬЗЯ архивировать "Общую"
                     showActions = isEditMode,
-                    onArchive = { /* no-op for virtual group */ },
+                    onArchive = { /* no-op */ },
                     onRestore = { /* no-op */ },
                     onToggle = {
                         expandedSectionId =
@@ -228,29 +221,20 @@ fun ClientsScreen(
                 }
             }
 
-            // ----- ОСТАЛЬНЫЕ ГРУППЫ (активные + локально заархивированные) -----
+            // ----- ОСТАЛЬНЫЕ ГРУППЫ -----
             items(
-                items = groupsForRender,
+                items = groups,
                 key = { "header_${it.id}" }
             ) { group ->
-                val isGroupArchived = group.isArchived == true || archivedGroupsLocal.any { it.id == group.id }
                 GroupHeader(
                     title = group.title,
                     count = countsByGroup[group.id] ?: 0,
                     isExpanded = expandedSectionId == group.id,
-                    isArchived = isGroupArchived,
+                    isArchived = group.isArchived == true,
+                    canArchive = true,
                     showActions = isEditMode,
-                    onArchive = {
-                        // моментально отобразим группу как архивную
-                        if (!archivedGroupsLocal.any { it.id == group.id }) {
-                            archivedGroupsLocal.add(group.copy(isArchived = true))
-                        }
-                        onArchiveGroup(group.id)
-                    },
-                    onRestore = {
-                        archivedGroupsLocal.removeAll { it.id == group.id }
-                        onRestoreGroup(group.id)
-                    },
+                    onArchive = { onArchiveGroup(group.id) },
+                    onRestore = { onRestoreGroup(group.id) },
                     onToggle = {
                         expandedSectionId =
                             if (expandedSectionId == group.id) "" else group.id
@@ -405,6 +389,7 @@ private fun GroupHeader(
     count: Int,
     isExpanded: Boolean,
     isArchived: Boolean,
+    canArchive: Boolean,
     showActions: Boolean,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
@@ -434,7 +419,7 @@ private fun GroupHeader(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.weight(1f)
         )
-        if (showActions) {
+        if (showActions && canArchive) {
             TextButton(onClick = { if (isArchived) onRestore() else onArchive() }) {
                 Text(if (isArchived) "Восстановить" else "Архивировать", color = contentColor)
             }

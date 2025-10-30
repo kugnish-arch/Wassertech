@@ -1,71 +1,48 @@
 package com.example.wassertech.ui.clients
 
-/*==================================================
-Маршрут-обёртка ClientsRoute
-
-Эта функция:
--получает VM (через фабрику),
--«подписывается» на Flow из VM,
--передаёт данные и коллбеки в экран ClientsScreen.
-==================================================*/
-
 import android.app.Application
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.viewmodel.ClientsViewModel
 import com.example.wassertech.viewmodel.ClientsViewModelFactory
-import kotlinx.coroutines.flow.collect
-import androidx.compose.runtime.collectAsState
 
 @Composable
 fun ClientsRoute(
-    onClientClick: (String) -> Unit,
-
+    onClientClick: (ClientEntity) -> Unit = {}
 ) {
-
-    val app = LocalContext.current.applicationContext as Application
-
-    // Создаём VM через твою фабрику (требует Application)
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
     val vm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(app))
 
-    val groups by vm.groups.collectAsState(emptyList())
-    val clients by vm.clients.collectAsState(emptyList())
-    val selectedGroupId by vm.selectedGroupId.collectAsState()
+    val groups by vm.groups.collectAsState()
+    val clients by vm.clients.collectAsState()
     val includeArchived by vm.includeArchived.collectAsState()
-
-
 
     ClientsScreen(
         groups = groups,
         clients = clients,
-        selectedGroupId = selectedGroupId,
+        selectedGroupId = null,            // фильтры групп больше не используем
         includeArchived = includeArchived,
+        onSelectAll = {},
+        onSelectNoGroup = {},
+        onSelectGroup = {},
 
-        onSelectAll = vm::selectAll,
-        onSelectNoGroup = vm::selectNoGroup,
-        onSelectGroup = vm::selectGroup,
+        onToggleIncludeArchived = { vm.toggleIncludeArchived() },
+        onCreateGroup = { title -> vm.createGroup(title) },
 
-        onToggleIncludeArchived = vm::toggleIncludeArchived,
-        onCreateGroup = vm::createGroup,
+        onAssignClientGroup = { _, _ -> }, // в новой раскладке не требуется
+        onClientClick = onClientClick,
+        onAddClient = { /* просто откроем диалог в UI */ },
 
-        onAssignClientGroup = vm::assignClientToGroup,
-        onClientClick = { client -> onClientClick(client.id) },
+        onCreateClient = { name, corp, groupId -> vm.createClient(name, corp, groupId) },
 
-        // можно оставить onAddClient пустым — диалог открывается локально в экране
-        onAddClient = {},
-
-        onArchiveClient = { vm.archiveClient(it) },
-        onRestoreClient = { vm.restoreClient(it) },
-        onArchiveGroup  = { vm.archiveGroup(it) },
-        onRestoreGroup  = { vm.restoreGroup(it) },
-
-        // ВАЖНО: проброс сохранения нового клиента
-        onCreateClient = { name, corporate, groupId ->
-            vm.createClient(name, corporate, groupId)
-        }
+        onArchiveClient = { id -> vm.archiveClient(id) },
+        onRestoreClient = { id -> vm.restoreClient(id) },
+        onArchiveGroup = { id -> vm.archiveGroup(id) },
+        onRestoreGroup = { id -> vm.restoreGroup(id) }
     )
 }
-
