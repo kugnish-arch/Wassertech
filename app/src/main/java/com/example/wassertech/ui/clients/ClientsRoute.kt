@@ -57,6 +57,11 @@ fun ClientsRoute(
         // можно оставить onAddClient пустым — диалог открывается локально в экране
         onAddClient = {},
 
+        onArchiveClient = { vm.archiveClient(it) },
+        onRestoreClient = { vm.restoreClient(it) },
+        onArchiveGroup  = { vm.archiveGroup(it) },
+        onRestoreGroup  = { vm.restoreGroup(it) },
+
         // ВАЖНО: проброс сохранения нового клиента
         onCreateClient = { name, corporate, groupId ->
             vm.createClient(name, corporate, groupId)

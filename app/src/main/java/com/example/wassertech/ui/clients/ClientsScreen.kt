@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,28 +30,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.unit.Dp
 
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
 
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
-
-
-
-
 
 const val ALL_GROUP_ID: String = "__ALL__"
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
@@ -76,7 +71,13 @@ fun ClientsScreen(
     onAddClient: () -> Unit = {},
 
     // создание клиента (сохраняем в БД во VM)
-    onCreateClient: (name: String, corporate: Boolean, groupId: String?) -> Unit = { _, _, _ -> }
+    onCreateClient: (name: String, corporate: Boolean, groupId: String?) -> Unit = { _, _, _ -> },
+
+    // архивация/восстановление
+    onArchiveClient: (clientId: String) -> Unit = {},
+    onRestoreClient: (clientId: String) -> Unit = {},
+    onArchiveGroup: (groupId: String) -> Unit = {},
+    onRestoreGroup: (groupId: String) -> Unit = {},
 ) {
     var createGroupDialog by remember { mutableStateOf(false) }
     var newGroupTitle by remember { mutableStateOf("") }
@@ -91,18 +92,35 @@ fun ClientsScreen(
     // ЕДИНСТВЕННАЯ раскрытая секция (по умолчанию "Общая")
     var expandedSectionId by remember { mutableStateOf(GENERAL_SECTION_ID) }
 
+    // Режим редактирования
+    var isEditMode by remember { mutableStateOf(false) }
+    var includeArchivedBeforeEdit by remember { mutableStateOf<Boolean?>(null) }
+
+    // Локальный кеш заархивированных групп, чтобы сразу показывать их в режиме редактирования
+    val archivedGroupsLocal = remember { mutableStateListOf<ClientGroupEntity>() }
+
     // Группировка клиентов по clientGroupId (null = без группы)
     val clientsByGroup = remember(clients) { clients.groupBy { it.clientGroupId } }
     val generalClients = clientsByGroup[null].orEmpty()
 
     // Предрасчёт счётчиков
     val generalCount = generalClients.size
-    val countsByGroup = remember(clientsByGroup, groups) {
-        groups.associate { g -> g.id to (clientsByGroup[g.id]?.size ?: 0) }
+    val countsByGroup = remember(clientsByGroup, groups, archivedGroupsLocal) {
+        val base = groups.associate { g -> g.id to (clientsByGroup[g.id]?.size ?: 0) }.toMutableMap()
+        archivedGroupsLocal.forEach { g ->
+            base.putIfAbsent(g.id, clientsByGroup[g.id]?.size ?: 0)
+        }
+        base
+    }
+
+    // Итоговый список групп для рендера: активные (из VM) + локально заархивированные (которых ещё нет в списке VM)
+    val groupsForRender = remember(groups, archivedGroupsLocal) {
+        val ids = groups.map { it.id }.toSet()
+        val extraArchived = archivedGroupsLocal.filter { it.id !in ids }
+        groups + extraArchived
     }
 
     Scaffold(
-        //topBar = { /* если нужен */ },
         bottomBar = {
             Row(
                 modifier = Modifier
@@ -110,16 +128,30 @@ fun ClientsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconToggleButton(
-                    checked = includeArchived,
-                    onCheckedChange = { onToggleIncludeArchived() }
+                FilledTonalButton(
+                    onClick = {
+                        // переключаем режим редактирования
+                        val next = !isEditMode
+                        if (next) {
+                            // запомним предыдущее состояние includeArchived и включим показ архива
+                            includeArchivedBeforeEdit = includeArchived
+                            if (!includeArchived) onToggleIncludeArchived()
+                        } else {
+                            // выходим из редактирования — восстановим исходный фильтр архива
+                            if (includeArchivedBeforeEdit == false && includeArchived) {
+                                onToggleIncludeArchived()
+                            }
+                            includeArchivedBeforeEdit = null
+                        }
+                        isEditMode = next
+                    }
                 ) {
-                    Icon(
-                        imageVector = if (includeArchived) Icons.Filled.Delete else Icons.Outlined.Delete,
-                        contentDescription = "Показать архив"
-                    )
+                    Icon(Icons.Filled.Edit, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (isEditMode) "Готово" else "Изменить")
                 }
-                Text("Корзина")
+                Spacer(Modifier.width(16.dp))
+                Text(if (isEditMode) "Режим редактирования" else "Просмотр")
             }
         },
         floatingActionButton = {
@@ -146,18 +178,15 @@ fun ClientsScreen(
                 }
             }
         }
-    ) { padding ->
+    ) { innerPadding ->
         val layoutDir = LocalLayoutDirection.current
 
         LazyColumn(
             modifier = Modifier
                 .padding(
-                    // убираем большой верхний отступ от Scaffold
                     top = 0.dp,
-                    // сохраняем боковые отступы от системных панелей (если будут)
-                    start = padding.calculateStartPadding(layoutDir),
-                    end   = padding.calculateEndPadding(layoutDir),
-                    // низ не трогаем — им управляет contentPadding ниже
+                    start = innerPadding.calculateStartPadding(layoutDir),
+                    end   = innerPadding.calculateEndPadding(layoutDir),
                 )
                 .fillMaxSize(),
             contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
@@ -168,6 +197,10 @@ fun ClientsScreen(
                     title = "Общая",
                     count = generalCount,
                     isExpanded = expandedSectionId == GENERAL_SECTION_ID,
+                    isArchived = false, // "Общая" — это виртуальная секция
+                    showActions = isEditMode,
+                    onArchive = { /* no-op for virtual group */ },
+                    onRestore = { /* no-op */ },
                     onToggle = {
                         expandedSectionId =
                             if (expandedSectionId == GENERAL_SECTION_ID) "" else GENERAL_SECTION_ID
@@ -185,22 +218,39 @@ fun ClientsScreen(
                         ClientListRow(
                             client = client,
                             onClick = { onClientClick(client) },
-                            indentStart = 16.dp // сдвиг вправо относительно группы
+                            indentStart = 16.dp, // сдвиг вправо относительно группы
+                            showActions = isEditMode,
+                            onArchive = { onArchiveClient(client.id) },
+                            onRestore = { onRestoreClient(client.id) }
                         )
                         Divider()
                     }
                 }
             }
 
-            // ----- ОСТАЛЬНЫЕ ГРУППЫ -----
+            // ----- ОСТАЛЬНЫЕ ГРУППЫ (активные + локально заархивированные) -----
             items(
-                items = groups,
+                items = groupsForRender,
                 key = { "header_${it.id}" }
             ) { group ->
+                val isGroupArchived = group.isArchived == true || archivedGroupsLocal.any { it.id == group.id }
                 GroupHeader(
                     title = group.title,
                     count = countsByGroup[group.id] ?: 0,
                     isExpanded = expandedSectionId == group.id,
+                    isArchived = isGroupArchived,
+                    showActions = isEditMode,
+                    onArchive = {
+                        // моментально отобразим группу как архивную
+                        if (!archivedGroupsLocal.any { it.id == group.id }) {
+                            archivedGroupsLocal.add(group.copy(isArchived = true))
+                        }
+                        onArchiveGroup(group.id)
+                    },
+                    onRestore = {
+                        archivedGroupsLocal.removeAll { it.id == group.id }
+                        onRestoreGroup(group.id)
+                    },
                     onToggle = {
                         expandedSectionId =
                             if (expandedSectionId == group.id) "" else group.id
@@ -215,7 +265,10 @@ fun ClientsScreen(
                             ClientListRow(
                                 client = client,
                                 onClick = { onClientClick(client) },
-                                indentStart = 16.dp
+                                indentStart = 16.dp,
+                                showActions = isEditMode,
+                                onArchive = { onArchiveClient(client.id) },
+                                onRestore = { onRestoreClient(client.id) }
                             )
                             Divider()
                         }
@@ -351,6 +404,10 @@ private fun GroupHeader(
     title: String,
     count: Int,
     isExpanded: Boolean,
+    isArchived: Boolean,
+    showActions: Boolean,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
     onToggle: () -> Unit
 ) {
     // слегка более тёмная плашка, чтобы отделить от клиентов
@@ -377,6 +434,11 @@ private fun GroupHeader(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.weight(1f)
         )
+        if (showActions) {
+            TextButton(onClick = { if (isArchived) onRestore() else onArchive() }) {
+                Text(if (isArchived) "Восстановить" else "Архивировать", color = contentColor)
+            }
+        }
         Icon(
             imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
             contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
@@ -401,7 +463,10 @@ private fun EmptyGroupStub(indent: Dp) {
 private fun ClientListRow(
     client: ClientEntity,
     onClick: () -> Unit,
-    indentStart: Dp
+    indentStart: Dp,
+    showActions: Boolean,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -417,7 +482,11 @@ private fun ClientListRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(client.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                client.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (client.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onBackground
+            )
             Spacer(Modifier.height(4.dp))
             val secondary = listOfNotNull(
                 client.phone?.takeIf { it.isNotBlank() },
@@ -425,7 +494,16 @@ private fun ClientListRow(
                 client.addressFull?.takeIf { it.isNotBlank() }
             ).joinToString(" · ")
             if (secondary.isNotBlank()) {
-                Text(secondary, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (client.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (showActions) {
+            TextButton(onClick = { if (client.isArchived == true) onRestore() else onArchive() }) {
+                Text(if (client.isArchived == true) "Восстановить" else "Архивировать")
             }
         }
     }
