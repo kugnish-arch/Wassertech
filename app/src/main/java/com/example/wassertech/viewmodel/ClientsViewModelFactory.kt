@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.wassertech.data.AppDatabase
 
-class ClientsViewModelFactory(
+/*class ClientsViewModelFactory(
     private val application: Application
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
@@ -17,4 +17,4 @@ class ClientsViewModelFactory(
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
-}
+}*/

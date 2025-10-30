@@ -110,12 +110,4 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun archiveClient(clientId: String) = viewModelScope.launch {
-        val c = getClient(clientId) ?: return@launch
-        editClient(c.copy(isArchived = true, archivedAtEpoch = System.currentTimeMillis()))
-    }
-    fun restoreClient(clientId: String) = viewModelScope.launch {
-        val c = getClient(clientId) ?: return@launch
-        editClient(c.copy(isArchived = false, archivedAtEpoch = null))
-    }
 }
