@@ -19,7 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.wassertech.R
 import com.example.wassertech.ui.clients.ClientDetailScreen
-import com.example.wassertech.ui.clients.ClientsScreen
+import com.example.wassertech.ui.clients.ClientsRoute // ← добавили импорт маршрута
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
@@ -111,7 +111,13 @@ private fun AppScaffold(navController: NavHostController) {
             composable("clients") {
                 Column {
                     SectionHeader("Клиенты")
-                    ClientsScreen(onOpenClient = { clientId -> navController.navigate("client/$clientId") })
+                    // Было: ClientsScreen(onOpenClient = { ... })
+                    // Стало: маршрут-обёртка, сам подписывается на VM и передает данные в UI
+                    ClientsRoute(
+                        onClientClick = { client ->
+                            navController.navigate("client/${client.id}")
+                        }
+                    )
                 }
             }
 

@@ -8,6 +8,8 @@ import androidx.room.TypeConverters
 import com.example.wassertech.data.dao.*
 import com.example.wassertech.data.entities.*
 
+//Импорты миграций =========================================
+import com.example.wassertech.data.migrations.Migration_1_2
 
 @Database(
     version = 2,
@@ -46,8 +48,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "wassertech_v1.db"
                 )
-                    // Known migrations; if some links are missing, we'll fall back to destructive (dev only)
-                    //.addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    // Подключаем миграции
+                    //.addMigrations(Migration_1_2)
 
                     // Разрешаем разрушительную миграцию ТОЛЬКО с очень старых версий,
                     //.fallbackToDestructiveMigrationFrom(1, 2, 3, 4)

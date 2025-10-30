@@ -9,30 +9,6 @@ import androidx.room.Update
 @Dao
 interface HierarchyDao {
 
-    @Update
-    suspend fun updateInstallation(installation: InstallationEntity)
-
-    // ---- Clients ----
-    /*
-    @Query("SELECT * FROM clients WHERE isArchived = 0 ORDER BY name COLLATE NOCASE")
-
-    fun observeClients(): Flow<List<ClientEntity>>
-
-    
-    @Query("""
-        SELECT * FROM clients
-        WHERE (:includeArchived = 1) OR (isArchived = 0)
-        ORDER BY name COLLATE NOCASE
-    """)
-    fun observeClients(includeArchived: Boolean): Flow<List<ClientEntity>>
-    
-
-    @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
-    suspend fun getClient(id: String): ClientEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertClient(client: ClientEntity)
-*/
 
     // ---- Sites ----
     @Query("SELECT * FROM sites WHERE clientId = :clientId ORDER BY orderIndex ASC, name COLLATE NOCASE")
@@ -54,6 +30,10 @@ interface HierarchyDao {
     }
 
     // ---- Installations ----
+
+    @Update
+    suspend fun updateInstallation(installation: InstallationEntity)
+
     @Query("SELECT * FROM installations WHERE siteId = :siteId ORDER BY orderIndex ASC, name COLLATE NOCASE")
     fun observeInstallations(siteId: String): Flow<List<InstallationEntity>>
 
