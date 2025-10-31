@@ -106,4 +106,8 @@ interface ClientDao {
         """
     )
     fun updateClientOrder(id: String, order: Int)
+
+    @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
+    fun observeClient(id: String): kotlinx.coroutines.flow.Flow<ClientEntity?>
+
 }

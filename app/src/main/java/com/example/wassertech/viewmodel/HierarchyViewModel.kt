@@ -23,6 +23,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun clients(includeArchived: Boolean = false): Flow<List<ClientEntity>> =
         if (includeArchived) clientDao.observeClients(true) else clientDao.observeClients()
 
+    fun client(id: String): kotlinx.coroutines.flow.Flow<ClientEntity?> =
+        clientDao.observeClient(id)
+
     fun sites(clientId: String): Flow<List<SiteEntity>> = hierarchyDao.observeSites(clientId)
     fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
