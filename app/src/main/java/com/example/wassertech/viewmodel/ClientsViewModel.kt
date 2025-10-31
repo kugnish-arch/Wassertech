@@ -127,6 +127,14 @@ class ClientsViewModel(
         reloadClients()
     }
 
+    fun editClient(client: ClientEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            clientDao.upsertClient(client)
+            reloadClients() // чтобы обновился список
+        }
+    }
+
+
     // --- Архив / Восстановление (группы) ---
     fun archiveGroup(groupId: String) = viewModelScope.launch(Dispatchers.IO) {
         val groupsNow = clientDao.getAllGroupsNow()
@@ -230,7 +238,7 @@ class ClientsViewModel(
         _groups.value = if (_includeArchived.value) all else all.filter { it.isArchived != true }
     }
 
-    private fun reloadClients() = viewModelScope.launch(Dispatchers.IO) {
+    fun reloadClients() = viewModelScope.launch(Dispatchers.IO) {
         // Мы не фильтруем по selectedGroupId на стороне VM — экран сам группирует по clientGroupId.
         // Поэтому просто берём всех клиентов (с учётом includeArchived) и отдаём в UI.
         val allGeneral = clientDao.getClientsNow(null)

@@ -41,7 +41,7 @@ fun ClientsScreen(
     onCreateGroup: (String) -> Unit,
 
     onAssignClientGroup: (clientId: String, groupId: String?) -> Unit,
-    onClientClick: (ClientEntity) -> Unit = {},
+    onClientClick: (String) -> Unit = {},
     onAddClient: () -> Unit = {},
 
     onCreateClient: (name: String, corporate: Boolean, groupId: String?) -> Unit = { _, _, _ -> },
@@ -186,7 +186,7 @@ fun ClientsScreen(
                     ) { client ->
                         ClientListRow(
                             client = client,
-                            onClick = { onClientClick(client) },
+                            onClick = { onClientClick(client.id) },
                             indentStart = 16.dp,
                             showActions = isEditMode,
                             onArchive = { onArchiveClient(client.id) },
@@ -238,7 +238,7 @@ fun ClientsScreen(
                             list.forEach { client ->
                                 ClientListRow(
                                     client = client,
-                                    onClick = { onClientClick(client) },
+                                    onClick = { onClientClick(client.id) },
                                     indentStart = 16.dp,
                                     showActions = isEditMode,
                                     onArchive = { onArchiveClient(client.id) },

@@ -8,6 +8,8 @@ import com.example.wassertech.data.entities.*
 import com.example.wassertech.data.types.ComponentType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -23,18 +25,15 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun clients(includeArchived: Boolean = false): Flow<List<ClientEntity>> =
         if (includeArchived) clientDao.observeClients(true) else clientDao.observeClients()
 
-    fun client(id: String): kotlinx.coroutines.flow.Flow<ClientEntity?> =
-        clientDao.observeClient(id)
+    fun client(id: String): Flow<ClientEntity?> =
+        clientDao.observeAllClients()
+            .map { list -> list.firstOrNull { it.id == id } }
 
     fun sites(clientId: String): Flow<List<SiteEntity>> = hierarchyDao.observeSites(clientId)
     fun installations(siteId: String): Flow<List<InstallationEntity>> = hierarchyDao.observeInstallations(siteId)
     fun components(installationId: String): Flow<List<ComponentEntity>> = hierarchyDao.observeComponents(installationId)
 
-    /*
-    suspend fun getClient(id: String): ClientEntity? = clientDao.getClient(id)
-    suspend fun getSite(id: String): SiteEntity? = hierarchyDao.getSite(id)
-    suspend fun getInstallation(id: String): InstallationEntity? = hierarchyDao.getInstallation(id)
-    */
+
     // ЧТЕНИЕ (были без контекста)
     suspend fun getClient(id: String): ClientEntity? =
         withContext(Dispatchers.IO) { clientDao.getClient(id) }
@@ -65,9 +64,6 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun editClient(client: ClientEntity) {
-        viewModelScope.launch(Dispatchers.IO) { clientDao.upsertClient(client) }
-    }
 
     fun editSite(site: SiteEntity) {
         viewModelScope.launch(Dispatchers.IO) { hierarchyDao.upsertSite(site) }

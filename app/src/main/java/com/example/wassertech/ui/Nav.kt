@@ -115,8 +115,10 @@ private fun AppScaffold(navController: NavHostController) {
                     // Стало: маршрут-обёртка, сам подписывается на VM и передает данные в UI
                     ClientsRoute(
                         onClientClick = { clientId ->
-                            navController.navigate("client/$clientId")
-                        }
+                            navController.navigate("client/$clientId") {
+                                launchSingleTop = true
+                                restoreState = true
+                            }                        }
                     )
                 }
             }

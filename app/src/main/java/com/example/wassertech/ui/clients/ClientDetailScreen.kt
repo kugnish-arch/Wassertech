@@ -21,6 +21,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
+import com.example.wassertech.viewmodel.ClientsViewModel
+import androidx.compose.ui.platform.LocalContext
+import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.ui.icons.AppIcons
 import kotlinx.coroutines.launch
 
@@ -32,6 +35,16 @@ fun ClientDetailScreen(
     onOpenInstallation: (String) -> Unit,
     vm: HierarchyViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val clientDao = AppDatabase.getInstance(context).clientDao()
+
+    val clientsVm: ClientsViewModel = viewModel {
+        val dao = AppDatabase.getInstance(context).clientDao()
+        ClientsViewModel(dao)
+    }
+
+    val groups by clientsVm.groups.collectAsState(initial = emptyList())
+
     val scope = rememberCoroutineScope()
     val accent = Color(0xFF26A69A)
 
@@ -40,11 +53,10 @@ fun ClientDetailScreen(
 
     //Данные клиента
     val client by vm.client(clientId).collectAsState(initial = null)
-    val clientName = client?.name ?: "Клиент"
+    val clientName = client?.name ?: "-Клиент-"
     val isCorporate = client?.isCorporate ?: false
-    // Заголовок
-    //var clientName by remember { mutableStateOf("Клиент") }
-    //var isCorporate by remember { mutableStateOf(false) }
+    // В начало экрана (рядом с другими collectAsState):
+    val all by vm.clients(includeArchived = true).collectAsState(initial = emptyList())
 
     // Режим редактирования (как на экране "Клиенты")
     var isEditing by remember { mutableStateOf(false) }
@@ -69,23 +81,27 @@ fun ClientDetailScreen(
     // Раскрытие установок по объектам (в обычном режиме)
     var expandedSites by remember { mutableStateOf(setOf<String>()) }
 
-    // Подтянуть карточку клиента
-    /*
-    LaunchedEffect(clientId) {
-        //val c = vm.getClient(clientId)
-        val c by vm.client(clientId).collectAsState(initial = null)
-        if (c != null) {
-            clientName = c.name
-            isCorporate = c.isCorporate
+    var showEditClient by remember { mutableStateOf(false) }
+    var editClientName by remember { mutableStateOf(TextFieldValue("")) }
+    var selectedGroupIndex by remember { mutableStateOf(0) }
+    var groupPickerExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showEditClient, client, groups) {
+        if (showEditClient && client != null) {
+            // имя
+            editClientName = TextFieldValue(client!!.name)
+
+            // выбрать индекс группы клиента; если null — ставим "Без группы" (индекс 0, см. ниже)
+            val currentGroupId = client!!.clientGroupId
+            selectedGroupIndex = if (currentGroupId == null) {
+                0 // "Без группы"
+            } else {
+                // +1 потому что 0 — это "Без группы", дальше идут реальные группы
+                val idx = groups.indexOfFirst { it.id == currentGroupId }
+                if (idx >= 0) idx + 1 else 0
+            }
         }
     }
-    */
-
-    // Можно сразу показывать имя из client, без промежуточных переменных:
-    //val client by vm.client(clientId).collectAsState(initial = null)
-    //val name = client?.name ?: "Клиент"
-    //val corporate = client?.isCorporate ?: false
-
 
     Scaffold(
         // Полностью убираем системные отступы — как просили
@@ -186,19 +202,45 @@ fun ClientDetailScreen(
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
+
                     Spacer(Modifier.weight(1f))
 
                     // Иконка "Редактировать" (✎) — показывается только в режиме редактирования
                     if (isEditing) {
-                        IconButton(onClick = { /* доп. экшн для инлайн-редактирования, если понадобится */ }) {
+                        IconButton(onClick = {
+                            // при открытии диалога сразу заполняем поля текущими данными
+                            editClientName = TextFieldValue(clientName)
+                            showEditClient = true
+                        }) {
                             Icon(
                                 imageVector = Icons.Filled.Edit,
-                                contentDescription = "Редактировать",
+                                contentDescription = "Редактировать клиента",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
                 }
+
+                if (client != null) {
+                    val groupName = groups.firstOrNull { it.id == client!!.clientGroupId }?.title
+                    if (groupName != null) {
+                        Text(
+                            text = "Группа: $groupName",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                            modifier = Modifier.padding(start = 40.dp, top = 2.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "Без группы",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(start = 40.dp, top = 2.dp)
+                        )
+                    }
+                }
+
+
             }
 
             // ======= Список объектов/установок =======
@@ -401,6 +443,92 @@ fun ClientDetailScreen(
                 }) { Text("Добавить") }
             },
             dismissButton = { TextButton(onClick = { showAddInstallation = false }) { Text("Отмена") } }
+
+
         )
     }
+
+    if (showEditClient) {
+        val groups by clientsVm.groups.collectAsState(initial = emptyList())
+
+        // Опции групп: [0] — "Без группы", дальше реальные группы
+        val groupOptions = remember(groups) {
+            buildList<Pair<String?, String>> {
+                add(null to "Без группы")
+                addAll(groups.map { it.id to it.title })
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showEditClient = false },
+            title = { Text("Редактировать клиента") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editClientName,
+                        onValueChange = { editClientName = it },
+                        label = { Text("Имя / название клиента") },
+                        singleLine = true
+                    )
+
+                    // Выбор группы
+
+
+                    ExposedDropdownMenuBox(
+                        expanded = groupPickerExpanded,
+                        onExpandedChange = { groupPickerExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = groupOptions.getOrNull(selectedGroupIndex)?.second ?: "Без группы",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Группа") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupPickerExpanded)
+                            },
+                            modifier = Modifier.menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = groupPickerExpanded,
+                            onDismissRequest = { groupPickerExpanded = false }
+                        ) {
+                            groupOptions.forEachIndexed { index, pair ->
+                                DropdownMenuItem(
+                                    text = { Text(pair.second) },
+                                    onClick = {
+                                        selectedGroupIndex = index
+                                        groupPickerExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    client?.let { current ->
+                        val newName = editClientName.text.trim()
+                        val selectedGroupId = groupOptions.getOrNull(selectedGroupIndex)?.first
+
+                        // имя
+                        clientsVm.editClient(current.copy(name = newName))
+
+                        // группа (включая переход в "Без группы" при null)
+                        if (selectedGroupId != current.clientGroupId) {
+                            clientsVm.assignClientToGroup(current.id, selectedGroupId)
+                        }
+                    }
+                    showEditClient = false
+                }) { Text("Сохранить") }
+
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditClient = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
 }

@@ -9,10 +9,15 @@ import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.viewmodel.ClientsViewModel
 import com.example.wassertech.viewmodel.ClientsViewModelFactory
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+
 
 @Composable
 fun ClientsRoute(
-    onClientClick: (ClientEntity) -> Unit
+    onClientClick: (String) -> Unit
 ) {
     val context = LocalContext.current
     val dao = AppDatabase.getInstance(context).clientDao()
@@ -26,6 +31,19 @@ fun ClientsRoute(
     val clients by vm.clients.collectAsState()
     val includeArchived by vm.includeArchived.collectAsState()
     val selectedGroupId by vm.selectedGroupId.collectAsState()
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                vm.reloadClients()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     ClientsScreen(
         groups = groups,
