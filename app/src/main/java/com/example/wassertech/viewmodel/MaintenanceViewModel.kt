@@ -10,6 +10,21 @@ import com.example.wassertech.data.entities.InstallationEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
+import com.example.wassertech.data.dao.SessionsDao
+import com.example.wassertech.data.entities.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+
+
+// viewmodel/MaintenanceViewModel.kt (вверху файла)
+data class FieldValue(
+    val installationId: String,
+    val componentId: String,
+    val fieldKey: String,
+    val type: String,          // "TEXT" | "NUMBER" | "CHECKBOX"
+    val value: Any?            // String/Double/Boolean
+)
 
 class MaintenanceViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
@@ -96,5 +111,57 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
         notes: String?
     ) {
         viewModelScope.launch { /* TODO implement actual persistence */ }
+    }
+
+
+    //=========== История ТО
+    fun observeHistory(installationId: String): Flow<List<MaintenanceSessionEntity>> =
+        sessionsDao.observeSessionsByInstallation(installationId)
+
+    fun saveSession(
+        siteId: String,
+        installationId: String?,           // может быть null
+        author: String?,                   // technician
+        notes: String?,
+        values: List<FieldValue>,          // твоя UI-модель значений
+        onSaved: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val sessionId = UUID.randomUUID().toString()
+
+            val session = MaintenanceSessionEntity(
+                id = sessionId,
+                siteId = siteId,
+                installationId = installationId,
+                startedAtEpoch = now,
+                finishedAtEpoch = now,     // фиксируем в момент сохранения
+                technician = author,
+                notes = notes,
+                synced = false
+            )
+
+            val valueRows = values.map { fv ->
+                MaintenanceValueEntity(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    siteId = siteId,
+                    installationId = installationId,        // может быть null
+                    componentId = fv.componentId,
+                    fieldKey = fv.fieldKey,
+                    valueText = when (fv.type) {
+                        "TEXT", "NUMBER" -> fv.value?.toString()
+                        else -> null
+                    },
+                    valueBool = when (fv.type) {
+                        "CHECKBOX" -> (fv.value as? Boolean)
+                        else -> null
+                    }
+                )
+            }
+
+            sessionsDao.insertSessionWithValues(session, valueRows)
+            onSaved(sessionId)
+        }
     }
 }

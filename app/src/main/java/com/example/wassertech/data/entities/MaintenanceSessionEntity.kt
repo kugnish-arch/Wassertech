@@ -14,3 +14,4 @@ data class MaintenanceSessionEntity(
     val notes: String? = null,
     val synced: Boolean = false
 )
+

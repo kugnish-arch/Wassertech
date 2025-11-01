@@ -8,6 +8,8 @@ import androidx.room.Update
 
 @Dao
 interface HierarchyDao {
+    // HierarchyDao.kt
+
 
 
     // ---- Sites ----
@@ -36,6 +38,9 @@ interface HierarchyDao {
 
     @Query("SELECT * FROM installations WHERE siteId = :siteId ORDER BY orderIndex ASC, name COLLATE NOCASE")
     fun observeInstallations(siteId: String): Flow<List<InstallationEntity>>
+
+    @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")
+    fun observeInstallation(id: String): kotlinx.coroutines.flow.Flow<InstallationEntity?>
 
     @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")
     suspend fun getInstallation(id: String): InstallationEntity?
@@ -68,4 +73,10 @@ interface HierarchyDao {
     suspend fun reorderComponents(newOrder: List<ComponentEntity>) {
         updateComponents(newOrder)
     }
+
+    @Query("SELECT * FROM components WHERE installationId = :installationId ORDER BY (orderIndex IS NULL), orderIndex, id")
+    fun observeComponentsByInstallation(installationId: String): kotlinx.coroutines.flow.Flow<List<ComponentEntity>>
+
+    @Query("DELETE FROM components WHERE id = :componentId")
+    fun deleteComponent(componentId: String)
 }

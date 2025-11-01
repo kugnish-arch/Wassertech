@@ -14,8 +14,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *    - переносим значения из displayName в name (только если name пуст).
  * 3) Создаём индексы, если их ещё нет.
  */
-object Migration_1_2 : Migration(1, 2) {
 
+val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // 1) Таблица групп клиентов
         db.execSQL(

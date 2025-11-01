@@ -22,10 +22,13 @@ import com.example.wassertech.ui.clients.ClientDetailScreen
 import com.example.wassertech.ui.clients.ClientsRoute // ← добавили импорт маршрута
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
-import com.example.wassertech.ui.maintenance.MaintenanceAllScreen
+
 import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
+import com.example.wassertech.ui.maintenance.MaintenanceScreen
+import android.net.Uri
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,24 +182,38 @@ private fun AppScaffold(navController: NavHostController) {
                     ComponentsScreen(
                         installationId = installationId,
                         onStartMaintenance = { /* unused single component */ },
-                        onStartMaintenanceAll = { navController.navigate("maintenance_all/$installationId") }
+                        onStartMaintenanceAll = { siteId, installationName, componentId ->
+                            val encodedName = Uri.encode(installationName)
+                            navController.navigate("maintenance_all/$siteId/$installationId/$encodedName/$componentId")
+                        }
                     )
                 }
             }
 
             composable(
-                "maintenance_all/{installationId}",
-                arguments = listOf(navArgument("installationId") { type = NavType.StringType })
+                route = "maintenance_all/{siteId}/{installationId}/{installationName}/{componentId}",
+                arguments = listOf(
+                    navArgument("siteId") { type = NavType.StringType },
+                    navArgument("installationId") { type = NavType.StringType },
+                    navArgument("installationName") { type = NavType.StringType }, // передаём для заголовка
+                    navArgument("componentId") { type = NavType.StringType }
+                )
             ) { bse ->
-                val installationId = bse.arguments?.getString("installationId") ?: return@composable
-                Column {
-                    SectionHeader("ТО установки")
-                    MaintenanceAllScreen(
-                        installationId = installationId,
-                        onDone = { navController.navigateUp() }
-                    )
-                }
+                val siteId = bse.arguments?.getString("siteId")!!
+                val installationId = bse.arguments?.getString("installationId")!!
+                val installationName = bse.arguments?.getString("installationName")!!
+                val componentId = bse.arguments?.getString("componentId")!!
+
+                MaintenanceScreen(
+                    siteId = siteId,
+                    installationId = installationId,
+                    installationName = installationName,   // ← попадёт в TopAppBar
+                    componentId = componentId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToHistory = { id -> navController.navigate("maintenance_history/$id") }
+                )
             }
+
 
             // --- История ТО: общий экран ---
             composable("maintenance_history") {
