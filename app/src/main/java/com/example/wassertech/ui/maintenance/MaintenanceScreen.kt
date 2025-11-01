@@ -1,3 +1,4 @@
+// MaintenanceScreen.kt
 package com.example.wassertech.ui.maintenance
 
 import androidx.compose.foundation.layout.*
@@ -20,22 +21,18 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceScreen(
-    // для сохранения
     siteId: String,
     installationId: String,
     installationName: String,
-    // пока работаем от компонента (как сейчас)
-    componentId: String,
-    // навигация
-    onNavigateBack: () -> Unit,               // остаётся на будущее (иконку назад в этом экране мы не рисуем)
+    onNavigateBack: () -> Unit,               // оставляем на будущее
     onNavigateToHistory: (installationId: String) -> Unit
 ) {
     val vm: MaintenanceViewModel = viewModel()
 
-    // загрузка полей для выбранного компонента
-    LaunchedEffect(componentId) { vm.loadForComponent(componentId) }
+    // ✅ грузим все поля по всем компонентам установки
+    LaunchedEffect(installationId) { vm.loadForInstallation(installationId) }
 
-    val fields by vm.fields.collectAsState()
+    val sections by vm.sections.collectAsState()
     val scroll = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -43,18 +40,23 @@ fun MaintenanceScreen(
     var technician by remember { mutableStateOf<String?>(null) }
     var notes by remember { mutableStateOf<String?>(null) }
 
-    // ВАЖНО: не рисуем TopAppBar здесь — он уже есть в общем Scaffold приложения.
+    // Локальные состояния свёрнуто/развёрнуто по componentId
+    val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
+    LaunchedEffect(sections) {
+        // по умолчанию разворачиваем все (или сделай false — как удобнее)
+        sections.forEach { sec -> expandedMap.putIfAbsent(sec.componentId, true) }
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { _ /* игнорируем внутренний padding, чтобы не было лишних отступов сверху */ ->
-
+    ) { _ ->
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scroll)
         ) {
-            // Узкая полоска-навигация под AppBar — как на остальных экранах
+            // Узкая полоска навигации
             Surface(tonalElevation = 1.dp) {
                 Text(
                     text = "Проведение обслуживания",
@@ -68,7 +70,7 @@ fun MaintenanceScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Плашка заголовка «ТО установки <имя>» в фирменном стиле
+            // Плашка заголовка
             ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -100,58 +102,88 @@ fun MaintenanceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Контент формы
+            // ==== Секции по компонентам ====
             Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (fields.isEmpty()) {
+                if (sections.isEmpty()) {
                     Text(
-                        "Шаблон не найден для этого компонента.",
+                        "В установке нет компонентов с полями для ТО.",
                         style = MaterialTheme.typography.bodyLarge
                     )
                 } else {
-                    fields.forEach { f ->
-                        when (f.type) {
-                            FieldType.CHECKBOX -> {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(f.label)
-                                    Checkbox(
-                                        checked = f.boolValue == true,
-                                        onCheckedChange = { f.boolValue = it }
-                                    )
+                    sections.forEach { sec ->
+                        ElevatedCard(Modifier.fillMaxWidth()) {
+                            Column(Modifier.fillMaxWidth()) {
+                                // заголовок секции (компонент)
+                                ListItem(
+                                    headlineContent = { Text(sec.componentName) },
+                                    trailingContent = {
+                                        val expanded = expandedMap[sec.componentId] == true
+                                        TextButton(onClick = {
+                                            expandedMap[sec.componentId] = !expanded
+                                        }) {
+                                            Text(if (expanded) "Свернуть" else "Развернуть")
+                                        }
+                                    }
+                                )
+                                // контент секции
+                                if (expandedMap[sec.componentId] == true) {
+                                    Column(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        if (sec.fields.isEmpty()) {
+                                            Text("Нет полей для ТО", style = MaterialTheme.typography.bodyMedium)
+                                        } else {
+                                            sec.fields.forEach { f ->
+                                                when (f.type) {
+                                                    FieldType.CHECKBOX -> {
+                                                        Row(
+                                                            Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Text(f.label)
+                                                            Checkbox(
+                                                                checked = f.boolValue == true,
+                                                                onCheckedChange = { f.boolValue = it }
+                                                            )
+                                                        }
+                                                    }
+                                                    FieldType.NUMBER -> {
+                                                        OutlinedTextField(
+                                                            value = f.numberValue,
+                                                            onValueChange = { f.numberValue = it },
+                                                            label = { Text(labelWithUnit(f)) },
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            singleLine = true,
+                                                            supportingText = {
+                                                                val warn = validateNumber(f.numberValue, f.min, f.max)
+                                                                if (warn != null) Text(warn)
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        )
+                                                    }
+                                                    FieldType.TEXT -> {
+                                                        OutlinedTextField(
+                                                            value = f.textValue,
+                                                            onValueChange = { f.textValue = it },
+                                                            label = { Text(f.label) },
+                                                            singleLine = false,
+                                                            minLines = 2,
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                            }
-
-                            FieldType.NUMBER -> {
-                                OutlinedTextField(
-                                    value = f.numberValue,
-                                    onValueChange = { f.numberValue = it },
-                                    label = { Text(labelWithUnit(f)) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    singleLine = true,
-                                    supportingText = {
-                                        val warn = validateNumber(f.numberValue, f.min, f.max)
-                                        if (warn != null) Text(warn)
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-
-                            FieldType.TEXT -> {
-                                OutlinedTextField(
-                                    value = f.textValue,
-                                    onValueChange = { f.textValue = it },
-                                    label = { Text(f.label) },
-                                    singleLine = false,
-                                    minLines = 2,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
                             }
                         }
                     }
@@ -161,9 +193,7 @@ fun MaintenanceScreen(
 
                 // Кнопки
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onNavigateBack) {
-                        Text("Отмена")
-                    }
+                    OutlinedButton(onClick = onNavigateBack) { Text("Отмена") }
                     Button(
                         onClick = {
                             vm.saveSession(
@@ -173,20 +203,15 @@ fun MaintenanceScreen(
                                 notes = notes
                             )
                             scope.launch { snackbarHostState.showSnackbar("ТО сохранено") }
-                            // По твоему последнему пожеланию — остаёмся на экране (в историю не уходим).
-                            // onNavigateToHistory(installationId)
+                            // остаёмся на экране
                         },
-                        enabled = fields.isNotEmpty()
-                    ) {
-                        Text("Сохранить")
-                    }
+                        enabled = sections.isNotEmpty()
+                    ) { Text("Сохранить") }
                 }
             }
         }
     }
 }
-
-// ------- helpers -------
 
 private fun labelWithUnit(f: ChecklistUiField): String =
     if (f.unit != null) "${f.label}, ${f.unit}" else f.label

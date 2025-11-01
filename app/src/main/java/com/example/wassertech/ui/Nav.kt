@@ -182,37 +182,36 @@ private fun AppScaffold(navController: NavHostController) {
                     ComponentsScreen(
                         installationId = installationId,
                         onStartMaintenance = { /* unused single component */ },
-                        onStartMaintenanceAll = { siteId, installationName, componentId ->
+                        onStartMaintenanceAll = { siteId, installationName ->
                             val encodedName = Uri.encode(installationName)
-                            navController.navigate("maintenance_all/$siteId/$installationId/$encodedName/$componentId")
+                            navController.navigate("maintenance_all/$siteId/$installationId/$encodedName")
                         }
+
                     )
                 }
             }
 
             composable(
-                route = "maintenance_all/{siteId}/{installationId}/{installationName}/{componentId}",
+                route = "maintenance_all/{siteId}/{installationId}/{installationName}",
                 arguments = listOf(
                     navArgument("siteId") { type = NavType.StringType },
                     navArgument("installationId") { type = NavType.StringType },
-                    navArgument("installationName") { type = NavType.StringType }, // передаём для заголовка
-                    navArgument("componentId") { type = NavType.StringType }
+                    navArgument("installationName") { type = NavType.StringType }
                 )
             ) { bse ->
                 val siteId = bse.arguments?.getString("siteId")!!
                 val installationId = bse.arguments?.getString("installationId")!!
                 val installationName = bse.arguments?.getString("installationName")!!
-                val componentId = bse.arguments?.getString("componentId")!!
 
                 MaintenanceScreen(
                     siteId = siteId,
                     installationId = installationId,
-                    installationName = installationName,   // ← попадёт в TopAppBar
-                    componentId = componentId,
+                    installationName = installationName,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToHistory = { id -> navController.navigate("maintenance_history/$id") }
                 )
             }
+
 
 
             // --- История ТО: общий экран ---

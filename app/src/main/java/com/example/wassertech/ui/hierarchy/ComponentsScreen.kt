@@ -32,7 +32,7 @@ import com.example.wassertech.data.types.ComponentType
 fun ComponentsScreen(
     installationId: String,
     onStartMaintenance: (String) -> Unit, // (пока не используется — оставляем для совместимости)
-    onStartMaintenanceAll: (siteId: String, installationName: String, componentId: String) -> Unit,
+    onStartMaintenanceAll: (siteId: String, installationName: String) -> Unit,
     onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {},
     vm: HierarchyViewModel = viewModel(),
     templatesVm: TemplatesViewModel = viewModel()
@@ -174,7 +174,7 @@ fun ComponentsScreen(
                     onClick = {
                         val inst = installation
                         if (inst != null && firstComp != null) {
-                            onStartMaintenanceAll(inst.siteId, inst.name ?: "", firstComp.id)
+                            onStartMaintenanceAll(inst.siteId, inst.name ?: "")
                         }
                     },
                     enabled = installation != null && firstComp != null,
