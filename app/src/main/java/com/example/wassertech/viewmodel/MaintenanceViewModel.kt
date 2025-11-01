@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+// ---------- UI-модели ----------
+
 data class ChecklistUiField(
     val key: String,
     val label: String,
@@ -26,11 +28,15 @@ data class ChecklistUiField(
     var textValue: String = ""
 )
 
+/** Секция экрана ТО: один компонент и его поля */
 data class ComponentSectionUi(
     val componentId: String,
     val componentName: String,
-    val fields: MutableList<ChecklistUiField>
+    val fields: List<ChecklistUiField>,
+    val expanded: Boolean = true
 )
+
+// ---------- ViewModel ----------
 
 class MaintenanceViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -39,20 +45,27 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
     private val templatesDao = db.templatesDao()
     private val sessionsDao = db.sessionsDao()
 
+    /** Старое поле для режима "ТО одного компонента" — можем оставить на всякий случай */
     private val _fields = MutableStateFlow<List<ChecklistUiField>>(emptyList())
     val fields: StateFlow<List<ChecklistUiField>> = _fields
 
+    /** Новый основной источник данных для экрана — секции по всем компонентам установки */
     private val _sections = MutableStateFlow<List<ComponentSectionUi>>(emptyList())
     val sections: StateFlow<List<ComponentSectionUi>> = _sections
 
-    /** Загрузка полей для одного компонента (старый режим, можно не использовать) */
+    // ---------- Загрузка данных ----------
+
+    /** (Опционально) Загрузка полей для одного компонента — legacy режим */
     fun loadForComponent(componentId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val comp = hierarchyDao.getComponent(componentId) ?: run {
                 _fields.value = emptyList()
                 return@launch
             }
-            val tmplId = comp.templateId ?: return@launch
+            val tmplId = comp.templateId ?: run {
+                _fields.value = emptyList()
+                return@launch
+            }
 
             val maintFields = templatesDao.getMaintenanceFieldsForTemplate(tmplId)
             val ui = maintFields.map { f ->
@@ -61,7 +74,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                     label = f.label,
                     type = f.type,
                     unit = f.unit,
-                    min = f.min,
+                    min = f.min,        // если у тебя в БД minValue/maxValue — замени тут
                     max = f.max
                 )
             }
@@ -75,24 +88,26 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
             val components = hierarchyDao.observeComponents(installationId).first()
 
             val built = components.map { comp ->
-                val fields = if (comp.templateId != null) {
-                    val maintFields = templatesDao.getMaintenanceFieldsForTemplate(comp.templateId!!)
-                    maintFields.map { f ->
-                        ChecklistUiField(
-                            key = f.key,
-                            label = f.label,
-                            type = f.type,
-                            unit = f.unit,
-                            min = f.min,
-                            max = f.max
-                        )
-                    }.toMutableList()
-                } else mutableListOf()
+                val fieldList: List<ChecklistUiField> =
+                    comp.templateId?.let { tmplId ->
+                        val maintFields = templatesDao.getMaintenanceFieldsForTemplate(tmplId)
+                        maintFields.map { f ->
+                            ChecklistUiField(
+                                key = f.key,
+                                label = f.label,
+                                type = f.type,
+                                unit = f.unit,
+                                min = f.min,    // при необходимости -> f.minValue
+                                max = f.max     // при необходимости -> f.maxValue
+                            )
+                        }
+                    } ?: emptyList()
 
                 ComponentSectionUi(
                     componentId = comp.id,
                     componentName = comp.name,
-                    fields = fields
+                    fields = fieldList,
+                    expanded = true
                 )
             }
 
@@ -100,7 +115,62 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    /** ✅ Сохраняем одно ТО для всей установки */
+    // ---------- Изменение UI-состояния секций/полей (для "правильного" реактивного обновления) ----------
+
+    fun toggleSection(componentId: String) {
+        _sections.value = _sections.value.map { s ->
+            if (s.componentId == componentId) s.copy(expanded = !s.expanded) else s
+        }
+    }
+
+    /** Отметить/снять чекбокс (поле компонента) */
+    fun setCheckbox(componentId: String, fieldKey: String, checked: Boolean) {
+        _sections.value = _sections.value.map { s ->
+            if (s.componentId != componentId) s else {
+                val newFields = s.fields.map { f ->
+                    if (f.key == fieldKey && f.type == FieldType.CHECKBOX) {
+                        f.copy(boolValue = checked)
+                    } else f
+                }
+                s.copy(fields = newFields)
+            }
+        }
+    }
+
+    /** Ввести числовой текст (хранится строкой) */
+    fun setNumber(componentId: String, fieldKey: String, value: String) {
+        _sections.value = _sections.value.map { s ->
+            if (s.componentId != componentId) s else {
+                val newFields = s.fields.map { f ->
+                    if (f.key == fieldKey && f.type == FieldType.NUMBER) {
+                        f.copy(numberValue = value)
+                    } else f
+                }
+                s.copy(fields = newFields)
+            }
+        }
+    }
+
+    /** Ввести обычный текст */
+    fun setText(componentId: String, fieldKey: String, value: String) {
+        _sections.value = _sections.value.map { s ->
+            if (s.componentId != componentId) s else {
+                val newFields = s.fields.map { f ->
+                    if (f.key == fieldKey && f.type == FieldType.TEXT) {
+                        f.copy(textValue = value)
+                    } else f
+                }
+                s.copy(fields = newFields)
+            }
+        }
+    }
+
+    // ---------- Сохранение ТО на всю установку ----------
+
+    /**
+     * Сохраняем одну сессию ТО для установки и все значения полей по всем компонентам.
+     * Пустые значения не пишем.
+     */
     fun saveSession(
         siteId: String,
         installationId: String,
@@ -120,24 +190,20 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 notes = notes,
                 synced = false
             )
-            sessionsDao.upsertSession(session)
 
-            // сохраняем значения всех полей
-// ...после создания sessionId и session
             val values = mutableListOf<MaintenanceValueEntity>()
-
             _sections.value.forEach { sec ->
                 sec.fields.forEach { f ->
                     val (textValue, boolValue) = when (f.type) {
                         FieldType.CHECKBOX -> null to (f.boolValue == true)
-                        FieldType.NUMBER  -> (f.numberValue.takeIf { it.isNotBlank() }) to null
-                        FieldType.TEXT    -> (f.textValue.takeIf { it.isNotBlank() }) to null
+                        FieldType.NUMBER   -> f.numberValue.takeIf { it.isNotBlank() } to null
+                        FieldType.TEXT     -> f.textValue.takeIf { it.isNotBlank() } to null
                     }
                     if (textValue != null || boolValue != null) {
                         values += MaintenanceValueEntity(
                             id = UUID.randomUUID().toString(),
                             sessionId = sessionId,
-                            siteId = siteId,
+                            siteId = siteId,                 // есть в твоём Entity
                             installationId = installationId,
                             componentId = sec.componentId,
                             fieldKey = f.key,
@@ -148,7 +214,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 }
             }
 
-// атомарно: и сессию, и все значения
+            // атомарно: и сессию, и значения
             sessionsDao.insertSessionWithValues(session, values)
         }
     }
