@@ -97,6 +97,9 @@ interface SessionsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertIssues(list: List<IssueEntity>)
 
+    @Query("SELECT * FROM maintenance_sessions WHERE id = :sessionId LIMIT 1")
+    suspend fun getSessionById(sessionId: String): MaintenanceSessionEntity?
+
     // --- Транзакция: сессия + значения ---
 
     /**

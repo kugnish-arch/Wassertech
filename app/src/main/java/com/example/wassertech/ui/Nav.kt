@@ -19,16 +19,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.wassertech.R
 import com.example.wassertech.ui.clients.ClientDetailScreen
-import com.example.wassertech.ui.clients.ClientsRoute // ← добавили импорт маршрута
+import com.example.wassertech.ui.clients.ClientsRoute
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
-
 import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import com.example.wassertech.ui.maintenance.MaintenanceScreen
+import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
 import android.net.Uri
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,14 +113,13 @@ private fun AppScaffold(navController: NavHostController) {
             composable("clients") {
                 Column {
                     SectionHeader("Клиенты")
-                    // Было: ClientsScreen(onOpenClient = { ... })
-                    // Стало: маршрут-обёртка, сам подписывается на VM и передает данные в UI
                     ClientsRoute(
                         onClientClick = { clientId ->
                             navController.navigate("client/$clientId") {
                                 launchSingleTop = true
                                 restoreState = true
-                            }                        }
+                            }
+                        }
                     )
                 }
             }
@@ -186,7 +184,6 @@ private fun AppScaffold(navController: NavHostController) {
                             val encodedName = Uri.encode(installationName)
                             navController.navigate("maintenance_all/$siteId/$installationId/$encodedName")
                         }
-
                     )
                 }
             }
@@ -212,15 +209,15 @@ private fun AppScaffold(navController: NavHostController) {
                 )
             }
 
-
-
             // --- История ТО: общий экран ---
             composable("maintenance_history") {
                 Column {
                     SectionHeader("История ТО")
                     MaintenanceHistoryScreen(
                         installationId = null,
-                        onBack = { navController.navigateUp() }
+                        onOpenSession = { sid ->
+                            navController.navigate("maintenance_session/$sid")
+                        }
                     )
                 }
             }
@@ -235,8 +232,22 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("История ТО")
                     MaintenanceHistoryScreen(
                         installationId = installationId,
-                        onBack = { navController.navigateUp() }
+                        onOpenSession = { sid ->
+                            navController.navigate("maintenance_session/$sid")
+                        }
                     )
+                }
+            }
+
+            // --- Детали сессии ТО ---
+            composable(
+                "maintenance_session/{sessionId}",
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+            ) { bse ->
+                val sessionId = bse.arguments?.getString("sessionId") ?: return@composable
+                Column {
+                    SectionHeader("Детали ТО")
+                    MaintenanceSessionDetailScreen(sessionId = sessionId)
                 }
             }
         }
