@@ -54,7 +54,6 @@ interface TemplatesDao {
         ORDER BY rowid
         """
     )
-
     suspend fun getFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -65,23 +64,28 @@ interface TemplatesDao {
 
     @Query(
         """
-    SELECT * FROM checklist_fields
-    WHERE templateId = :templateId AND isForMaintenance = 1
-    ORDER BY rowid
-    """
+        SELECT * FROM checklist_fields
+        WHERE templateId = :templateId AND isForMaintenance = 1
+        ORDER BY rowid
+        """
     )
     fun observeMaintenanceFields(templateId: String): Flow<List<ChecklistFieldEntity>>
 
     @Query(
         """
-    SELECT * FROM checklist_fields
-    WHERE templateId = :templateId AND isForMaintenance = 1
-    ORDER BY rowid
-    """
+        SELECT * FROM checklist_fields
+        WHERE templateId = :templateId AND isForMaintenance = 1
+        ORDER BY rowid
+        """
     )
     suspend fun getMaintenanceFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
 
     @Query("SELECT DISTINCT ClientGroupID FROM clients ORDER BY ClientGroupID COLLATE NOCASE")
     fun observeClientGroups(): Flow<List<String>>
 
+    @Query("DELETE FROM checklist_fields WHERE id = :id")
+    suspend fun deleteField(id: String)
+
+    @Query("SELECT title FROM checklist_templates WHERE id = :id LIMIT 1")
+    suspend fun getTemplateTitleById(id: String): String?
 }

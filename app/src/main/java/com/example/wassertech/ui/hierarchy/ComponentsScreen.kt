@@ -1,3 +1,4 @@
+
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.wassertech.ui.hierarchy
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -26,7 +28,11 @@ import com.example.wassertech.viewmodel.HierarchyViewModel
 import com.example.wassertech.viewmodel.TemplatesViewModel
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
-
+import com.example.wassertech.data.AppDatabase
+import kotlinx.coroutines.flow.Flow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 
 @Composable
 fun ComponentsScreen(
@@ -35,13 +41,19 @@ fun ComponentsScreen(
     onStartMaintenanceAll: (siteId: String, installationName: String) -> Unit,
     onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {},
     vm: HierarchyViewModel = viewModel(),
-    templatesVm: TemplatesViewModel = viewModel()
+    templatesVm: TemplatesViewModel = viewModel() // оставляем для совместимости, но ниже не используем
 ) {
+    // 0) Templates: берём напрямую из БД, чтобы не тянуть VM сюда
+    val context = LocalContext.current
+    val db = remember { AppDatabase.getInstance(context) }
+    val allTemplatesFlow: Flow<List<com.example.wassertech.data.entities.ChecklistTemplateEntity>> =
+        remember { db.templatesDao().observeAllTemplates() }
+    val allTemplates by allTemplatesFlow.collectAsState(initial = emptyList())
+    val templateTitleById = remember(allTemplates) { allTemplates.associateBy({ it.id }, { it.title }) }
+
     // 1) Данные
     val installation by vm.installation(installationId).collectAsState(initial = null)
     val components by vm.components(installationId).collectAsState(initial = emptyList())
-    val templates by templatesVm.templates.collectAsState()
-    val templateTitleById = remember(templates) { templates.associate { it.id to it.title } }
 
     // 2) UI-состояния
     var isEditing by remember { mutableStateOf(false) }              // режим редактирования (как на экранах Клиенты/Клиент)
@@ -62,7 +74,7 @@ fun ComponentsScreen(
                 onClick = {
                     showAdd = true
                     newName = TextFieldValue("")
-                    selectedTemplate = templates.firstOrNull()
+                    selectedTemplate = allTemplates.firstOrNull()
                 },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text("Компонент") }
@@ -89,10 +101,7 @@ fun ComponentsScreen(
                     )
 
                     Button(
-                        onClick = {
-                            // здесь позже можно сохранить новый порядок в БД
-                            isEditing = !isEditing
-                        },
+                        onClick = { isEditing = !isEditing },
                         colors = btnColors
                     ) {
                         Icon(Icons.Filled.Edit, contentDescription = null)
@@ -300,9 +309,10 @@ fun ComponentsScreen(
                         expanded = templateMenu,
                         onExpandedChange = { templateMenu = it }
                     ) {
+                        val selectedTitle = selectedTemplate?.title
+                            ?: if (allTemplates.isEmpty()) "Нет шаблонов" else "Выберите шаблон"
                         OutlinedTextField(
-                            value = selectedTemplate?.title
-                                ?: if (templates.isEmpty()) "Нет шаблонов" else "Выберите шаблон",
+                            value = selectedTitle,
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Шаблон") },
@@ -315,13 +325,13 @@ fun ComponentsScreen(
                             expanded = templateMenu,
                             onDismissRequest = { templateMenu = false }
                         ) {
-                            if (templates.isEmpty()) {
+                            if (allTemplates.isEmpty()) {
                                 DropdownMenuItem(
                                     text = { Text("Шаблонов нет") },
                                     onClick = { templateMenu = false }
                                 )
                             } else {
-                                templates.forEach { tmpl ->
+                                for (tmpl in allTemplates) {
                                     DropdownMenuItem(
                                         text = { Text(tmpl.title) },
                                         onClick = {
@@ -346,7 +356,6 @@ fun ComponentsScreen(
             text = { Text("Это действие нельзя отменить.") },
             confirmButton = {
                 TextButton(onClick = {
-                    // IMPORTANT: поменяй на свой метод, если он называется иначе (например, removeComponent)
                     vm.deleteComponent(compId)
                     pendingDeleteId = null
                 }) { Text("Удалить") }

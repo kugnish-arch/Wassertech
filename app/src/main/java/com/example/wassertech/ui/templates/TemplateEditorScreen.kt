@@ -1,171 +1,207 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package com.example.wassertech.ui.templates
 
-import android.app.Application
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.types.FieldType
-import com.example.wassertech.viewmodel.FieldDraft
-import com.example.wassertech.viewmodel.TemplateEditorViewModel
+import com.example.wassertech.util.Translit
+import com.example.wassertech.viewmodel.TemplatesViewModel
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TemplateEditorScreen(templateId: String) {
-    val app = LocalContext.current.applicationContext as Application
-
-    val vm: TemplateEditorViewModel = viewModel(
-        factory = viewModelFactory {
-            initializer { TemplateEditorViewModel(app, templateId) }
-        }
-    )
-
+fun TemplateEditorScreen(
+    templateId: String,
+    vm: TemplatesViewModel = viewModel(),
+    onSaved: () -> Unit = {}
+) {
     val fields by vm.fields.collectAsState()
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    val db = remember { AppDatabase.getInstance(ctx) }
 
-    var dialogOpen by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<FieldDraft?>(null) }
+    var templateTitle by remember { mutableStateOf<String>("Шаблон") }
 
-    Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("Конструктор шаблона") }) },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { editing = null; dialogOpen = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Поле") }
-            )
+    LaunchedEffect(templateId) {
+        vm.load(templateId)
+        // заголовок шаблона
+        withContext(Dispatchers.IO) {
+            try {
+                val title = db.templatesDao().getTemplateTitleById(templateId)
+                if (title != null) templateTitle = title
+            } catch (_: Throwable) { }
         }
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            if (fields.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    Text("Нет полей. Нажми «Поле».")
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(fields, key = { it.id }) { f ->
-                        ElevatedCard(Modifier.fillMaxWidth()) {
-                            ListItem(
-                                headlineContent = { Text(f.label) },
-                                supportingContent = {
-                                    val unitSuffix = f.unit?.let { " • $it" } ?: ""
-                                    Text("${f.type} • ключ: ${f.key}" + (f.unit?.let { " • $it" } ?: ""))
-                                },
-                                trailingContent = {
-                                    Row {
-                                        IconButton(onClick = {
-                                            editing = FieldDraft(
-                                                id = f.id,
-                                                key = f.key,
-                                                label = f.label,
-                                                type = f.type,
-                                                unit = f.unit,
-                                                min = f.min?.toString() ?: "",
-                                                max = f.max?.toString() ?: ""
-                                            )
-                                            dialogOpen = true
-                                        }) { Icon(Icons.Default.Edit, contentDescription = "Edit") }
-                                        IconButton(onClick = { vm.delete(f.id) }) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Delete")
-                                        }
-                                    }
-                                }
-                            )
-                        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        // Шапка с названием шаблона и кнопками
+        Surface(tonalElevation = 1.dp, color = MaterialTheme.colorScheme.secondaryContainer) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(templateTitle, style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { vm.addField() }) { Text("+ Поле") }
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                vm.saveAll()
+                                Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
+                                onSaved()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF26A69A),
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Filled.Save, contentDescription = "Сохранить")
                     }
                 }
             }
         }
-    }
 
-    if (dialogOpen) {
-        FieldEditDialog(
-            initial = editing,
-            onDismiss = { dialogOpen = false },
-            onSave = { draft -> vm.addOrUpdate(draft); dialogOpen = false }
-        )
-    }
-}
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(fields, key = { it.id }) { f ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // 1) Имя (label). Key скрыт — генерируется автоматически.
+                        OutlinedTextField(
+                            value = f.label,
+                            onValueChange = { newLabel ->
+                                val prevAuto = Translit.ruToEnKey(f.label)
+                                val looksAuto = f.key.isBlank() ||
+                                        f.key == prevAuto ||
+                                        f.key.startsWith("field_") ||
+                                        (f.key.any { it.isDigit() } && f.key.length >= 12)
+                                val newAuto = Translit.ruToEnKey(newLabel)
+                                vm.update(f.id) {
+                                    it.copy(
+                                        label = newLabel,
+                                        key = if (looksAuto) newAuto else it.key
+                                    )
+                                }
+                            },
+                            label = { Text("Имя") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
 
-@Composable
-private fun FieldEditDialog(
-    initial: FieldDraft?,
-    onDismiss: () -> Unit,
-    onSave: (FieldDraft) -> Unit
-) {
-    var key by remember { mutableStateOf(initial?.key ?: "") }
-    var label by remember { mutableStateOf(initial?.label ?: "") }
-    var type by remember { mutableStateOf(initial?.type ?: com.example.wassertech.data.types.FieldType.TEXT) }
-    var unit by remember { mutableStateOf(initial?.unit ?: "") }
-    var min by remember { mutableStateOf(initial?.min ?: "") }
-    var max by remember { mutableStateOf(initial?.max ?: "") }
+                        // 2) Тумблер "Характеристика" — справа
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Spacer(Modifier.weight(1f))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Характеристика", style = MaterialTheme.typography.labelMedium)
+                                Spacer(Modifier.width(8.dp))
+                                Switch(
+                                    checked = !f.isForMaintenance, // характеристика = не параметр ТО
+                                    onCheckedChange = { checked ->
+                                        vm.update(f.id) { it.copy(isForMaintenance = !checked) }
+                                    }
+                                )
+                            }
+                        }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                onSave(
-                    FieldDraft(
-                        id = initial?.id,
-                        key = key,
-                        label = label,
-                        type = type,
-                        unit = unit.ifBlank { null },
-                        min = min,
-                        max = max
-                    )
-                )
-            }) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        title = { Text(if (initial == null) "Новое поле" else "Редактирование поля") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text("Название") }, singleLine = true)
-                OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text("Ключ (латиница)") }, singleLine = true)
-                TypeSelector(type = type, onChange = { type = it })
-                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Ед. изм. (опц.)") }, singleLine = true)
-                OutlinedTextField(value = min, onValueChange = { min = it }, label = { Text("Мин. (опц.)") }, singleLine = true)
-                OutlinedTextField(value = max, onValueChange = { max = it }, label = { Text("Макс. (опц.)") }, singleLine = true)
+                        // 3) Сегменты типа поля на всю ширину
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            var selected by remember(f.id, f.type) { mutableStateOf(f.type) }
+                            SegmentedButton(
+                                selected = selected == FieldType.TEXT,
+                                onClick = { selected = FieldType.TEXT; vm.setType(f.id, FieldType.TEXT) },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                                label = { Text("TXT", maxLines = 1, overflow = TextOverflow.Clip, style = MaterialTheme.typography.labelMedium) }
+                            )
+                            SegmentedButton(
+                                selected = selected == FieldType.CHECKBOX,
+                                onClick = { selected = FieldType.CHECKBOX; vm.setType(f.id, FieldType.CHECKBOX) },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                                label = { Text("CHK", maxLines = 1, overflow = TextOverflow.Clip, style = MaterialTheme.typography.labelMedium) }
+                            )
+                            SegmentedButton(
+                                selected = selected == FieldType.NUMBER,
+                                onClick = { selected = FieldType.NUMBER; vm.setType(f.id, FieldType.NUMBER) },
+                                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                                label = { Text("NUM", maxLines = 1, overflow = TextOverflow.Clip, style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
+
+                        // 4) Только для NUMBER — ед. изм. + Min/Max
+                        if (f.type == FieldType.NUMBER) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = f.unit.orEmpty(),
+                                    onValueChange = { new -> vm.update(f.id) { it.copy(unit = new) } },
+                                    label = { Text("Ед. изм.") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = f.min.orEmpty(),
+                                    onValueChange = { new -> vm.update(f.id) { it.copy(min = new) } },
+                                    label = { Text("Min") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = f.max.orEmpty(),
+                                    onValueChange = { new -> vm.update(f.id) { it.copy(max = new) } },
+                                    label = { Text("Max") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true
+                                )
+                            }
+                        }
+
+                        // 5) Действия: корзина справа
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { vm.remove(f.id) }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "Удалить")
+                            }
+                        }
+                    }
+                }
             }
-        }
-    )
-}
-
-@Composable
-private fun TypeSelector(type: com.example.wassertech.data.types.FieldType, onChange: (com.example.wassertech.data.types.FieldType) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        OutlinedTextField(
-            value = when (type) {
-                com.example.wassertech.data.types.FieldType.TEXT -> "TEXT"
-                com.example.wassertech.data.types.FieldType.NUMBER -> "NUMBER"
-                com.example.wassertech.data.types.FieldType.CHECKBOX -> "CHECKBOX"
-            },
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Тип") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("TEXT") }, onClick = { onChange(com.example.wassertech.data.types.FieldType.TEXT); expanded = false })
-            DropdownMenuItem(text = { Text("NUMBER") }, onClick = { onChange(com.example.wassertech.data.types.FieldType.NUMBER); expanded = false })
-            DropdownMenuItem(text = { Text("CHECKBOX") }, onClick = { onChange(com.example.wassertech.data.types.FieldType.CHECKBOX); expanded = false })
         }
     }
 }

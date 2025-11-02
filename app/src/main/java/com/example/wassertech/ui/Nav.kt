@@ -23,10 +23,10 @@ import com.example.wassertech.ui.clients.ClientsRoute
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
 import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
-import com.example.wassertech.ui.templates.TemplateEditorScreen
-import com.example.wassertech.ui.templates.TemplatesScreen
 import com.example.wassertech.ui.maintenance.MaintenanceScreen
 import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
+import com.example.wassertech.ui.templates.TemplateEditorScreen
+import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,7 +138,10 @@ private fun AppScaffold(navController: NavHostController) {
                 arguments = listOf(navArgument("templateId") { type = NavType.StringType })
             ) { bse ->
                 val id = bse.arguments?.getString("templateId") ?: return@composable
-                TemplateEditorScreen(templateId = id)
+                TemplateEditorScreen(
+                    templateId = id,
+                    onSaved = { navController.popBackStack() }
+                )
             }
 
             composable(
@@ -209,20 +212,19 @@ private fun AppScaffold(navController: NavHostController) {
                 )
             }
 
-            // --- История ТО: общий экран ---
+            // История ТО (общая)
             composable("maintenance_history") {
                 Column {
                     SectionHeader("История ТО")
                     MaintenanceHistoryScreen(
                         installationId = null,
-                        onOpenSession = { sid ->
-                            navController.navigate("maintenance_session/$sid")
-                        }
+                        onBack = { navController.navigateUp() },
+                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") }
                     )
                 }
             }
 
-            // --- История ТО конкретной установки ---
+            // История ТО по установке
             composable(
                 "maintenance_history/{installationId}",
                 arguments = listOf(navArgument("installationId") { type = NavType.StringType })
@@ -232,14 +234,13 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("История ТО")
                     MaintenanceHistoryScreen(
                         installationId = installationId,
-                        onOpenSession = { sid ->
-                            navController.navigate("maintenance_session/$sid")
-                        }
+                        onBack = { navController.navigateUp() },
+                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") }
                     )
                 }
             }
 
-            // --- Детали сессии ТО ---
+            // Экран деталей ТО
             composable(
                 "maintenance_session/{sessionId}",
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
