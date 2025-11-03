@@ -1,3 +1,4 @@
+
 package com.example.wassertech.ui
 
 import androidx.compose.foundation.Image
@@ -28,6 +29,10 @@ import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
+import com.example.wassertech.ui.theme.Dimens
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -267,4 +272,6 @@ private fun SectionHeader(title: String) {
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
+    // ЕДИНЫЙ зазор под сабнавбаром
+    Spacer(Modifier.height(Dimens.SubNavbarGap))
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -85,7 +86,7 @@ fun MaintenanceHistoryScreen(
                             Text(display.second, style = MaterialTheme.typography.bodyMedium)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Outlined.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(6.dp))
                             Text(display.third, style = MaterialTheme.typography.bodySmall)
                         }

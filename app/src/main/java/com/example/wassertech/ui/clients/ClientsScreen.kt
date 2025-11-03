@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
 // NOTE: убрали animateItemPlacement, чтобы не зависеть от версии foundation
 
 import com.example.wassertech.data.entities.ClientEntity
@@ -146,6 +147,7 @@ fun ClientsScreen(
         }
     ) { innerPadding ->
         val layoutDir = LocalLayoutDirection.current
+
 
         LazyColumn(
             modifier = Modifier
