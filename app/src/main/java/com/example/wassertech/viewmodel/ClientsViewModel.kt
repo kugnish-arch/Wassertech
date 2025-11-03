@@ -31,7 +31,8 @@ class ClientsViewModel(
     private val _includeArchived = MutableStateFlow(false)
     val includeArchived: StateFlow<Boolean> = _includeArchived.asStateFlow()
 
-    private val _selectedGroupId = MutableStateFlow<String?>(null) // null = "Общая", спец ALL не используем
+    private val _selectedGroupId =
+        MutableStateFlow<String?>(null) // null = "Общая", спец ALL не используем
     val selectedGroupId: StateFlow<String?> = _selectedGroupId.asStateFlow()
 
     private val _groups = MutableStateFlow<List<ClientGroupEntity>>(emptyList())
@@ -86,31 +87,33 @@ class ClientsViewModel(
         reloadGroups()
     }
 
-    fun createClient(name: String, corporate: Boolean, groupId: String?) = viewModelScope.launch(Dispatchers.IO) {
-        val nextOrder = (clientDao.getClientsNow(groupId)
-            .maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
+    fun createClient(name: String, corporate: Boolean, groupId: String?) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val nextOrder = (clientDao.getClientsNow(groupId)
+                .maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
 
-        val now = System.currentTimeMillis()
-        val client = ClientEntity(
-            id = UUID.randomUUID().toString(),
-            name = name,
-            isCorporate = corporate,
-            clientGroupId = groupId,
-            sortOrder = nextOrder,
-            isArchived = false,
-            archivedAtEpoch = null,
-            createdAtEpoch = now,
-            updatedAtEpoch = now,
-            // остальные nullable поля по умолчанию из data-класса
-        )
-        clientDao.upsertClient(client)
-        reloadClients()
-    }
+            val now = System.currentTimeMillis()
+            val client = ClientEntity(
+                id = UUID.randomUUID().toString(),
+                name = name,
+                isCorporate = corporate,
+                clientGroupId = groupId,
+                sortOrder = nextOrder,
+                isArchived = false,
+                archivedAtEpoch = null,
+                createdAtEpoch = now,
+                updatedAtEpoch = now,
+                // остальные nullable поля по умолчанию из data-класса
+            )
+            clientDao.upsertClient(client)
+            reloadClients()
+        }
 
-    fun assignClientToGroup(clientId: String, groupId: String?) = viewModelScope.launch(Dispatchers.IO) {
-        clientDao.setClientGroup(clientId, groupId, System.currentTimeMillis())
-        reloadClients()
-    }
+    fun assignClientToGroup(clientId: String, groupId: String?) =
+        viewModelScope.launch(Dispatchers.IO) {
+            clientDao.setClientGroup(clientId, groupId, System.currentTimeMillis())
+            reloadClients()
+        }
 
     // --- Архив / Восстановление (клиенты) ---
     fun archiveClient(clientId: String) = viewModelScope.launch(Dispatchers.IO) {
@@ -245,6 +248,31 @@ class ClientsViewModel(
         val byGroups = clientDao.getAllGroupsNow().flatMap { g -> clientDao.getClientsNow(g.id) }
         val all = (allGeneral + byGroups).sortedBy { it.sortOrder ?: Int.MAX_VALUE }
         _clients.value = if (_includeArchived.value) all else all.filter { it.isArchived != true }
+    }
+
+    fun renameGroup(groupId: String, newTitle: String) {
+        val title = newTitle.trim()
+        if (title.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            clientDao.updateGroupTitle(groupId, title)
+            reloadGroups()
+        }
+    }
+
+    fun renameClientName(clientId: String, newName: String) {
+        val name = newName.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            clientDao.updateClientName(clientId, name)
+            reloadClients()
+        }
+    }
+
+    fun assignClientGroup(clientId: String, groupId: String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            clientDao.assignClientToGroup(clientId, groupId)
+            reloadClients()
+        }
     }
 }
 

@@ -112,5 +112,17 @@ interface ClientDao {
 
     @Query("SELECT * FROM clients")
     fun observeAllClients(): Flow<List<ClientEntity>>
+
+    // Переименовать имя клиента
+    @Query("UPDATE clients SET name = :newName WHERE id = :clientId")
+    suspend fun updateClientName(clientId: String, newName: String): Int
+
+    // Перенести клиента в другую группу (или убрать из группы, если null)
+    @Query("UPDATE clients SET clientGroupId = :groupId WHERE id = :clientId")
+    suspend fun assignClientToGroup(clientId: String, groupId: String?): Int
+
+    // Переименовать группу
+    @Query("UPDATE client_groups SET title = :newTitle WHERE id = :groupId")
+    suspend fun updateGroupTitle(groupId: String, newTitle: String): Int
 }
 

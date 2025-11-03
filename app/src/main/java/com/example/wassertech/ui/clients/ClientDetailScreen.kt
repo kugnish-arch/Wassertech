@@ -26,6 +26,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.ui.icons.AppIcons
 import kotlinx.coroutines.launch
+import com.example.wassertech.ui.common.EditDoneBottomBar
+import com.example.wassertech.ui.common.BarAction
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,48 +131,23 @@ fun ClientDetailScreen(
 
         // Нижняя кнопка "Изменить/Готово" слева, как на экране "Клиенты"
         bottomBar = {
-            Surface(tonalElevation = 3.dp) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-                    val colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (isEditing)
-                            Color(0xFF26A69A) // зелёно-бирюзовый при активном редактировании
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (isEditing)
-                            Color.White
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Button(
-                        onClick = {
-                            if (isEditing) {
-                                // Сохраняем порядок сайтов и выходим из редактирования
-                                vm.reorderSites(clientId, localOrder)
-                                isEditing = false
-                            } else {
-                                isEditing = true
-                                // сброс локального порядка на актуальный
-                                localOrder = sites.map { it.id }
-                            }
-                        },
-                        colors = colors
-                    ) {
-                        Icon(Icons.Filled.Edit, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (isEditing) "Готово" else "Изменить")
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Text(if (isEditing) "Редактирование" else "Просмотр")
-                }
-            }
+            EditDoneBottomBar(
+                isEditing = isEditing,
+                onEdit = {
+                    // включаем режим редактирования
+                    isEditing = true
+                    // сброс локального порядка на актуальный
+                    localOrder = sites.map { it.id }
+                },
+                onDone = {
+                    // сохраняем порядок сайтов и выходим из редактирования
+                    vm.reorderSites(clientId, localOrder)
+                    isEditing = false
+                },
+                actions = emptyList() // или можно добавить действия справа, если нужно
+            )
         }
+
     ) { _->
         Column(
             Modifier
@@ -188,7 +166,7 @@ fun ClientDetailScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -228,14 +206,14 @@ fun ClientDetailScreen(
                             text = "Группа: $groupName",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
-                            modifier = Modifier.padding(start = 40.dp, top = 2.dp)
+                            modifier = Modifier.padding(start = 50.dp, top = 2.dp, bottom = 4.dp)
                         )
                     } else {
                         Text(
                             text = "Без группы",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(start = 40.dp, top = 2.dp)
+                            modifier = Modifier.padding(start = 50.dp, top = 2.dp, bottom = 4.dp)
                         )
                     }
                 }
