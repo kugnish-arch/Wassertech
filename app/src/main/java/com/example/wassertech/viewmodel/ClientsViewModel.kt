@@ -274,7 +274,16 @@ class ClientsViewModel(
             reloadClients()
         }
     }
+
+    fun reorderClientsInGroup(groupId: String?, orderedIds: List<String>) =
+        viewModelScope.launch(Dispatchers.IO) {
+            orderedIds.forEachIndexed { index, id ->
+                clientDao.updateClientOrder(id, index)
+            }
+            reloadClients()
+        }
 }
+
 
 /** Фабрика на основе ClientDao (Application-agnostic) */
 class ClientsViewModelFactory(

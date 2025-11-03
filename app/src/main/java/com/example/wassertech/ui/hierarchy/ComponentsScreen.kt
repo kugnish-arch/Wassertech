@@ -205,6 +205,9 @@ fun ComponentsScreen(
                     modifier = Modifier.weight(1f)
                 ) { Text("Провести ТО") }
 
+
+
+
                 OutlinedButton(
                     onClick = { onOpenMaintenanceHistoryForInstallation(installationId) },
                     modifier = Modifier.weight(1f)

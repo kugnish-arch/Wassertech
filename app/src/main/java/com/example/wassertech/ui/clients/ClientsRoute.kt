@@ -71,5 +71,7 @@ fun ClientsRoute(
         onMoveGroupDown = vm::moveGroupDown,
         onMoveClientUp = vm::moveClientUp,
         onMoveClientDown = vm::moveClientDown,
+
+        onReorderGroupClients = vm::reorderClientsInGroup
     )
 }

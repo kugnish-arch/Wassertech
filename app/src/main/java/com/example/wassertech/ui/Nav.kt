@@ -187,17 +187,14 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("Установка")
                     ComponentsScreen(
                         installationId = installationId,
-                        onStartMaintenance = { /* одиночный компонент пока не используем */ },
+                        onStartMaintenance = { /* ... */ },
                         onStartMaintenanceAll = { siteId, installationName ->
-                            // маршрут ожидает 3 параметра: siteId / installationId / installationName
                             navController.navigate(
                                 "maintenance_all/$siteId/$installationId/${Uri.encode(installationName)}"
                             )
                         },
-                        // Пока открываем общую историю ТО (как просил ранее).
-                        // Позже переключим на maintenance_history/{installationId}
-                        onOpenMaintenanceHistoryForInstallation = {
-                            navController.navigate("maintenance_history")
+                        onOpenMaintenanceHistoryForInstallation = { id ->
+                            navController.navigate("maintenance_history/$id")
                         }
                     )
                 }

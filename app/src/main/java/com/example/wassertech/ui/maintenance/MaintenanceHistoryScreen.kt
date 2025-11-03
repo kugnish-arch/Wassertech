@@ -27,7 +27,8 @@ import java.util.*
 fun MaintenanceHistoryScreen(
     installationId: String?,
     onBack: () -> Unit,
-    onOpenSession: (String) -> Unit
+    onOpenSession: (String) -> Unit,
+    onClearFilter: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
