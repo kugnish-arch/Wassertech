@@ -9,12 +9,13 @@ import com.example.wassertech.data.dao.*
 import com.example.wassertech.data.entities.*
 import com.example.wassertech.data.entities.MaintenanceValueEntity
 
-//Импорты миграций =========================================
+// Импорты миграций =========================================
 import com.example.wassertech.data.migrations.MIGRATION_1_2
 import com.example.wassertech.data.migrations.MIGRATION_2_3
+import com.example.wassertech.data.migrations.MIGRATION_3_4   // ← ДОБАВЛЕНО
 
 @Database(
-    version = 3,
+    version = 4, // ← БЫЛО 3
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -25,7 +26,7 @@ import com.example.wassertech.data.migrations.MIGRATION_2_3
         ChecklistTemplateEntity::class,
         ChecklistFieldEntity::class,
         MaintenanceSessionEntity::class,
-        MaintenanceValueEntity::class, // ← ДОБАВЬ ЭТО
+        MaintenanceValueEntity::class,
         ObservationEntity::class,
         IssueEntity::class
     ]
@@ -37,9 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun templatesDao(): TemplatesDao
     abstract fun sessionsDao(): SessionsDao
     abstract fun checklistDao(): ChecklistDao
-
     abstract fun clientDao(): ClientDao
-
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -52,17 +51,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "wassertech_v1.db"
                 )
                     // Подключаем миграции
-                    .addMigrations(MIGRATION_1_2,MIGRATION_2_3)
-
-
-                    // Разрешаем разрушительную миграцию ТОЛЬКО с очень старых версий,
-                    //.fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
-
-                    // Разрешаем разрушить БД при переходе с 1-й версии:
-                    //.fallbackToDestructiveMigrationFrom(1)
-
-                    //на реальных данных убираем 2 строки ниже, чтобы не убивать базу
-                    //.fallbackToDestructiveMigration() // <-- drop & recreate if no full path from current to 7
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4    // ← ДОБАВЛЕНО
+                    )
+                    // В проде обычно не используем destructive-опции, оставляю как у тебя:
+                    //.fallbackToDestructiveMigration()
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = db
