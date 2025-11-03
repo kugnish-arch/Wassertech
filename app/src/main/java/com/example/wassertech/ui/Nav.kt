@@ -187,14 +187,23 @@ private fun AppScaffold(navController: NavHostController) {
                     SectionHeader("Установка")
                     ComponentsScreen(
                         installationId = installationId,
-                        onStartMaintenance = { /* unused single component */ },
+                        onStartMaintenance = { /* одиночный компонент пока не используем */ },
                         onStartMaintenanceAll = { siteId, installationName ->
-                            val encodedName = Uri.encode(installationName)
-                            navController.navigate("maintenance_all/$siteId/$installationId/$encodedName")
+                            // маршрут ожидает 3 параметра: siteId / installationId / installationName
+                            navController.navigate(
+                                "maintenance_all/$siteId/$installationId/${Uri.encode(installationName)}"
+                            )
+                        },
+                        // Пока открываем общую историю ТО (как просил ранее).
+                        // Позже переключим на maintenance_history/{installationId}
+                        onOpenMaintenanceHistoryForInstallation = {
+                            navController.navigate("maintenance_history")
                         }
                     )
                 }
             }
+
+
 
             composable(
                 route = "maintenance_all/{siteId}/{installationId}/{installationName}",

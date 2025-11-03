@@ -1,4 +1,3 @@
-
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.wassertech.ui.hierarchy
@@ -18,7 +17,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.TextFieldValue
@@ -29,47 +27,67 @@ import com.example.wassertech.viewmodel.TemplatesViewModel
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
 import com.example.wassertech.data.AppDatabase
+import com.example.wassertech.ui.common.EditDoneBottomBar
+import com.example.wassertech.viewmodel.ClientsViewModel
+import com.example.wassertech.viewmodel.ClientsViewModelFactory
 import kotlinx.coroutines.flow.Flow
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.flowOf
 
 @Composable
 fun ComponentsScreen(
     installationId: String,
-    onStartMaintenance: (String) -> Unit, // (пока не используется — оставляем для совместимости)
+    onStartMaintenance: (String) -> Unit, // пока не используем для одиночного компонента
     onStartMaintenanceAll: (siteId: String, installationName: String) -> Unit,
-    onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {},
+    onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {},   // навигация в историю ТО
     vm: HierarchyViewModel = viewModel(),
-    templatesVm: TemplatesViewModel = viewModel() // оставляем для совместимости, но ниже не используем
+    templatesVm: TemplatesViewModel = viewModel() // оставлено для совместимости
 ) {
-    // 0) Templates: берём напрямую из БД, чтобы не тянуть VM сюда
+    // --- Templates из БД без VM ---
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
-    val allTemplatesFlow: Flow<List<com.example.wassertech.data.entities.ChecklistTemplateEntity>> =
+    val allTemplatesFlow: Flow<List<ChecklistTemplateEntity>> =
         remember { db.templatesDao().observeAllTemplates() }
     val allTemplates by allTemplatesFlow.collectAsState(initial = emptyList())
-    val templateTitleById = remember(allTemplates) { allTemplates.associateBy({ it.id }, { it.title }) }
+    val templateTitleById = remember(allTemplates) { allTemplates.associate { it.id to it.title } }
 
-    // 1) Данные
+    // --- Второй VM: клиенты (чтобы получить имя клиента без observeClient()) ---
+    val clientsVm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(db.clientDao()))
+    val allClients by clientsVm.clients.collectAsState()
+
+    // --- Данные установки / компонентов ---
     val installation by vm.installation(installationId).collectAsState(initial = null)
     val components by vm.components(installationId).collectAsState(initial = emptyList())
 
-    // 2) UI-состояния
-    var isEditing by remember { mutableStateOf(false) }              // режим редактирования (как на экранах Клиенты/Клиент)
-    var showEdit by remember { mutableStateOf(false) }               // диалог переименования установки
+    // Подтянем сайт (нужен clientId). Если у тебя другой метод — поправь здесь.
+    val siteFlow = remember(installation?.siteId) {
+        installation?.siteId?.let { vm.site(it) } ?: flowOf(null)
+    }
+    val site by siteFlow.collectAsState(initial = null)
+
+    // Имя клиента берём из clientsVm.clients
+    val clientName: String? = remember(site, allClients) {
+        val id = site?.clientId ?: return@remember null
+        allClients.firstOrNull { it.id == id }?.name
+    }
+
+    // --- Локальные UI-состояния ---
+    var isEditing by remember { mutableStateOf(false) }
+
+    // локальный порядок (живой) — отрисовываем список по нему
+    var localOrder by remember(components) { mutableStateOf(components.map { it.id } ) }
+
+    var showEdit by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf(TextFieldValue("")) }
 
-    var showAdd by remember { mutableStateOf(false) }                // диалог добавления компонента
+    var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
     var selectedTemplate by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
     var templateMenu by remember { mutableStateOf(false) }
 
-    var pendingDeleteId by remember { mutableStateOf<String?>(null) } // подтверждение удаления компонента
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         floatingActionButton = {
-            // FAB “Компонент” оставляем доступным в обоих режимах (как у тебя и было)
             ExtendedFloatingActionButton(
                 onClick = {
                     showAdd = true
@@ -80,97 +98,94 @@ fun ComponentsScreen(
                 text = { Text("Компонент") }
             )
         },
-        // НИЖНЯЯ ПАНЕЛЬ — как на экране “Клиенты”
         bottomBar = {
-            Surface(tonalElevation = 3.dp) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val btnColors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (isEditing)
-                            Color(0xFF26A69A)
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (isEditing)
-                            Color.White
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Button(
-                        onClick = { isEditing = !isEditing },
-                        colors = btnColors
-                    ) {
-                        Icon(Icons.Filled.Edit, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (isEditing) "Готово" else "Изменить")
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Text(if (isEditing) "Редактирование" else "Просмотр")
+            EditDoneBottomBar(
+                isEditing = isEditing,
+                onEdit = {
+                    isEditing = true
+                    localOrder = components.map { it.id } // фиксируем актуальный порядок в момент входа в редактирование
+                },
+                onDone = {
+                    // сохраняем новый порядок компонентов в БД
+                    vm.reorderComponents(installationId, localOrder)
+                    isEditing = false
                 }
-            }
+            )
         }
     ) { padding ->
         val layoutDirection = LocalLayoutDirection.current
+
         Column(
             Modifier
                 .padding(
                     start = padding.calculateStartPadding(layoutDirection),
-                    top = 0.dp, // убираем зазор под заголовком «Установка»
+                    top = 0.dp,
                     end = padding.calculateEndPadding(layoutDirection),
                     bottom = padding.calculateBottomPadding()
                 )
                 .fillMaxSize()
         ) {
-            // ===== Плашка заголовка (в стиле Клиенты/Клиент) =====
+            // ===== Заголовок установки =====
             val instName = installation?.name?.takeIf { it.isNotBlank() } ?: "Без названия"
+            val metaText: String? = when {
+                clientName != null && site?.name != null ->
+                    "Объект: $clientName — ${site!!.name}"
+                site?.name != null ->
+                    "Объект: ${site!!.name}"
+                else -> null
+            }
+
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
                 )
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.SettingsApplications,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = instName,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.weight(1f)
-                    )
-                    // ✎ показываем ТОЛЬКО в режиме редактирования
-                    if (isEditing) {
-                        IconButton(
-                            onClick = {
-                                editName = TextFieldValue(installation?.name ?: "")
-                                showEdit = true
-                            },
-                            enabled = installation != null
-                        ) {
-                            Icon(
-                                Icons.Filled.Edit,
-                                contentDescription = "Редактировать установку",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
+                Column(Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SettingsApplications,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = instName,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isEditing) {
+                            IconButton(
+                                onClick = {
+                                    editName = TextFieldValue(installation?.name ?: "")
+                                    showEdit = true
+                                },
+                                enabled = installation != null
+                            ) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = "Редактировать установку",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
                         }
+                    }
+                    metaText?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                        )
                     }
                 }
             }
 
-            // Кнопки действий под заголовком
+            // ===== Кнопки действий под заголовком =====
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier
@@ -198,8 +213,13 @@ fun ComponentsScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // ===== Список компонентов =====
-            if (components.isEmpty()) {
+            // ===== Список компонентов (отрисовываем в порядке localOrder) =====
+            val componentsById = remember(components) { components.associateBy { it.id } }
+            val orderedComponents = remember(localOrder, componentsById) {
+                localOrder.mapNotNull { componentsById[it] }
+            }
+
+            if (orderedComponents.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Нет компонентов. Нажмите «Компонент».")
                 }
@@ -208,7 +228,7 @@ fun ComponentsScreen(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(components, key = { it.id }) { comp ->
+                    items(orderedComponents, key = { it.id }) { comp ->
                         val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             ListItem(
@@ -223,12 +243,28 @@ fun ComponentsScreen(
                                 trailingContent = {
                                     if (isEditing) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            IconButton(onClick = { /* TODO: move up */ }) {
-                                                Icon(Icons.Filled.ArrowUpward, contentDescription = "Вверх")
-                                            }
-                                            IconButton(onClick = { /* TODO: move down */ }) {
-                                                Icon(Icons.Filled.ArrowDownward, contentDescription = "Вниз")
-                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    val i = localOrder.indexOf(comp.id)
+                                                    if (i > 0) {
+                                                        val m = localOrder.toMutableList()
+                                                        m[i - 1] = m[i].also { _ -> m[i] = m[i - 1] }
+                                                        localOrder = m
+                                                    }
+                                                }
+                                            ) { Icon(Icons.Filled.ArrowUpward, contentDescription = "Вверх") }
+
+                                            IconButton(
+                                                onClick = {
+                                                    val i = localOrder.indexOf(comp.id)
+                                                    if (i != -1 && i < localOrder.lastIndex) {
+                                                        val m = localOrder.toMutableList()
+                                                        m[i + 1] = m[i].also { _ -> m[i] = m[i + 1] }
+                                                        localOrder = m
+                                                    }
+                                                }
+                                            ) { Icon(Icons.Filled.ArrowDownward, contentDescription = "Вниз") }
+
                                             Spacer(Modifier.width(4.dp))
                                             IconButton(onClick = { pendingDeleteId = comp.id }) {
                                                 Icon(
@@ -265,7 +301,6 @@ fun ComponentsScreen(
                     val newTitle = editName.text.trim()
                     if (newTitle.isNotEmpty()) {
                         vm.renameInstallation(installationId, newTitle)
-                        // UI обновится через Flow
                     }
                     showEdit = false
                 }) { Text("Сохранить") }
@@ -288,7 +323,7 @@ fun ComponentsScreen(
                     vm.addComponentFromTemplate(
                         installationId = installationId,
                         name = compName,
-                        type = ComponentType.FILTER,      // тип для совместимости
+                        type = ComponentType.FILTER, // подставь нужный тип при необходимости
                         templateId = tmpl?.id
                     )
                     showAdd = false
@@ -331,7 +366,7 @@ fun ComponentsScreen(
                                     onClick = { templateMenu = false }
                                 )
                             } else {
-                                for (tmpl in allTemplates) {
+                                allTemplates.forEach { tmpl ->
                                     DropdownMenuItem(
                                         text = { Text(tmpl.title) },
                                         onClick = {

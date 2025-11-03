@@ -14,6 +14,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
+/**
+ * ViewModel для иерархии: Клиенты → Объекты → Установки → Компоненты.
+ * Добавлены удобные observe* алиасы, чтобы их можно было вызывать из UI.
+ */
 class HierarchyViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
@@ -27,6 +31,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun clients(includeArchived: Boolean = false): Flow<List<ClientEntity>> =
         if (includeArchived) clientDao.observeClients(true) else clientDao.observeClients()
 
+    /** Поток одного клиента по id. */
     fun client(id: String): Flow<ClientEntity?> =
         clientDao.observeAllClients().map { list -> list.firstOrNull { it.id == id } }
 
@@ -54,6 +59,12 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun sites(clientId: String): Flow<List<SiteEntity>> =
         hierarchyDao.observeSites(clientId)
+
+    /** Поток одного объекта по id. */
+    fun site(id: String): Flow<SiteEntity?> = hierarchyDao.observeSite(id)
+
+    /** Алиас для читаемости в UI: observeSite(id). */
+    fun observeSite(id: String): Flow<SiteEntity?> = site(id)
 
     suspend fun getSite(id: String): SiteEntity? =
         withContext(Dispatchers.IO) { hierarchyDao.getSite(id) }
@@ -98,8 +109,12 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun installations(siteId: String): Flow<List<InstallationEntity>> =
         hierarchyDao.observeInstallations(siteId)
 
+    /** Поток одной установки по id. */
     fun installation(id: String): Flow<InstallationEntity?> =
         hierarchyDao.observeInstallation(id)
+
+    /** Алиас для читаемости в UI: observeInstallation(id). */
+    fun observeInstallation(id: String): Flow<InstallationEntity?> = installation(id)
 
     suspend fun getInstallation(id: String): InstallationEntity? =
         withContext(Dispatchers.IO) { hierarchyDao.getInstallation(id) }
@@ -197,7 +212,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    /** 🔥 Удалить компонент по id (используется иконкой корзины на экране «Установка»). */
+    /** Удалить компонент по id (иконка корзины на экране «Установка»). */
     fun deleteComponent(componentId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             hierarchyDao.deleteComponent(componentId)

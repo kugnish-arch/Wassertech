@@ -3,18 +3,19 @@ package com.example.wassertech.data.dao
 import androidx.room.*
 import com.example.wassertech.data.entities.*
 import kotlinx.coroutines.flow.Flow
-import androidx.room.Update
-
 
 @Dao
 interface HierarchyDao {
-    // HierarchyDao.kt
-
-
 
     // ---- Sites ----
+
+    /** Поток списка объектов клиента, отсортированный по orderIndex, затем по имени. */
     @Query("SELECT * FROM sites WHERE clientId = :clientId ORDER BY orderIndex ASC, name COLLATE NOCASE")
     fun observeSites(clientId: String): Flow<List<SiteEntity>>
+
+    /** Поток одного объекта по id (удобно для подписи «Объект: Клиент — Объект»). */
+    @Query("SELECT * FROM sites WHERE id = :id LIMIT 1")
+    fun observeSite(id: String): Flow<SiteEntity?>
 
     @Query("SELECT * FROM sites WHERE id = :id LIMIT 1")
     suspend fun getSite(id: String): SiteEntity?
@@ -27,7 +28,7 @@ interface HierarchyDao {
 
     @Transaction
     suspend fun reorderSites(newOrder: List<SiteEntity>) {
-        // assume orderIndex уже вычислен на стороне UI
+        // orderIndex уже пересчитан на стороне VM/UI
         updateSites(newOrder)
     }
 
@@ -39,8 +40,9 @@ interface HierarchyDao {
     @Query("SELECT * FROM installations WHERE siteId = :siteId ORDER BY orderIndex ASC, name COLLATE NOCASE")
     fun observeInstallations(siteId: String): Flow<List<InstallationEntity>>
 
+    /** Поток одной установки по id. */
     @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")
-    fun observeInstallation(id: String): kotlinx.coroutines.flow.Flow<InstallationEntity?>
+    fun observeInstallation(id: String): Flow<InstallationEntity?>
 
     @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")
     suspend fun getInstallation(id: String): InstallationEntity?
@@ -57,6 +59,7 @@ interface HierarchyDao {
     }
 
     // ---- Components ----
+
     @Query("SELECT * FROM components WHERE installationId = :installationId ORDER BY orderIndex ASC, name COLLATE NOCASE")
     fun observeComponents(installationId: String): Flow<List<ComponentEntity>>
 
@@ -74,9 +77,11 @@ interface HierarchyDao {
         updateComponents(newOrder)
     }
 
+    /** Дублирующий поток (если где-то использовался ранее) — оставлен для совместимости. */
     @Query("SELECT * FROM components WHERE installationId = :installationId ORDER BY (orderIndex IS NULL), orderIndex, id")
-    fun observeComponentsByInstallation(installationId: String): kotlinx.coroutines.flow.Flow<List<ComponentEntity>>
+    fun observeComponentsByInstallation(installationId: String): Flow<List<ComponentEntity>>
 
+    /** Удалить компонент по id. */
     @Query("DELETE FROM components WHERE id = :componentId")
-    fun deleteComponent(componentId: String)
+    suspend fun deleteComponent(componentId: String)
 }
