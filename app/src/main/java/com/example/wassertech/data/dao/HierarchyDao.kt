@@ -4,6 +4,9 @@ import androidx.room.*
 import com.example.wassertech.data.entities.*
 import kotlinx.coroutines.flow.Flow
 
+import com.example.wassertech.data.entities.ComponentEntity
+import com.example.wassertech.data.entities.InstallationEntity
+import com.example.wassertech.data.entities.SiteEntity
 @Dao
 interface HierarchyDao {
 
@@ -84,4 +87,19 @@ interface HierarchyDao {
     /** Удалить компонент по id. */
     @Query("DELETE FROM components WHERE id = :componentId")
     suspend fun deleteComponent(componentId: String)
+
+    @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")
+    suspend fun getInstallationNow(id: String): InstallationEntity?
+
+    @Query("SELECT * FROM sites WHERE id = :id LIMIT 1")
+    suspend fun getSiteNow(id: String): SiteEntity?
+
+    @Query("""
+    SELECT * FROM components
+    WHERE installationId = :installationId
+    ORDER BY 
+      CASE WHEN orderIndex IS NULL THEN 1 ELSE 0 END,
+      orderIndex ASC, name COLLATE NOCASE ASC
+""")
+    suspend fun getComponentsNow(installationId: String): List<ComponentEntity>
 }

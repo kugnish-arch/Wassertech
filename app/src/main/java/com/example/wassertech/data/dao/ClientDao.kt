@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
 
+
 /**
  * Расширенный DAO: добавлены observeClients(...) и getClient(...)
  * чтобы не править существующий HierarchyViewModel.
@@ -124,5 +125,9 @@ interface ClientDao {
     // Переименовать группу
     @Query("UPDATE client_groups SET title = :newTitle WHERE id = :groupId")
     suspend fun updateGroupTitle(groupId: String, newTitle: String): Int
+
+    @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
+    suspend fun getClientNow(id: String): ClientEntity
+
 }
 

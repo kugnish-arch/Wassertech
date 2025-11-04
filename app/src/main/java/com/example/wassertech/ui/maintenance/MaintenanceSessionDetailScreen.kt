@@ -19,6 +19,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import java.io.File
+import com.example.wassertech.report.ReportAssembler
+import com.example.wassertech.report.HtmlTemplateEngine
+import com.example.wassertech.report.PdfExporter
+import com.example.wassertech.report.ShareUtils
+
 
 @Composable
 fun MaintenanceSessionDetailScreen(
@@ -39,6 +49,10 @@ fun MaintenanceSessionDetailScreen(
         SimpleDateFormat("d MMMM yyyy (HH:mm)", Locale("ru"))
             .apply { timeZone = TimeZone.getDefault() }
     }
+
+    val scope = rememberCoroutineScope()
+    var exporting by remember { mutableStateOf(false) }
+    var snack by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(sessionId) {
         withContext(Dispatchers.IO) {
@@ -148,6 +162,44 @@ fun MaintenanceSessionDetailScreen(
                 )
             }
         }
+    }
+
+    Button(
+        enabled = !exporting,
+        onClick = {
+            scope.launch {
+                exporting = true
+                try {
+                    // 1) собрали DTO
+                    val dto = ReportAssembler.assemble(context, sessionId)
+                    // 2) собрали HTML по шаблону
+                    val html = HtmlTemplateEngine.render(
+                        context = context,
+                        templateAssetPath = "templates/maintenance_v1.html",
+                        dto = dto
+                    )
+                    // 3) путь для PDF
+                    val reportsDir = File(context.getExternalFilesDir(null), "Reports").apply { mkdirs() }
+                    val out = File(reportsDir, "Report_${dto.reportNumber}.pdf")
+                    // 4) HTML -> PDF
+                    PdfExporter.exportHtmlToPdf(context, html, out)
+                    // 5) шарим
+                    ShareUtils.sharePdf(context, out)
+                } catch (t: Throwable) {
+                    snack = "Не удалось создать PDF: ${t.message}"
+                } finally {
+                    exporting = false
+                }
+            }
+        }
+    ) {
+        if (exporting) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        else Text("Отчёт (PDF)")
+    }
+    snack?.let {
+        SnackbarHost(hostState = remember { SnackbarHostState() }.also { host ->
+            LaunchedEffect(it) { host.showSnackbar(message = it); snack = null }
+        })
     }
 }
 

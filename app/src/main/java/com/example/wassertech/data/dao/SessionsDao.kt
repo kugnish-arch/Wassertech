@@ -12,6 +12,7 @@ import com.example.wassertech.data.entities.MaintenanceValueEntity
 import com.example.wassertech.data.entities.ObservationEntity
 import kotlinx.coroutines.flow.Flow
 
+
 /**
  * Вспомогательная строка: последнее время ТО по каждому компоненту.
  * (Сохраняем твою исходную выборку по таблице observations)
@@ -116,6 +117,13 @@ interface SessionsDao {
             insertValues(values)
         }
     }
+
+    // ============ PDF Exporter ===========
+    @Query("SELECT * FROM maintenance_sessions WHERE id = :sessionId LIMIT 1")
+    suspend fun getSessionNow(sessionId: String): MaintenanceSessionEntity
+
+    @Query("SELECT * FROM observations WHERE sessionId = :sessionId ORDER BY rowid ASC")
+    suspend fun getObservationsForSessionNow(sessionId: String): List<ObservationEntity>
 
 
 }
