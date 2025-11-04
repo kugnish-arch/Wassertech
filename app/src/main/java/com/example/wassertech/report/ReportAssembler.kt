@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.report.model.ComponentRowDTO
 import com.example.wassertech.report.model.ReportDTO
+import com.example.wassertech.report.model.WaterAnalysisItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -45,7 +46,9 @@ object ReportAssembler {
         }
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateFmtRus = SimpleDateFormat("dd.MM.yyyy", Locale("ru"))
         val reportDate = session.startedAtEpoch?.let { dateFmt.format(Date(it)) } ?: "Не указана"
+        val reportDateRus = session.startedAtEpoch?.let { dateFmtRus.format(Date(it)) } ?: ""
         val nextDate = null // нет поля nextMaintenance в сущности MaintenanceSessionEntity
 
         // Составляем строки наблюдений: выбираем текстовое представление значения
@@ -59,17 +62,27 @@ object ReportAssembler {
             txt?.takeIf { it.isNotBlank() }
         }
 
+        // Загружаем конфигурацию компании
+        val (companyConfig, contractConfig) = CompanyConfigLoader.loadConfig(context)
+
+        // Формируем список выполненных работ из наблюдений
+        val works = observationTexts.takeIf { it.isNotEmpty() } ?: listOf("Плановое ТО установки водоподготовки")
+
+        // Извлекаем данные анализов воды из наблюдений (можно улучшить логику позже)
+        val waterAnalyses = emptyList<WaterAnalysisItem>() // Пока пусто, можно заполнить позже
+
         ReportDTO(
             reportNumber = "TO-${sessionId.take(8).uppercase()}",
             reportDate = reportDate,
+            reportDateRus = reportDateRus,
 
-            companyName = "Wassertech",
+            companyName = companyConfig?.legal_name ?: "Wassertech",
             engineerName = session.technician ?: "Инженер",
 
             clientName = client?.name ?: "Клиент",
-            // ReportDTO fields ожидают non-null String (исправляем nullable -> дефолт "")
             clientAddress = client?.addressFull ?: "",
             clientPhone = client?.phone ?: "",
+            clientSignName = client?.contactPerson,
 
             siteName = site?.name ?: "",
             installationName = installation?.name ?: "",
@@ -79,6 +92,13 @@ object ReportAssembler {
             observations = observationTexts,
             conclusions = session.notes ?: "",
             nextMaintenanceDate = nextDate,
+
+            works = works,
+            waterAnalyses = waterAnalyses,
+            comments = session.notes ?: "",
+
+            companyConfig = companyConfig,
+            contractConfig = contractConfig,
 
             logoAssetPath = "img/logo-wassertech-bolder.png"
         )

@@ -8,66 +8,107 @@ object HtmlTemplateEngine {
 
     fun render(context: Context, templateAssetPath: String, dto: ReportDTO): String {
         val template = context.assets.open(templateAssetPath).bufferedReader().use(BufferedReader::readText)
-
-        // Плейсхолдеры 1:1 с нашим планом
-        val map = mapOf(
-            "\${report.number}" to dto.reportNumber,
-            "\${report.date}" to dto.reportDate,
-
-            "\${company.name}" to (dto.companyName),
-            "\${engineer.name}" to (dto.engineerName ?: ""),
-
-            "\${client.name}" to dto.clientName,
-            "\${client.address}" to (dto.clientAddress ?: ""),
-            "\${client.phone}" to (dto.clientPhone ?: ""),
-
-            "\${site.name}" to (dto.siteName ?: ""),
-            "\${installation.name}" to dto.installationName,
-            "\${installation.location}" to (dto.installationLocation ?: ""),
-
-            "\${conclusions}" to (dto.conclusions ?: ""),
-            "\${next.date}" to (dto.nextMaintenanceDate ?: "")
-        )
-
+        
         var html = template
-        map.forEach { (k, v) -> html = html.replace(k, escapeHtml(v)) }
-
-        // Строки таблицы компонентов
-        val componentsRows = buildString {
-            dto.components.forEachIndexed { idx, c ->
-                appendLine(
-                    """
-                    <tr class="row">
-                      <td class="col idx">${idx + 1}</td>
-                      <td class="col name">${escapeHtml(c.name)}</td>
-                      <td class="col type">${escapeHtml(c.type ?: "")}</td>
-                      <td class="col serial">${escapeHtml(c.serial ?: "")}</td>
-                      <td class="col status">${escapeHtml(c.status)}</td>
-                      <td class="col notes">${escapeHtml(c.notes ?: "")}</td>
-                    </tr>
-                    """.trimIndent()
-                )
-            }
+        
+        // Заменяем плейсхолдеры компании
+        dto.companyConfig?.let { company ->
+            html = html.replace("{{company.legal_name}}", escapeHtml(company.legal_name))
+            html = html.replace("{{company.inn}}", escapeHtml(company.inn))
+            html = html.replace("{{company.phone1}}", escapeHtml(company.phone1))
+            html = html.replace("{{company.phone2}}", escapeHtml(company.phone2))
+            html = html.replace("{{company.email}}", escapeHtml(company.email))
+            html = html.replace("{{company.website}}", escapeHtml(company.website))
+            html = html.replace("{{company.sign_name}}", escapeHtml(company.sign_name))
+            html = html.replace("{{company.sign_short}}", escapeHtml(company.sign_short))
         }
-        html = html.replace("<!-- COMPONENTS_ROWS -->", componentsRows)
-
-        // Наблюдения списком
-        val obsList = if (dto.observations.isNotEmpty()) {
-            buildString {
-                appendLine("<ul class=\"observations\">")
-                dto.observations.forEach { line ->
-                    appendLine("<li>${escapeHtml(line)}</li>")
+        
+        // Логотип как data URI
+        dto.logoAssetPath?.let { path ->
+            val logoDataUri = CompanyConfigLoader.logoToDataUri(context, path)
+            html = html.replace("{{company.logo_data_uri}}", logoDataUri)
+        }
+        
+        // Документ
+        html = html.replace("{{doc.number}}", escapeHtml(dto.reportNumber))
+        html = html.replace("{{doc.date_rus}}", escapeHtml(dto.reportDateRus))
+        
+        // Договор
+        dto.contractConfig?.let { contract ->
+            html = html.replace("{{contract.number}}", escapeHtml(contract.number))
+            html = html.replace("{{contract.date_rus}}", escapeHtml(contract.date_rus))
+        }
+        
+        // Клиент
+        html = html.replace("{{client.name}}", escapeHtml(dto.clientName))
+        html = html.replace("{{client.sign_name}}", escapeHtml(dto.clientSignName ?: ""))
+        
+        // Объект и установка
+        html = html.replace("{{site.name}}", escapeHtml(dto.siteName ?: ""))
+        html = html.replace("{{installation.name}}", escapeHtml(dto.installationName))
+        
+        // Выполненные работы
+        val worksBlockRegex = Regex("\\{\\{#works\\}\\}([\\s\\S]*?)\\{\\{/works\\}\\}")
+        val worksElseBlockRegex = Regex("\\{\\{^works\\}\\}([\\s\\S]*?)\\{\\{/works\\}\\}")
+        
+        if (dto.works.isNotEmpty()) {
+            // Находим шаблон внутри блока {{#works}}...{{/works}}
+            val worksTemplateMatch = worksBlockRegex.find(html)
+            if (worksTemplateMatch != null) {
+                val template = worksTemplateMatch.groupValues[1]
+                // Заменяем {{.}} на реальные значения
+                val worksHtml = dto.works.joinToString("") { work ->
+                    template.replace("{{.}}", escapeHtml(work))
                 }
-                appendLine("</ul>")
+                html = html.replace(worksBlockRegex, worksHtml)
             }
-        } else ""
-        html = html.replace("<!-- OBSERVATIONS_LIST -->", obsList)
-
-        // Лого (если есть)
-        dto.logoAssetPath?.let {
-            html = html.replace("\${assets.logo}", it)
+            // Удаляем блок {{^works}}...{{/works}}
+            html = html.replace(worksElseBlockRegex, "")
+        } else {
+            // Удаляем блок {{#works}}...{{/works}}
+            html = html.replace(worksBlockRegex, "")
+            // Оставляем содержимое блока {{^works}}...{{/works}}
+            html = html.replace(worksElseBlockRegex, "$1")
         }
-
+        
+        // Комментарии
+        html = html.replace("{{comments}}", escapeHtml(dto.comments ?: ""))
+        
+        // Результаты анализов воды
+        val waterBlockRegex = Regex("\\{\\{#water\\}\\}([\\s\\S]*?)\\{\\{/water\\}\\}")
+        val waterElseBlockRegex = Regex("\\{\\{^water\\}\\}([\\s\\S]*?)\\{\\{/water\\}\\}")
+        
+        if (dto.waterAnalyses.isNotEmpty()) {
+            // Находим шаблон внутри блока {{#water}}...{{/water}}
+            val waterTemplateMatch = waterBlockRegex.find(html)
+            if (waterTemplateMatch != null) {
+                val template = waterTemplateMatch.groupValues[1]
+                // Заменяем плейсхолдеры на реальные значения для каждого элемента
+                val waterHtml = dto.waterAnalyses.joinToString("") { item ->
+                    template.replace("{{name}}", escapeHtml(item.name))
+                        .replace("{{value}}", escapeHtml(item.value))
+                        .replace("{{unit}}", escapeHtml(item.unit))
+                        .replace("{{norm}}", escapeHtml(item.norm))
+                }
+                html = html.replace(waterBlockRegex, waterHtml)
+            }
+            // Удаляем блок {{^water}}...{{/water}}
+            html = html.replace(waterElseBlockRegex, "")
+        } else {
+            // Удаляем блок {{#water}}...{{/water}}
+            html = html.replace(waterBlockRegex, "")
+            // Оставляем содержимое блока {{^water}}...{{/water}}
+            html = html.replace(waterElseBlockRegex, "$1")
+        }
+        
+        // Заключение (опционально)
+        if (dto.conclusions?.isNotBlank() == true) {
+            html = html.replace("{{conclusion}}", escapeHtml(dto.conclusions))
+            html = html.replace(Regex("\\{\\{#conclusion\\}\\}([\\s\\S]*?)\\{\\{/conclusion\\}\\}"), "$1")
+        } else {
+            html = html.replace(Regex("\\{\\{#conclusion\\}\\}([\\s\\S]*?)\\{\\{/conclusion\\}\\}"), "")
+        }
+        
         return html
     }
 
@@ -76,4 +117,5 @@ object HtmlTemplateEngine {
             .replace("<", "&lt;")
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
+            .replace("'", "&#39;")
 }

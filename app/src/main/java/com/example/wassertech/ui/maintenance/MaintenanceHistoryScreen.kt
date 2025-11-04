@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HomeWork
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,7 @@ fun MaintenanceHistoryScreen(
     installationId: String?,
     onBack: () -> Unit,
     onOpenSession: (String) -> Unit,
+    onOpenReports: () -> Unit = {},
     onClearFilter: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -59,37 +61,75 @@ fun MaintenanceHistoryScreen(
         }
     }
 
-    if (sessions.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Записей ТО пока нет")
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Кнопка "Отчёты ТО"
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End
         ) {
-            items(sessionDisplay.zip(sessions)) { (display, s) ->
-                ElevatedCard(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenSession(s.id) }
-                ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Business, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(6.dp))
-                            Text(display.first, style = MaterialTheme.typography.titleMedium)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.HomeWork, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(6.dp))
-                            Text(display.second, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(6.dp))
-                            Text(display.third, style = MaterialTheme.typography.bodySmall)
+            Button(
+                onClick = onOpenReports,
+                modifier = Modifier.padding(vertical = 4.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Отчёты ТО")
+            }
+        }
+
+        if (sessions.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Записей ТО пока нет")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(sessionDisplay.zip(sessions)) { (display, s) ->
+                    ElevatedCard(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenSession(s.id) }
+                    ) {
+                        Column(
+                            Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.Business,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(display.first, style = MaterialTheme.typography.titleMedium)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.HomeWork,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(display.second, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(display.third, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }

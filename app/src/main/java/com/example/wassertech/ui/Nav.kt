@@ -26,6 +26,7 @@ import com.example.wassertech.ui.hierarchy.SiteDetailScreen
 import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
 import com.example.wassertech.ui.maintenance.MaintenanceScreen
 import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
+import com.example.wassertech.ui.reports.ReportsScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
@@ -230,7 +231,8 @@ private fun AppScaffold(navController: NavHostController) {
                     MaintenanceHistoryScreen(
                         installationId = null,
                         onBack = { navController.navigateUp() },
-                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") }
+                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
+                        onOpenReports = { navController.navigate("reports") }
                     )
                 }
             }
@@ -246,8 +248,17 @@ private fun AppScaffold(navController: NavHostController) {
                     MaintenanceHistoryScreen(
                         installationId = installationId,
                         onBack = { navController.navigateUp() },
-                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") }
+                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
+                        onOpenReports = { navController.navigate("reports") }
                     )
+                }
+            }
+            
+            // Экран отчётов ТО
+            composable("reports") {
+                Column {
+                    SectionHeader("Отчёты ТО")
+                    ReportsScreen()
                 }
             }
 

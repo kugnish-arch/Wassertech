@@ -1,0 +1,17 @@
+{
+  "company": {
+    "legal_name": "Wassertech (ИП Шульски Д.В.)",
+    "inn": "7734703708",
+    "phone1": "(926) 188-40-07",
+    "phone2": "",
+    "email": "info@wassertech.ru",
+    "website": "www.wassertech.ru",
+    "sign_name": "Шульски Дмитрий Владимирович",
+    "sign_short": "Д.В. Шульски"
+  },
+  "contract": {
+    "number": "ДОГ-2024-001",
+    "date_rus": "01.01.2024"
+  }
+}
+

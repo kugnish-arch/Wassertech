@@ -141,7 +141,7 @@ fun MaintenanceSessionDetailScreen(
                                     val dto = ReportAssembler.assemble(context, sessionId)
                                     val html = HtmlTemplateEngine.render(
                                         context = context,
-                                        templateAssetPath = "templates/maintenance_v1.html",
+                                        templateAssetPath = "templates/maintenance_v2.html",
                                         dto = dto
                                     )
                                     Pair(dto, html)
