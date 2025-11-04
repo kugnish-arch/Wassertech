@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,18 +17,16 @@ import androidx.compose.ui.unit.dp
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.MaintenanceSessionEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.launch
-import java.io.File
 import com.example.wassertech.report.ReportAssembler
 import com.example.wassertech.report.HtmlTemplateEngine
 import com.example.wassertech.report.PdfExporter
 import com.example.wassertech.report.ShareUtils
+import android.util.Log
 
 
 @Composable
@@ -52,7 +51,7 @@ fun MaintenanceSessionDetailScreen(
 
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
-    var snack by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(sessionId) {
         withContext(Dispatchers.IO) {
@@ -92,7 +91,9 @@ fun MaintenanceSessionDetailScreen(
                     try {
                         db.templatesDao().getMaintenanceFieldsForTemplate(tid)
                             .associate { it.key to (it.label ?: it.key) }
-                    } catch (e: Exception) { emptyMap() }
+                    } catch (e: Exception) {
+                        emptyMap()
+                    }
                 } ?: emptyMap()
 
                 val rows = vals.map { v ->
@@ -118,91 +119,146 @@ fun MaintenanceSessionDetailScreen(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Header card (secondaryContainer)
-        item {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)) {
+            // Кнопка "Отчет в PDF" в верхней части экрана
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End
             ) {
-                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val icon = if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
-                        Icon(icon, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(clientName, style = MaterialTheme.typography.titleMedium)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.SettingsApplications, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(installationName, style = MaterialTheme.typography.bodyLarge)
-                    }
-                    Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            exporting = true
+                            try {
+                                // Подготовка DTO и HTML на IO потоке
+                                val dtoHtml = withContext(Dispatchers.IO) {
+                                    val dto = ReportAssembler.assemble(context, sessionId)
+                                    val html = HtmlTemplateEngine.render(
+                                        context = context,
+                                        templateAssetPath = "templates/maintenance_v1.html",
+                                        dto = dto
+                                    )
+                                    Pair(dto, html)
+                                }
 
-        items(groups) { g ->
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text(g.componentName) },
-                    supportingContent = {
-                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            g.rows.forEach { row ->
-                                Text("• ${row.fieldLabel}: ${row.value}")
+                                val (dto, html) = dtoHtml
+
+                                // Путь для PDF
+                                val reportsDir = File(
+                                    context.getExternalFilesDir(null),
+                                    "Reports"
+                                ).apply { mkdirs() }
+                                val out = File(reportsDir, "Report_${dto.reportNumber}.pdf")
+
+                                // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
+                                PdfExporter.exportHtmlToPdf(context, html, out)
+
+                                // Шарим созданный файл
+                                ShareUtils.sharePdf(context, out)
+                                snackbarHostState.showSnackbar("PDF успешно создан")
+                            } catch (t: Throwable) {
+                                // Логируем ошибку для отладки
+                                Log.e("PDF", "Error creating PDF", t)
+                                
+                                val errorMsg = when {
+                                    t is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания (30 сек). Попробуйте еще раз."
+                                    t.cause is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания. Попробуйте еще раз."
+                                    t.message?.contains("WebView") == true -> "Ошибка загрузки HTML: ${t.message}"
+                                    t.message?.contains("timeout") == true -> "Превышено время ожидания. Попробуйте еще раз."
+                                    t.message?.contains("Renderer process") == true -> "Ошибка рендеринга PDF. Попробуйте еще раз."
+                                    else -> "Ошибка при создании PDF: ${t.message ?: t.javaClass.simpleName}"
+                                }
+                                snackbarHostState.showSnackbar(errorMsg)
+                            } finally {
+                                exporting = false
                             }
                         }
+                    },
+                    enabled = !exporting,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
+                    if (exporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Создание PDF...")
+                    } else {
+                        Icon(
+                            Icons.Outlined.PictureAsPdf,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Отчет в PDF")
                     }
-                )
+                }
             }
-        }
-    }
 
-    Button(
-        enabled = !exporting,
-        onClick = {
-            scope.launch {
-                exporting = true
-                try {
-                    // 1) собрали DTO
-                    val dto = ReportAssembler.assemble(context, sessionId)
-                    // 2) собрали HTML по шаблону
-                    val html = HtmlTemplateEngine.render(
-                        context = context,
-                        templateAssetPath = "templates/maintenance_v1.html",
-                        dto = dto
-                    )
-                    // 3) путь для PDF
-                    val reportsDir = File(context.getExternalFilesDir(null), "Reports").apply { mkdirs() }
-                    val out = File(reportsDir, "Report_${dto.reportNumber}.pdf")
-                    // 4) HTML -> PDF
-                    PdfExporter.exportHtmlToPdf(context, html, out)
-                    // 5) шарим
-                    ShareUtils.sharePdf(context, out)
-                } catch (t: Throwable) {
-                    snack = "Не удалось создать PDF: ${t.message}"
-                } finally {
-                    exporting = false
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Header card (secondaryContainer)
+                item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val icon =
+                                    if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
+                                Icon(icon, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(clientName, style = MaterialTheme.typography.titleMedium)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.SettingsApplications, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(installationName, style = MaterialTheme.typography.bodyLarge)
+                            }
+                            Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                items(groups) { g ->
+                    ElevatedCard(Modifier.fillMaxWidth()) {
+                        ListItem(
+                            headlineContent = { Text(g.componentName) },
+                            supportingContent = {
+                                Column(
+                                    Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    g.rows.forEach { row ->
+                                        Text("• ${row.fieldLabel}: ${row.value}")
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
-    ) {
-        if (exporting) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-        else Text("Отчёт (PDF)")
-    }
-    snack?.let {
-        SnackbarHost(hostState = remember { SnackbarHostState() }.also { host ->
-            LaunchedEffect(it) { host.showSnackbar(message = it); snack = null }
-        })
     }
 }
-
 // Renamed to avoid clash with MaintenanceAllScreen.kt
 private data class DetailComponentGroup(
     val componentName: String,

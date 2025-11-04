@@ -45,7 +45,7 @@ object ReportAssembler {
         }
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val reportDate = dateFmt.format(Date(session.startedAtEpoch))
+        val reportDate = session.startedAtEpoch?.let { dateFmt.format(Date(it)) } ?: "Не указана"
         val nextDate = null // нет поля nextMaintenance в сущности MaintenanceSessionEntity
 
         // Составляем строки наблюдений: выбираем текстовое представление значения
@@ -80,7 +80,7 @@ object ReportAssembler {
             conclusions = session.notes ?: "",
             nextMaintenanceDate = nextDate,
 
-            logoAssetPath = "img/logo.png"
+            logoAssetPath = "img/logo-wassertech-bolder.png"
         )
     }
 }

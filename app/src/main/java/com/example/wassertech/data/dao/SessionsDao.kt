@@ -125,5 +125,8 @@ interface SessionsDao {
     @Query("SELECT * FROM observations WHERE sessionId = :sessionId ORDER BY rowid ASC")
     suspend fun getObservationsForSessionNow(sessionId: String): List<ObservationEntity>
 
+    @Query("SELECT * FROM maintenance_sessions WHERE id = :id LIMIT 1")
+    suspend fun getSession(id: String): MaintenanceSessionEntity?
+
 
 }
