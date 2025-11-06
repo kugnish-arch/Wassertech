@@ -1,11 +1,13 @@
 package com.example.wassertech.ui.templates
 
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +43,21 @@ fun TemplateEditorScreen(
     val db = remember { AppDatabase.getInstance(ctx) }
 
     var templateTitle by remember { mutableStateOf<String>("Шаблон") }
+    
+    // Локальный порядок полей для drag-and-drop
+    var localFieldOrder by remember(fields.size) { 
+        mutableStateOf(fields.map { it.id }) 
+    }
+    
+    // Обновляем локальный порядок при изменении списка полей
+    LaunchedEffect(fields.size, fields.map { it.id }.toSet()) {
+        val currentIds = fields.map { it.id }
+        val newOrder = localFieldOrder.filter { it in currentIds } + 
+                       currentIds.filter { it !in localFieldOrder }
+        if (newOrder != localFieldOrder) {
+            localFieldOrder = newOrder
+        }
+    }
 
     LaunchedEffect(templateId) {
         vm.load(templateId)
@@ -69,7 +86,7 @@ fun TemplateEditorScreen(
                     Button(
                         onClick = {
                             scope.launch {
-                                vm.saveAll()
+                                vm.saveAll(localFieldOrder)
                                 Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
                                 onSaved()
                             }
@@ -88,10 +105,19 @@ fun TemplateEditorScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(12.dp),
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 12.dp,
+                bottom = 200.dp // Дополнительный отступ внизу для клавиатуры
+            ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(fields, key = { it.id }) { f ->
+            items(localFieldOrder, key = { it }) { fieldId ->
+                val f = fields.find { it.id == fieldId } ?: return@items
+                val index = localFieldOrder.indexOf(fieldId)
+                var lastMoveThreshold by remember { mutableStateOf(0f) }
+                
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(
                         Modifier
@@ -99,6 +125,64 @@ fun TemplateEditorScreen(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // Ручка для перетаскивания
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Menu,
+                                contentDescription = "Перетащить",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .pointerInput(f.id, index) {
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                lastMoveThreshold = 0f
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                                    val pos = localFieldOrder.indexOf(fieldId)
+                                                    if (pos > 0) {
+                                                        val list = localFieldOrder.toMutableList()
+                                                        val tmp = list[pos - 1]
+                                                        list[pos - 1] = list[pos]
+                                                        list[pos] = tmp
+                                                        localFieldOrder = list
+                                                    }
+                                                    lastMoveThreshold = -60f
+                                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                                    val pos = localFieldOrder.indexOf(fieldId)
+                                                    if (pos >= 0 && pos < localFieldOrder.lastIndex) {
+                                                        val list = localFieldOrder.toMutableList()
+                                                        val tmp = list[pos + 1]
+                                                        list[pos + 1] = list[pos]
+                                                        list[pos] = tmp
+                                                        localFieldOrder = list
+                                                    }
+                                                    lastMoveThreshold = 60f
+                                                }
+                                                if (dragAmount.y in -60f..60f) {
+                                                    lastMoveThreshold = dragAmount.y
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                lastMoveThreshold = 0f
+                                            }
+                                        )
+                                    }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${index + 1}.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        
                         // 1) Имя (label). Key скрыт — генерируется автоматически.
                         OutlinedTextField(
                             value = f.label,

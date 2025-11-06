@@ -82,13 +82,14 @@ fun ClientDetailScreen(
     LaunchedEffect(sitesToShow) { if (!isEditing) localOrder = sitesToShow.map { it.id } }
 
     // Локальный порядок установок по объектам (siteId -> List<installationId>)
-    // Получаем все установки заранее для всех сайтов
+    // Получаем все установки заранее для всех сайтов (включая архивные в режиме редактирования)
     var allInstallations by remember { mutableStateOf<Map<String, List<InstallationEntity>>>(emptyMap()) }
-    LaunchedEffect(sitesToShow, includeArchived) {
+    LaunchedEffect(sitesToShow, includeArchived, isEditing) {
         scope.launch(Dispatchers.IO) {
             val installationsMap = mutableMapOf<String, List<InstallationEntity>>()
+            val shouldIncludeArchived = includeArchived || isEditing
             sitesToShow.forEach { site ->
-                val installations = vm.installations(site.id, includeArchived = includeArchived).first()
+                val installations = vm.installations(site.id, includeArchived = shouldIncludeArchived).first()
                 installationsMap[site.id] = installations
             }
             allInstallations = installationsMap
@@ -175,7 +176,8 @@ fun ClientDetailScreen(
                     scope.launch(Dispatchers.IO) {
                         val orders = mutableMapOf<String, List<String>>()
                         sitesToShow.forEach { site ->
-                            val installations = allInstallations[site.id] ?: emptyList()
+                            // Загружаем установки заново, включая архивные
+                            val installations = vm.installations(site.id, includeArchived = true).first()
                             orders[site.id] = installations.map { it.id }
                         }
                         localInstallationOrders = orders
@@ -318,14 +320,29 @@ fun ClientDetailScreen(
                                     }
                                 )
                                 
-                                // Установки внутри объекта (только неархивные в режиме редактирования)
-                                val installationsToShow = if (site.isArchived) emptyList() else installations.filter { !it.isArchived || includeArchived }
+                                // Установки внутри объекта (показываем все в режиме редактирования, включая архивные)
+                                val installationsToShow = if (site.isArchived) emptyList() else installations
+                                // Обновляем локальный порядок, если в нем отсутствуют некоторые установки
+                                LaunchedEffect(siteId, installations.size) {
+                                    if (isEditing) {
+                                        val currentOrder = localInstallationOrders[siteId] ?: emptyList()
+                                        val allIds = installations.map { it.id }
+                                        // Добавляем отсутствующие установки в конец
+                                        val newOrder = (currentOrder + allIds.filter { it !in currentOrder }).distinct()
+                                        if (newOrder != currentOrder) {
+                                            localInstallationOrders = localInstallationOrders.toMutableMap().apply {
+                                                put(siteId, newOrder)
+                                            }
+                                        }
+                                    }
+                                }
                                 if (installationOrder.isNotEmpty() && installationsToShow.isNotEmpty()) {
                                     Column(
                                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        installationOrder.filter { instId -> installationsToShow.any { it.id == instId } }.forEach { instId ->
+                                        // Показываем все установки в порядке installationOrder
+                                        installationOrder.filter { instId -> installations.any { it.id == instId } }.forEach { instId ->
                                             val inst = installations.find { it.id == instId } ?: return@forEach
                                             val instIndex = installationOrder.indexOf(instId)
                                             InstallationRowWithDrag(
@@ -759,7 +776,7 @@ private fun InstallationRowWithDrag(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
                         .size(20.dp)
-                        .pointerInput(installation.id) {
+                        .pointerInput(installation.id, index) {
                             detectDragGestures(
                                 onDragStart = { 
                                     lastMoveThreshold = 0f

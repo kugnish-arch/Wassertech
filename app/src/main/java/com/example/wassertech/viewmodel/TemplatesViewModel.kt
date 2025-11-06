@@ -89,14 +89,20 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
         _fields.value = _fields.value.filterNot { it.id == id }
     }
 
-    suspend fun saveAll() {
+    suspend fun saveAll(fieldOrder: List<String>? = null) {
         withContext(Dispatchers.IO) {
             pendingDelete.forEach { 
                 templatesDao.deleteField(it)
                 DeletionTracker.markFieldDeleted(db, it)
             }
             pendingDelete.clear()
-            _fields.value.forEachIndexed { index, ui ->
+            // Если передан порядок полей, используем его, иначе используем текущий порядок
+            val orderedFields = if (fieldOrder != null) {
+                fieldOrder.mapNotNull { id -> _fields.value.find { it.id == id } }
+            } else {
+                _fields.value
+            }
+            orderedFields.forEachIndexed { index, ui ->
                 templatesDao.upsertField(ui.toEntity(indexHint = index))
             }
         }
