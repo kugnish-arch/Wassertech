@@ -87,6 +87,14 @@ interface HierarchyDao {
     /** Удалить компонент по id. */
     @Query("DELETE FROM components WHERE id = :componentId")
     suspend fun deleteComponent(componentId: String)
+    
+    /** Удалить установку по id. */
+    @Query("DELETE FROM installations WHERE id = :installationId")
+    suspend fun deleteInstallation(installationId: String)
+    
+    /** Удалить объект по id. */
+    @Query("DELETE FROM sites WHERE id = :siteId")
+    suspend fun deleteSite(siteId: String)
 
     @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")
     suspend fun getInstallationNow(id: String): InstallationEntity?
@@ -102,4 +110,28 @@ interface HierarchyDao {
       orderIndex ASC, name COLLATE NOCASE ASC
 """)
     suspend fun getComponentsNow(installationId: String): List<ComponentEntity>
+
+    /** Получить все объекты для синхронизации */
+    @Query("SELECT * FROM sites")
+    fun getAllSitesNow(): List<SiteEntity>
+
+    /** Получить все установки для синхронизации */
+    @Query("SELECT * FROM installations")
+    fun getAllInstallationsNow(): List<InstallationEntity>
+
+    /** Получить все компоненты для синхронизации */
+    @Query("SELECT * FROM components")
+    fun getAllComponentsNow(): List<ComponentEntity>
+
+    /** Вставка объекта (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSite(site: SiteEntity)
+
+    /** Вставка установки (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInstallation(installation: InstallationEntity)
+
+    /** Вставка компонента (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertComponent(component: ComponentEntity)
 }

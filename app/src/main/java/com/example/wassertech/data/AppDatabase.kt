@@ -12,10 +12,11 @@ import com.example.wassertech.data.entities.MaintenanceValueEntity
 // Импорты миграций =========================================
 import com.example.wassertech.data.migrations.MIGRATION_1_2
 import com.example.wassertech.data.migrations.MIGRATION_2_3
-import com.example.wassertech.data.migrations.MIGRATION_3_4   // ← ДОБАВЛЕНО
+import com.example.wassertech.data.migrations.MIGRATION_3_4
+import com.example.wassertech.data.migrations.MIGRATION_4_5   // ← ДОБАВЛЕНО
 
 @Database(
-    version = 4, // ← БЫЛО 3
+    version = 5, // ← Обновлено: добавлена таблица deleted_records
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -28,7 +29,8 @@ import com.example.wassertech.data.migrations.MIGRATION_3_4   // ← ДОБАВ�
         MaintenanceSessionEntity::class,
         MaintenanceValueEntity::class,
         ObservationEntity::class,
-        IssueEntity::class
+        IssueEntity::class,
+        DeletedRecordEntity::class
     ]
 )
 @TypeConverters(Converters::class)
@@ -39,6 +41,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sessionsDao(): SessionsDao
     abstract fun checklistDao(): ChecklistDao
     abstract fun clientDao(): ClientDao
+    abstract fun archiveDao(): ArchiveDao
+    abstract fun deletedRecordsDao(): DeletedRecordsDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -54,7 +58,8 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2,
                         MIGRATION_2_3,
-                        MIGRATION_3_4    // ← ДОБАВЛЕНО
+                        MIGRATION_3_4,
+                        MIGRATION_4_5    // ← ДОБАВЛЕНО
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

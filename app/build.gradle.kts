@@ -13,7 +13,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 2
-        versionName = "0.5.2"
+        versionName = "0.5.3"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -83,7 +83,15 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-
+    
+    // DOCX processing
+    implementation("org.apache.poi:poi:5.2.5")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
+    implementation("org.apache.poi:poi-scratchpad:5.2.5")
+    
+    // MySQL JDBC driver (старая версия для совместимости с Android)
+    implementation("mysql:mysql-connector-java:5.1.49")
+    
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")

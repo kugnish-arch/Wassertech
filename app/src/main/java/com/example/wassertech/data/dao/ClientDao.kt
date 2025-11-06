@@ -129,5 +129,9 @@ interface ClientDao {
     @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
     suspend fun getClientNow(id: String): ClientEntity
 
+    /** Получить всех клиентов для синхронизации */
+    @Query("SELECT * FROM clients")
+    fun getAllClientsNow(): List<ClientEntity>
+
 }
 

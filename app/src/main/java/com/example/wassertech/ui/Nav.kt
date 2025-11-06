@@ -27,6 +27,7 @@ import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
 import com.example.wassertech.ui.maintenance.MaintenanceScreen
 import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
 import com.example.wassertech.ui.reports.ReportsScreen
+import com.example.wassertech.ui.settings.SettingsScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
@@ -87,6 +88,15 @@ fun AppTopBar(navController: NavHostController) {
                     onClick = {
                         menuOpen = false
                         navController.navigate("maintenance_history") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Настройки") },
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate("settings") {
                             launchSingleTop = true
                         }
                     }
@@ -271,6 +281,14 @@ private fun AppScaffold(navController: NavHostController) {
                 Column {
                     SectionHeader("Детали ТО")
                     MaintenanceSessionDetailScreen(sessionId = sessionId)
+                }
+            }
+            
+            // Экран настроек
+            composable("settings") {
+                Column {
+                    SectionHeader("Настройки")
+                    SettingsScreen()
                 }
             }
         }

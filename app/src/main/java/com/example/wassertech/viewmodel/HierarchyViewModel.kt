@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.*
 import com.example.wassertech.data.types.ComponentType
+import com.example.wassertech.sync.DeletionTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -216,6 +217,23 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun deleteComponent(componentId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             hierarchyDao.deleteComponent(componentId)
+            DeletionTracker.markComponentDeleted(db, componentId)
+        }
+    }
+    
+    /** Удалить установку по id. */
+    fun deleteInstallation(installationId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            hierarchyDao.deleteInstallation(installationId)
+            DeletionTracker.markInstallationDeleted(db, installationId)
+        }
+    }
+    
+    /** Удалить объект по id. */
+    fun deleteSite(siteId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            hierarchyDao.deleteSite(siteId)
+            DeletionTracker.markSiteDeleted(db, siteId)
         }
     }
 }

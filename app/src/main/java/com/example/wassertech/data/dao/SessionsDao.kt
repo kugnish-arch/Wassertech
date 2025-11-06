@@ -128,5 +128,28 @@ interface SessionsDao {
     @Query("SELECT * FROM maintenance_sessions WHERE id = :id LIMIT 1")
     suspend fun getSession(id: String): MaintenanceSessionEntity?
 
+    /** Получить все сессии для синхронизации */
+    @Query("SELECT * FROM maintenance_sessions")
+    fun getAllSessionsNow(): List<MaintenanceSessionEntity>
+
+    /** Получить все значения для синхронизации */
+    @Query("SELECT * FROM maintenance_values")
+    fun getAllValuesNow(): List<MaintenanceValueEntity>
+
+    /** Вставка сессии (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertSession(session: MaintenanceSessionEntity)
+
+    /** Вставка значения (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertValue(value: MaintenanceValueEntity)
+
+    /** Удалить сессию ТО */
+    @Query("DELETE FROM maintenance_sessions WHERE id = :sessionId")
+    suspend fun deleteSession(sessionId: String)
+    
+    /** Удалить значение ТО */
+    @Query("DELETE FROM maintenance_values WHERE id = :valueId")
+    suspend fun deleteValue(valueId: String)
 
 }

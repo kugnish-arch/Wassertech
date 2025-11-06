@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.ChecklistFieldEntity
 import com.example.wassertech.data.types.FieldType
+import com.example.wassertech.sync.DeletionTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,7 +91,10 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun saveAll() {
         withContext(Dispatchers.IO) {
-            pendingDelete.forEach { templatesDao.deleteField(it) }
+            pendingDelete.forEach { 
+                templatesDao.deleteField(it)
+                DeletionTracker.markFieldDeleted(db, it)
+            }
             pendingDelete.clear()
             _fields.value.forEachIndexed { index, ui ->
                 templatesDao.upsertField(ui.toEntity(indexHint = index))

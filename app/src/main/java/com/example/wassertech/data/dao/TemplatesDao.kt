@@ -161,4 +161,20 @@ interface TemplatesDao {
         updatedTs: Long
     )
 
+    /** Получить все шаблоны для синхронизации */
+    @Query("SELECT * FROM checklist_templates")
+    fun getAllTemplatesNow(): List<ChecklistTemplateEntity>
+
+    /** Получить все поля для синхронизации */
+    @Query("SELECT * FROM checklist_fields")
+    fun getAllFieldsNow(): List<ChecklistFieldEntity>
+
+    /** Вставка шаблона (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertTemplate(template: ChecklistTemplateEntity)
+
+    /** Вставка поля (для синхронизации) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertField(field: ChecklistFieldEntity)
+
 }

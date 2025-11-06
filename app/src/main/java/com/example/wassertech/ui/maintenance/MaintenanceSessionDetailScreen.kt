@@ -24,7 +24,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.example.wassertech.report.ReportAssembler
 import com.example.wassertech.report.HtmlTemplateEngine
+import com.example.wassertech.report.DocxTemplateEngine
 import com.example.wassertech.report.PdfExporter
+import com.example.wassertech.report.DocxToPdfExporter
 import com.example.wassertech.report.ShareUtils
 import android.util.Log
 
@@ -51,6 +53,7 @@ fun MaintenanceSessionDetailScreen(
 
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
+    var useDocxTemplate by remember { mutableStateOf(false) } // Выбор формата шаблона
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(sessionId) {
@@ -129,25 +132,41 @@ fun MaintenanceSessionDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Переключатель формата шаблона
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "HTML",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (!useDocxTemplate) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Switch(
+                        checked = useDocxTemplate,
+                        onCheckedChange = { useDocxTemplate = it }
+                    )
+                    Text(
+                        "DOCX",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (useDocxTemplate) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Spacer(Modifier.width(16.dp))
+                
                 Button(
                     onClick = {
                         scope.launch {
                             exporting = true
                             try {
-                                // Подготовка DTO и HTML на IO потоке
-                                val dtoHtml = withContext(Dispatchers.IO) {
-                                    val dto = ReportAssembler.assemble(context, sessionId)
-                                    val html = HtmlTemplateEngine.render(
-                                        context = context,
-                                        templateAssetPath = "templates/maintenance_v2.html",
-                                        dto = dto
-                                    )
-                                    Pair(dto, html)
+                                // Подготовка DTO на IO потоке
+                                val dto = withContext(Dispatchers.IO) {
+                                    ReportAssembler.assemble(context, sessionId)
                                 }
-
-                                val (dto, html) = dtoHtml
 
                                 // Путь для PDF
                                 val reportsDir = File(
@@ -156,8 +175,29 @@ fun MaintenanceSessionDetailScreen(
                                 ).apply { mkdirs() }
                                 val out = File(reportsDir, "Report_${dto.reportNumber}.pdf")
 
-                                // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
-                                PdfExporter.exportHtmlToPdf(context, html, out)
+                                if (useDocxTemplate) {
+                                    // DOCX шаблон
+                                    val docxBytes = withContext(Dispatchers.IO) {
+                                        DocxTemplateEngine.processTemplate(
+                                            context = context,
+                                            templateAssetPath = "templates/Report_Template_Wassertech.docx",
+                                            dto = dto
+                                        )
+                                    }
+                                    // DOCX -> PDF
+                                    DocxToPdfExporter.exportDocxToPdf(context, docxBytes, out)
+                                } else {
+                                    // HTML шаблон
+                                    val html = withContext(Dispatchers.IO) {
+                                        HtmlTemplateEngine.render(
+                                            context = context,
+                                            templateAssetPath = "templates/maintenance_v2.html",
+                                            dto = dto
+                                        )
+                                    }
+                                    // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
+                                    PdfExporter.exportHtmlToPdf(context, html, out)
+                                }
 
                                 // Шарим созданный файл
                                 ShareUtils.sharePdf(context, out)
