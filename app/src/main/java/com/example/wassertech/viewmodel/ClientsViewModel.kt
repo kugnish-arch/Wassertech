@@ -3,9 +3,11 @@ package com.example.wassertech.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.dao.ClientDao
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
+import com.example.wassertech.sync.SafeDeletionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +26,8 @@ import java.util.UUID
  * чтобы не зависеть от наличия Flow в DAO. После любых операций дергаем reload().
  */
 class ClientsViewModel(
-    private val clientDao: ClientDao
+    private val clientDao: ClientDao,
+    private val db: AppDatabase
 ) : ViewModel() {
 
     // --- UI state ---
@@ -282,17 +285,29 @@ class ClientsViewModel(
             }
             reloadClients()
         }
+
+    // --- Удаление (только для архивных элементов) ---
+    fun deleteClient(clientId: String) = viewModelScope.launch(Dispatchers.IO) {
+        SafeDeletionHelper.deleteClient(db, clientId)
+        reloadClients()
+    }
+
+    fun deleteGroup(groupId: String) = viewModelScope.launch(Dispatchers.IO) {
+        SafeDeletionHelper.deleteClientGroup(db, groupId)
+        reloadAll()
+    }
 }
 
 
 /** Фабрика на основе ClientDao (Application-agnostic) */
 class ClientsViewModelFactory(
-    private val clientDao: ClientDao
+    private val clientDao: ClientDao,
+    private val db: AppDatabase
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ClientsViewModel::class.java)) {
-            return ClientsViewModel(clientDao) as T
+            return ClientsViewModel(clientDao, db) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

@@ -7,6 +7,7 @@ import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.*
 import com.example.wassertech.data.types.ComponentType
 import com.example.wassertech.sync.DeletionTracker
+import com.example.wassertech.sync.SafeDeletionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -58,8 +59,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     // 2) ОБЪЕКТЫ (Sites)
     // ---------------------------------------------------------------------
 
-    fun sites(clientId: String): Flow<List<SiteEntity>> =
-        hierarchyDao.observeSites(clientId)
+    fun sites(clientId: String, includeArchived: Boolean = false): Flow<List<SiteEntity>> =
+        if (includeArchived) hierarchyDao.observeSitesIncludingArchived(clientId)
+        else hierarchyDao.observeSites(clientId)
 
     /** Поток одного объекта по id. */
     fun site(id: String): Flow<SiteEntity?> = hierarchyDao.observeSite(id)
@@ -107,8 +109,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     // 3) УСТАНОВКИ (Installations)
     // ---------------------------------------------------------------------
 
-    fun installations(siteId: String): Flow<List<InstallationEntity>> =
-        hierarchyDao.observeInstallations(siteId)
+    fun installations(siteId: String, includeArchived: Boolean = false): Flow<List<InstallationEntity>> =
+        if (includeArchived) hierarchyDao.observeInstallationsIncludingArchived(siteId)
+        else hierarchyDao.observeInstallations(siteId)
 
     /** Поток одной установки по id. */
     fun installation(id: String): Flow<InstallationEntity?> =
@@ -171,6 +174,16 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) { hierarchyDao.updateInstallations(list) }
     }
 
+    fun reorderInstallations(siteId: String, orderIds: List<String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = hierarchyDao.observeInstallations(siteId).first()
+            val ordered = orderIds.mapIndexedNotNull { idx, id ->
+                current.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+            }
+            hierarchyDao.updateInstallations(ordered)
+        }
+    }
+
     // ---------------------------------------------------------------------
     // 4) КОМПОНЕНТЫ (Components)
     // ---------------------------------------------------------------------
@@ -221,19 +234,66 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
     
-    /** Удалить установку по id. */
-    fun deleteInstallation(installationId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            hierarchyDao.deleteInstallation(installationId)
-            DeletionTracker.markInstallationDeleted(db, installationId)
-        }
-    }
     
     /** Удалить объект по id. */
     fun deleteSite(siteId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            hierarchyDao.deleteSite(siteId)
-            DeletionTracker.markSiteDeleted(db, siteId)
+            SafeDeletionHelper.deleteSite(db, siteId)
+        }
+    }
+    
+    /** Архивировать объект. */
+    fun archiveSite(siteId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val site = hierarchyDao.getSite(siteId) ?: return@launch
+            val updated = site.copy(
+                isArchived = true,
+                archivedAtEpoch = System.currentTimeMillis()
+            )
+            hierarchyDao.upsertSite(updated)
+        }
+    }
+    
+    /** Восстановить объект из архива. */
+    fun restoreSite(siteId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val site = hierarchyDao.getSite(siteId) ?: return@launch
+            val updated = site.copy(
+                isArchived = false,
+                archivedAtEpoch = null
+            )
+            hierarchyDao.upsertSite(updated)
+        }
+    }
+    
+    /** Архивировать установку. */
+    fun archiveInstallation(installationId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installation = hierarchyDao.getInstallation(installationId) ?: return@launch
+            val updated = installation.copy(
+                isArchived = true,
+                archivedAtEpoch = System.currentTimeMillis()
+            )
+            hierarchyDao.updateInstallation(updated)
+        }
+    }
+    
+    /** Восстановить установку из архива. */
+    fun restoreInstallation(installationId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installation = hierarchyDao.getInstallation(installationId) ?: return@launch
+            val updated = installation.copy(
+                isArchived = false,
+                archivedAtEpoch = null
+            )
+            hierarchyDao.updateInstallation(updated)
+        }
+    }
+    
+    /** Удалить установку по id (для архивных). */
+    fun deleteInstallation(installationId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            SafeDeletionHelper.deleteInstallation(db, installationId)
         }
     }
 }

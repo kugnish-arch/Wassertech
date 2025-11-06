@@ -133,5 +133,13 @@ interface ClientDao {
     @Query("SELECT * FROM clients")
     fun getAllClientsNow(): List<ClientEntity>
 
+    /** Удалить группу клиентов навсегда */
+    @Query("DELETE FROM client_groups WHERE id = :groupId")
+    suspend fun deleteGroup(groupId: String)
+
+    /** Удалить клиента навсегда */
+    @Query("DELETE FROM clients WHERE id = :clientId")
+    suspend fun deleteClient(clientId: String)
+
 }
 

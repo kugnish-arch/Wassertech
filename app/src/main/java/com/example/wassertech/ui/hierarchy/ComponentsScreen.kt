@@ -51,7 +51,7 @@ fun ComponentsScreen(
     val templateTitleById = remember(allTemplates) { allTemplates.associate { it.id to it.title } }
 
     // --- Второй VM: клиенты (чтобы получить имя клиента без observeClient()) ---
-    val clientsVm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(db.clientDao()))
+    val clientsVm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(db.clientDao(), db))
     val allClients by clientsVm.clients.collectAsState()
 
     // --- Данные установки / компонентов ---

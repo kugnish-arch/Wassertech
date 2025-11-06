@@ -13,8 +13,21 @@ interface HierarchyDao {
     // ---- Sites ----
 
     /** Поток списка объектов клиента, отсортированный по orderIndex, затем по имени. */
-    @Query("SELECT * FROM sites WHERE clientId = :clientId ORDER BY orderIndex ASC, name COLLATE NOCASE")
+    @Query("""
+        SELECT * FROM sites 
+        WHERE clientId = :clientId 
+        AND (isArchived = 0 OR isArchived IS NULL)
+        ORDER BY orderIndex ASC, name COLLATE NOCASE
+    """)
     fun observeSites(clientId: String): Flow<List<SiteEntity>>
+    
+    /** Поток списка объектов клиента, включая архивные. */
+    @Query("""
+        SELECT * FROM sites 
+        WHERE clientId = :clientId 
+        ORDER BY orderIndex ASC, name COLLATE NOCASE
+    """)
+    fun observeSitesIncludingArchived(clientId: String): Flow<List<SiteEntity>>
 
     /** Поток одного объекта по id (удобно для подписи «Объект: Клиент — Объект»). */
     @Query("SELECT * FROM sites WHERE id = :id LIMIT 1")
@@ -40,8 +53,21 @@ interface HierarchyDao {
     @Update
     suspend fun updateInstallation(installation: InstallationEntity)
 
-    @Query("SELECT * FROM installations WHERE siteId = :siteId ORDER BY orderIndex ASC, name COLLATE NOCASE")
+    @Query("""
+        SELECT * FROM installations 
+        WHERE siteId = :siteId 
+        AND (isArchived = 0 OR isArchived IS NULL)
+        ORDER BY orderIndex ASC, name COLLATE NOCASE
+    """)
     fun observeInstallations(siteId: String): Flow<List<InstallationEntity>>
+    
+    /** Поток списка установок, включая архивные. */
+    @Query("""
+        SELECT * FROM installations 
+        WHERE siteId = :siteId 
+        ORDER BY orderIndex ASC, name COLLATE NOCASE
+    """)
+    fun observeInstallationsIncludingArchived(siteId: String): Flow<List<InstallationEntity>>
 
     /** Поток одной установки по id. */
     @Query("SELECT * FROM installations WHERE id = :id LIMIT 1")

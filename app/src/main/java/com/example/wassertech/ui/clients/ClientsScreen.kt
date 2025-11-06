@@ -3,6 +3,7 @@ package com.example.wassertech.ui.clients
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -22,6 +24,12 @@ import com.example.wassertech.data.entities.ClientGroupEntity
 import com.example.wassertech.ui.common.EditDoneBottomBar
 
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
+
+private data class DeleteDialogState(
+    val isClient: Boolean,
+    val id: String,
+    val name: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +66,11 @@ fun ClientsScreen(
     onMoveClientDown: (clientId: String) -> Unit = {},
 
     // НОВОЕ: массовая фиксация порядка в БД
-    onReorderGroupClients: (groupId: String?, orderedIds: List<String>) -> Unit = { _, _ -> }
+    onReorderGroupClients: (groupId: String?, orderedIds: List<String>) -> Unit = { _, _ -> },
+
+    // Удаление
+    onDeleteClient: (clientId: String) -> Unit = {},
+    onDeleteGroup: (groupId: String) -> Unit = {}
 ) {
     var createGroupDialog by remember { mutableStateOf(false) }
     var newGroupTitle by remember { mutableStateOf("") }
@@ -73,6 +85,9 @@ fun ClientsScreen(
 
     var isEditMode by remember { mutableStateOf(false) }
     var includeArchivedBeforeEdit by remember { mutableStateOf<Boolean?>(null) }
+
+    // Диалог подтверждения удаления
+    var deleteDialogState by remember { mutableStateOf<DeleteDialogState?>(null) }
 
     // Исходные данные
     val clientsByGroup = remember(clients) { clients.groupBy { it.clientGroupId } }
@@ -269,6 +284,9 @@ fun ClientsScreen(
                                 editClientName = client.name
                                 editClientGroupId = client.clientGroupId
                             },
+                            onDelete = {
+                                deleteDialogState = DeleteDialogState(isClient = true, id = client.id, name = client.name)
+                            },
                             modifier = Modifier.animateContentSize()
                         )
                         Divider()
@@ -300,6 +318,9 @@ fun ClientsScreen(
                         editGroupId = groupId
                         editGroupTitle = group.title
                     },
+                    onDelete = {
+                        deleteDialogState = DeleteDialogState(isClient = false, id = groupId, name = group.title)
+                    },
                     modifier = Modifier.animateContentSize()
                 )
 
@@ -330,6 +351,9 @@ fun ClientsScreen(
                                         editClientId = client.id
                                         editClientName = client.name
                                         editClientGroupId = client.clientGroupId
+                                    },
+                                    onDelete = {
+                                        deleteDialogState = DeleteDialogState(isClient = true, id = client.id, name = client.name)
                                     },
                                     modifier = Modifier.animateContentSize()
                                 )
@@ -563,6 +587,45 @@ fun ClientsScreen(
             }
         )
     }
+
+    // Диалог подтверждения удаления
+    deleteDialogState?.let { state ->
+        AlertDialog(
+            onDismissRequest = { deleteDialogState = null },
+            title = { Text("Подтверждение удаления") },
+            text = {
+                Text(
+                    if (state.isClient) {
+                        "Вы уверены, что хотите удалить клиента \"${state.name}\"?\n\nЭто действие нельзя отменить."
+                    } else {
+                        "Вы уверены, что хотите удалить группу \"${state.name}\"?\n\nВсе клиенты из этой группы будут перемещены в \"Общую\". Это действие нельзя отменить."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (state.isClient) {
+                            onDeleteClient(state.id)
+                        } else {
+                            onDeleteGroup(state.id)
+                        }
+                        deleteDialogState = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteDialogState = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 }
 
 /* ---------- Вспомогательные UI-компоненты ---------- */
@@ -581,10 +644,13 @@ private fun GroupHeader(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onDragStart: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val bg = MaterialTheme.colorScheme.secondaryContainer
     val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+    var lastMoveThreshold by remember { mutableStateOf(0f) }
 
     Row(
         modifier = modifier
@@ -595,6 +661,41 @@ private fun GroupHeader(
             .animateContentSize(),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Ручка для перетаскивания (только в режиме редактирования и для неархивных групп)
+        if (showActions && !isArchived && canArchive) {
+            Icon(
+                imageVector = Icons.Filled.Menu,
+                contentDescription = "Перетащить",
+                tint = contentColor.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(20.dp)
+                    .pointerInput("group_$title") {
+                        detectDragGestures(
+                            onDragStart = { 
+                                lastMoveThreshold = 0f
+                                onDragStart?.invoke() 
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                    onMoveUp()
+                                    lastMoveThreshold = -60f
+                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                    onMoveDown()
+                                    lastMoveThreshold = 60f
+                                }
+                                if (dragAmount.y in -60f..60f) {
+                                    lastMoveThreshold = dragAmount.y
+                                }
+                            },
+                            onDragEnd = {
+                                lastMoveThreshold = 0f
+                            }
+                        )
+                    }
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         Icon(Icons.Filled.Group, contentDescription = "Группа", tint = contentColor)
         Spacer(Modifier.width(12.dp))
         Text(
@@ -616,19 +717,18 @@ private fun GroupHeader(
                             tint = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
-                    IconButton(onClick = onMoveUp) {
-                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Вверх", tint = MaterialTheme.colorScheme.outline)
-                    }
-                    IconButton(onClick = onMoveDown) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Вниз", tint = MaterialTheme.colorScheme.outline)
-                    }
-                    IconButton(onClick = onArchive) {
-                        Icon(Icons.Filled.Archive, contentDescription = "Архивировать группу", tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                    }
                 }
             } else if (isArchived) {
-                IconButton(onClick = onRestore) {
-                    Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить группу", tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onRestore) {
+                        Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить группу", tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Удалить группу", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
@@ -665,9 +765,12 @@ private fun ClientRowWithEdit(
     onMoveDown: () -> Unit,
     onMoveToGroup: (String?) -> Unit, // null = «Без группы»
     onEditName: () -> Unit,
+    onDelete: () -> Unit = {},
+    onDragStart: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    var lastMoveThreshold by remember { mutableStateOf(0f) }
 
     Row(
         modifier = modifier
@@ -677,6 +780,44 @@ private fun ClientRowWithEdit(
             .animateContentSize(),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Ручка для перетаскивания (только в режиме редактирования и для неархивных клиентов)
+        if (isEditMode && !client.isArchived) {
+            Icon(
+                imageVector = Icons.Filled.Menu,
+                contentDescription = "Перетащить",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(24.dp)
+                    .pointerInput(client.id) {
+                        detectDragGestures(
+                            onDragStart = { 
+                                lastMoveThreshold = 0f
+                                onDragStart?.invoke() 
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                // dragAmount.y - накопленное смещение с начала жеста
+                                // Перемещаем при достижении порога 60dp и сбрасываем счетчик
+                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                    onMoveUp()
+                                    lastMoveThreshold = -60f
+                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                    onMoveDown()
+                                    lastMoveThreshold = 60f
+                                }
+                                // Сбрасываем порог при возврате в зону
+                                if (dragAmount.y in -60f..60f) {
+                                    lastMoveThreshold = dragAmount.y
+                                }
+                            },
+                            onDragEnd = {
+                                lastMoveThreshold = 0f
+                            }
+                        )
+                    }
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         val icon = if (client.isCorporate == true) Icons.Filled.Business else Icons.Filled.Person
         Icon(icon, contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент")
         Spacer(Modifier.width(12.dp))
@@ -702,18 +843,20 @@ private fun ClientRowWithEdit(
         }
         if (isEditMode) {
             if (client.isArchived == true) {
-                IconButton(onClick = onRestore) {
-                    Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить клиента", tint = MaterialTheme.colorScheme.onSurface)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onRestore) {
+                        Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить клиента", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Удалить клиента", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             } else {
                 IconButton(onClick = onEditName) {
                     Icon(Icons.Filled.Edit, contentDescription = "Редактировать клиента", tint = MaterialTheme.colorScheme.onSurface)
-                }
-                IconButton(onClick = onMoveUp) {
-                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Вверх", tint = MaterialTheme.colorScheme.outline)
-                }
-                IconButton(onClick = onMoveDown) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Вниз", tint = MaterialTheme.colorScheme.outline)
                 }
                 // Меню «Переместить в…»
                 Box {

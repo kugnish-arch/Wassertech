@@ -17,7 +17,8 @@ fun ClientsRoute(
     // Factory-путь (не Hilt)
     val context = LocalContext.current
     val dao = remember { AppDatabase.getInstance(context).clientDao() }
-    val vm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(dao))
+    val db = AppDatabase.getInstance(context)
+    val vm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(db.clientDao(), db))
 
     // Подписки на стейты VM
     val groups by vm.groups.collectAsState()
@@ -72,6 +73,10 @@ fun ClientsRoute(
         onMoveClientUp = vm::moveClientUp,
         onMoveClientDown = vm::moveClientDown,
 
-        onReorderGroupClients = vm::reorderClientsInGroup
+        onReorderGroupClients = vm::reorderClientsInGroup,
+
+        // Удаление
+        onDeleteClient = vm::deleteClient,
+        onDeleteGroup = vm::deleteGroup
     )
 }

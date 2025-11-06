@@ -1,22 +1,19 @@
 package com.example.wassertech.ui.clients
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.SettingsApplications
-//import androidx.compose.material.icons.outlined.Manufacturing
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -25,10 +22,20 @@ import com.example.wassertech.viewmodel.ClientsViewModel
 import androidx.compose.ui.platform.LocalContext
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.ui.icons.AppIcons
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import com.example.wassertech.ui.common.EditDoneBottomBar
 import com.example.wassertech.ui.common.BarAction
+import com.example.wassertech.data.entities.SiteEntity
+import com.example.wassertech.data.entities.InstallationEntity
 
+private data class SiteDeleteDialogState(
+    val isSite: Boolean,
+    val id: String,
+    val name: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,9 +48,9 @@ fun ClientDetailScreen(
     val context = LocalContext.current
     val clientDao = AppDatabase.getInstance(context).clientDao()
 
+    // Передаём сам AppDatabase в конструктор ClientsViewModel (если конструктор ожидает параметр 'db')
     val clientsVm: ClientsViewModel = viewModel {
-        val dao = AppDatabase.getInstance(context).clientDao()
-        ClientsViewModel(dao)
+        ClientsViewModel(clientDao, AppDatabase.getInstance(context))
     }
 
     val groups by clientsVm.groups.collectAsState(initial = emptyList())
@@ -63,10 +70,34 @@ fun ClientDetailScreen(
 
     // Режим редактирования (как на экране "Клиенты")
     var isEditing by remember { mutableStateOf(false) }
+    var includeArchived by remember { mutableStateOf(false) }
+    var includeArchivedBeforeEdit by remember { mutableStateOf<Boolean?>(null) }
 
-    // Локальный порядок сайтов (для стрелок при редактировании)
-    var localOrder by remember(clientId) { mutableStateOf(sites.map { it.id }) }
-    LaunchedEffect(sites) { if (!isEditing) localOrder = sites.map { it.id } }
+    // Данные с учетом архивирования
+    val sitesIncludingArchived by vm.sites(clientId, includeArchived = true).collectAsState(initial = emptyList())
+    val sitesToShow = if (includeArchived) sitesIncludingArchived else sites
+
+    // Локальный порядок сайтов (для drag-and-drop)
+    var localOrder by remember(clientId, sitesToShow) { mutableStateOf(sitesToShow.map { it.id }) }
+    LaunchedEffect(sitesToShow) { if (!isEditing) localOrder = sitesToShow.map { it.id } }
+
+    // Локальный порядок установок по объектам (siteId -> List<installationId>)
+    // Получаем все установки заранее для всех сайтов
+    var allInstallations by remember { mutableStateOf<Map<String, List<InstallationEntity>>>(emptyMap()) }
+    LaunchedEffect(sitesToShow, includeArchived) {
+        scope.launch(Dispatchers.IO) {
+            val installationsMap = mutableMapOf<String, List<InstallationEntity>>()
+            sitesToShow.forEach { site ->
+                val installations = vm.installations(site.id, includeArchived = includeArchived).first()
+                installationsMap[site.id] = installations
+            }
+            allInstallations = installationsMap
+        }
+    }
+    var localInstallationOrders by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    
+    // Диалог подтверждения удаления
+    var deleteDialogState by remember { mutableStateOf<SiteDeleteDialogState?>(null) }
 
     // Диалоги
     var showAddSite by remember { mutableStateOf(false) }
@@ -134,24 +165,46 @@ fun ClientDetailScreen(
             EditDoneBottomBar(
                 isEditing = isEditing,
                 onEdit = {
+                    includeArchivedBeforeEdit = includeArchived
+                    if (!includeArchived) includeArchived = true
                     // включаем режим редактирования
                     isEditing = true
                     // сброс локального порядка на актуальный
-                    localOrder = sites.map { it.id }
+                    localOrder = sitesToShow.map { it.id }
+                    // Инициализация локального порядка установок
+                    scope.launch(Dispatchers.IO) {
+                        val orders = mutableMapOf<String, List<String>>()
+                        sitesToShow.forEach { site ->
+                            val installations = allInstallations[site.id] ?: emptyList()
+                            orders[site.id] = installations.map { it.id }
+                        }
+                        localInstallationOrders = orders
+                    }
                 },
                 onDone = {
-                    // сохраняем порядок сайтов и выходим из редактирования
+                    // сохраняем порядок сайтов
                     vm.reorderSites(clientId, localOrder)
+                    // сохраняем порядок установок для каждого объекта
+                    scope.launch {
+                        localInstallationOrders.forEach { (siteId, orderIds) ->
+                            vm.reorderInstallations(siteId, orderIds)
+                        }
+                    }
+                    if (includeArchivedBeforeEdit == false && includeArchived) {
+                        includeArchived = false
+                    }
+                    includeArchivedBeforeEdit = null
                     isEditing = false
                 },
                 actions = emptyList() // или можно добавить действия справа, если нужно
             )
         }
 
-    ) { _->
+    ) { paddingValues ->
         Column(
             Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .padding(paddingValues),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ======= HEADER =======
@@ -223,58 +276,89 @@ fun ClientDetailScreen(
 
             // ======= Список объектов/установок =======
             if (isEditing) {
-                // Режим редактирования: показываем список объектов с крупными стрелками для сортировки
+                // Режим редактирования: drag-and-drop для объектов и установок
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(sites, key = { it.id }) { s ->
-                        val index = localOrder.indexOf(s.id)
+                    items(localOrder, key = { it }) { siteId ->
+                        val site = sitesToShow.find { it.id == siteId } ?: return@items
+                        val index = localOrder.indexOf(siteId)
+                        val installations = allInstallations[siteId] ?: emptyList()
+                        val installationOrder = localInstallationOrders[siteId] ?: installations.map { it.id }
+                        
                         ElevatedCard(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "${index + 1}. ${s.name}",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Spacer(Modifier.weight(1f))
-                                Row {
-                                    IconButton(
-                                        onClick = {
-                                            val pos = localOrder.indexOf(s.id)
-                                            if (pos > 0) {
-                                                val list = localOrder.toMutableList()
-                                                val tmp = list[pos - 1]; list[pos - 1] = list[pos]; list[pos] = tmp
-                                                localOrder = list
-                                            }
-                                        },
-                                        enabled = index > 0
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.KeyboardArrowUp,
-                                            contentDescription = "Вверх",
-                                            modifier = Modifier.size(28.dp)
-                                        )
+                            Column {
+                                // Рядок объекта с ручкой для drag-and-drop
+                                SiteRowWithDrag(
+                                    site = site,
+                                    index = index,
+                                    isArchived = site.isArchived,
+                                    onMoveUp = {
+                                        val pos = localOrder.indexOf(siteId)
+                                        if (pos > 0) {
+                                            val list = localOrder.toMutableList()
+                                            val tmp = list[pos - 1]; list[pos - 1] = list[pos]; list[pos] = tmp
+                                            localOrder = list
+                                        }
+                                    },
+                                    onMoveDown = {
+                                        val pos = localOrder.indexOf(siteId)
+                                        if (pos >= 0 && pos < localOrder.lastIndex) {
+                                            val list = localOrder.toMutableList()
+                                            val tmp = list[pos + 1]; list[pos + 1] = list[pos]; list[pos] = tmp
+                                            localOrder = list
+                                        }
+                                    },
+                                    onArchive = { vm.archiveSite(siteId) },
+                                    onRestore = { vm.restoreSite(siteId) },
+                                    onDelete = {
+                                        deleteDialogState = SiteDeleteDialogState(isSite = true, id = siteId, name = site.name)
                                     }
-                                    IconButton(
-                                        onClick = {
-                                            val pos = localOrder.indexOf(s.id)
-                                            if (pos >= 0 && pos < localOrder.lastIndex) {
-                                                val list = localOrder.toMutableList()
-                                                val tmp = list[pos + 1]; list[pos + 1] = list[pos]; list[pos] = tmp
-                                                localOrder = list
-                                            }
-                                        },
-                                        enabled = index < localOrder.lastIndex
+                                )
+                                
+                                // Установки внутри объекта (только неархивные в режиме редактирования)
+                                val installationsToShow = if (site.isArchived) emptyList() else installations.filter { !it.isArchived || includeArchived }
+                                if (installationOrder.isNotEmpty() && installationsToShow.isNotEmpty()) {
+                                    Column(
+                                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.KeyboardArrowDown,
-                                            contentDescription = "Вниз",
-                                            modifier = Modifier.size(28.dp)
-                                        )
+                                        installationOrder.filter { instId -> installationsToShow.any { it.id == instId } }.forEach { instId ->
+                                            val inst = installations.find { it.id == instId } ?: return@forEach
+                                            val instIndex = installationOrder.indexOf(instId)
+                                            InstallationRowWithDrag(
+                                                installation = inst,
+                                                index = instIndex,
+                                                isArchived = inst.isArchived,
+                                                onMoveUp = {
+                                                    val pos = installationOrder.indexOf(instId)
+                                                    if (pos > 0) {
+                                                        val list = installationOrder.toMutableList()
+                                                        val tmp = list[pos - 1]; list[pos - 1] = list[pos]; list[pos] = tmp
+                                                        localInstallationOrders = localInstallationOrders.toMutableMap().apply {
+                                                            put(siteId, list)
+                                                        }
+                                                    }
+                                                },
+                                                onMoveDown = {
+                                                    val pos = installationOrder.indexOf(instId)
+                                                    if (pos >= 0 && pos < installationOrder.lastIndex) {
+                                                        val list = installationOrder.toMutableList()
+                                                        val tmp = list[pos + 1]; list[pos + 1] = list[pos]; list[pos] = tmp
+                                                        localInstallationOrders = localInstallationOrders.toMutableMap().apply {
+                                                            put(siteId, list)
+                                                        }
+                                                    }
+                                                },
+                                                onArchive = { vm.archiveInstallation(instId) },
+                                                onRestore = { vm.restoreInstallation(instId) },
+                                                onDelete = {
+                                                    deleteDialogState = SiteDeleteDialogState(isSite = false, id = instId, name = inst.name)
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -288,7 +372,7 @@ fun ClientDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(sites, key = { it.id }) { s ->
+                    items(sitesToShow, key = { it.id }) { s ->
                         val isExpanded = expandedSites.contains(s.id)
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             Column {
@@ -313,7 +397,8 @@ fun ClientDetailScreen(
                                     }
                                 )
                                 if (isExpanded) {
-                                    val installations by vm.installations(s.id).collectAsState(initial = emptyList())
+                                    val installationsFlow = vm.installations(s.id, includeArchived = false)
+                                    val installations by installationsFlow.collectAsState(initial = emptyList())
                                     Column(
                                         Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -353,6 +438,45 @@ fun ClientDetailScreen(
                 }
             }
         }
+    }
+
+    // Диалог подтверждения удаления
+    deleteDialogState?.let { state ->
+        AlertDialog(
+            onDismissRequest = { deleteDialogState = null },
+            title = { Text("Подтверждение удаления") },
+            text = {
+                Text(
+                    if (state.isSite) {
+                        "Вы уверены, что хотите удалить объект \"${state.name}\"?\n\nЭто действие нельзя отменить."
+                    } else {
+                        "Вы уверены, что хотите удалить установку \"${state.name}\"?\n\nЭто действие нельзя отменить."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (state.isSite) {
+                            vm.deleteSite(state.id)
+                        } else {
+                            vm.deleteInstallation(state.id)
+                        }
+                        deleteDialogState = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteDialogState = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 
     // ---- Dialogs ----
@@ -509,4 +633,188 @@ fun ClientDetailScreen(
         )
     }
 
+}
+
+// Компонент для объекта с drag-and-drop
+@Composable
+private fun SiteRowWithDrag(
+    site: SiteEntity,
+    index: Int,
+    isArchived: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var lastMoveThreshold by remember { mutableStateOf(0f) }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Ручка для перетаскивания (только для неархивных)
+        if (!isArchived) {
+            Icon(
+                imageVector = Icons.Filled.Menu,
+                contentDescription = "Перетащить",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(24.dp)
+                    .pointerInput(site.id) {
+                        detectDragGestures(
+                            onDragStart = { 
+                                lastMoveThreshold = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                    onMoveUp()
+                                    lastMoveThreshold = -60f
+                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                    onMoveDown()
+                                    lastMoveThreshold = 60f
+                                }
+                                if (dragAmount.y in -60f..60f) {
+                                    lastMoveThreshold = dragAmount.y
+                                }
+                            },
+                            onDragEnd = {
+                                lastMoveThreshold = 0f
+                            }
+                        )
+                    }
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Icon(
+            imageVector = AppIcons.Site,
+            contentDescription = null,
+            tint = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "${index + 1}. ${site.name}",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        // Кнопки действий
+        if (isArchived) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onRestore) {
+                    Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить объект", tint = MaterialTheme.colorScheme.onSurface)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Удалить объект", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        } else {
+            IconButton(onClick = onArchive) {
+                Icon(Icons.Filled.Archive, contentDescription = "Архивировать объект", tint = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
+}
+
+// Компонент для установки с drag-and-drop
+@Composable
+private fun InstallationRowWithDrag(
+    installation: InstallationEntity,
+    index: Int,
+    isArchived: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var lastMoveThreshold by remember { mutableStateOf(0f) }
+    
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isArchived) 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Ручка для перетаскивания (только для неархивных)
+            if (!isArchived) {
+                Icon(
+                    imageVector = Icons.Filled.Menu,
+                    contentDescription = "Перетащить",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .pointerInput(installation.id) {
+                            detectDragGestures(
+                                onDragStart = { 
+                                    lastMoveThreshold = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                        onMoveUp()
+                                        lastMoveThreshold = -60f
+                                    } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                        onMoveDown()
+                                        lastMoveThreshold = 60f
+                                    }
+                                    if (dragAmount.y in -60f..60f) {
+                                        lastMoveThreshold = dragAmount.y
+                                    }
+                                },
+                                onDragEnd = {
+                                    lastMoveThreshold = 0f
+                                }
+                            )
+                        }
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Icon(
+                imageVector = Icons.Outlined.SettingsApplications,
+                contentDescription = null,
+                tint = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "${index + 1}. ${installation.name}",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            // Кнопки действий
+            if (isArchived) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onRestore) {
+                        Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить установку", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Удалить установку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                    }
+                }
+            } else {
+                IconButton(onClick = onArchive) {
+                    Icon(Icons.Filled.Archive, contentDescription = "Архивировать установку", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
 }
