@@ -26,12 +26,19 @@ fun MaintenanceScreen(
     installationId: String,
     installationName: String,
     onNavigateBack: () -> Unit,               // остаётся (кнопка «Отмена»)
-    onNavigateToHistory: (installationId: String) -> Unit
+    onNavigateToHistory: (installationId: String) -> Unit,
+    sessionId: String? = null                 // Если указан, режим редактирования
 ) {
     val vm: MaintenanceViewModel = viewModel()
 
-    // грузим все поля по всем компонентам установки
-    LaunchedEffect(installationId) { vm.loadForInstallation(installationId) }
+    // грузим все поля по всем компонентам установки или данные существующей сессии
+    LaunchedEffect(installationId, sessionId) {
+        if (sessionId != null) {
+            vm.loadForSession(sessionId)
+        } else {
+            vm.loadForInstallation(installationId)
+        }
+    }
 
     val sections by vm.sections.collectAsState()
     val scroll = rememberScrollState()
@@ -178,19 +185,35 @@ fun MaintenanceScreen(
                     OutlinedButton(onClick = onNavigateBack) { Text("Отмена") }
                     Button(
                         onClick = {
-                            vm.saveSession(
-                                siteId = siteId,
-                                installationId = installationId,
-                                technician = technician,
-                                notes = notes
-                            )
-                            scope.launch {
-                                snackbarHostState.showSnackbar("ТО сохранено")
-                                onNavigateBack()  // ✅ сразу возвращаемся на прошлый экран
+                            if (sessionId != null) {
+                                // Режим редактирования
+                                vm.updateSession(
+                                    sessionId = sessionId,
+                                    siteId = siteId,
+                                    installationId = installationId,
+                                    technician = technician,
+                                    notes = notes
+                                )
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("ТО обновлено")
+                                    onNavigateBack()  // ✅ сразу возвращаемся на прошлый экран
+                                }
+                            } else {
+                                // Режим создания новой сессии
+                                vm.saveSession(
+                                    siteId = siteId,
+                                    installationId = installationId,
+                                    technician = technician,
+                                    notes = notes
+                                )
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("ТО сохранено")
+                                    onNavigateBack()  // ✅ сразу возвращаемся на прошлый экран
+                                }
                             }
                         },
                         enabled = sections.isNotEmpty()
-                    ) { Text("Сохранить") }
+                    ) { Text(if (sessionId != null) "Обновить" else "Сохранить") }
 
                 }
             }

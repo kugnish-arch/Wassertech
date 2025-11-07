@@ -152,4 +152,24 @@ interface SessionsDao {
     @Query("DELETE FROM maintenance_values WHERE id = :valueId")
     suspend fun deleteValue(valueId: String)
 
+    /** Удалить все значения для сессии */
+    @Query("DELETE FROM maintenance_values WHERE sessionId = :sessionId")
+    suspend fun deleteValuesForSession(sessionId: String)
+
+    /**
+     * Атомарно обновить сессию ТО и все её значения.
+     * Удаляет старые значения и вставляет новые.
+     */
+    @Transaction
+    suspend fun updateSessionWithValues(
+        session: MaintenanceSessionEntity,
+        values: List<MaintenanceValueEntity>
+    ) {
+        upsertSession(session)
+        deleteValuesForSession(session.id)
+        if (values.isNotEmpty()) {
+            insertValues(values)
+        }
+    }
+
 }

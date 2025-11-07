@@ -230,7 +230,33 @@ private fun AppScaffold(navController: NavHostController) {
                     installationId = installationId,
                     installationName = installationName,
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToHistory = { id -> navController.navigate("maintenance_history/$id") }
+                    onNavigateToHistory = { id -> navController.navigate("maintenance_history/$id") },
+                    sessionId = null
+                )
+            }
+
+            // Редактирование существующей сессии ТО
+            composable(
+                route = "maintenance_edit/{sessionId}/{siteId}/{installationId}/{installationName}",
+                arguments = listOf(
+                    navArgument("sessionId") { type = NavType.StringType },
+                    navArgument("siteId") { type = NavType.StringType },
+                    navArgument("installationId") { type = NavType.StringType },
+                    navArgument("installationName") { type = NavType.StringType }
+                )
+            ) { bse ->
+                val sessionId = bse.arguments?.getString("sessionId")!!
+                val siteId = bse.arguments?.getString("siteId")!!
+                val installationId = bse.arguments?.getString("installationId")!!
+                val installationName = bse.arguments?.getString("installationName")!!
+
+                MaintenanceScreen(
+                    siteId = siteId,
+                    installationId = installationId,
+                    installationName = installationName,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToHistory = { id -> navController.navigate("maintenance_history/$id") },
+                    sessionId = sessionId
                 )
             }
 
@@ -280,7 +306,14 @@ private fun AppScaffold(navController: NavHostController) {
                 val sessionId = bse.arguments?.getString("sessionId") ?: return@composable
                 Column {
                     SectionHeader("Детали ТО")
-                    MaintenanceSessionDetailScreen(sessionId = sessionId)
+                    MaintenanceSessionDetailScreen(
+                        sessionId = sessionId,
+                        onNavigateToEdit = { sid, siteId, installationId, installationName ->
+                            navController.navigate(
+                                "maintenance_edit/$sid/$siteId/$installationId/${Uri.encode(installationName)}"
+                            )
+                        }
+                    )
                 }
             }
             

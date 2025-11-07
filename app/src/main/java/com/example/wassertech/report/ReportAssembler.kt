@@ -3,6 +3,8 @@ package com.example.wassertech.report
 import android.content.Context
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.report.model.ComponentRowDTO
+import com.example.wassertech.report.model.ComponentWithFieldsDTO
+import com.example.wassertech.report.model.ComponentFieldDTO
 import com.example.wassertech.report.model.ReportDTO
 import com.example.wassertech.report.model.WaterAnalysisItem
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +73,88 @@ object ReportAssembler {
         // Извлекаем данные анализов воды из наблюдений (можно улучшить логику позже)
         val waterAnalyses = emptyList<WaterAnalysisItem>() // Пока пусто, можно заполнить позже
 
+        // Собираем данные из maintenance_values с разрешением меток полей
+        val maintenanceValues = db.sessionsDao().getValuesForSession(sessionId)
+        val valuesByComponent = maintenanceValues.groupBy { it.componentId }
+        
+        val componentsWithFields = mutableListOf<ComponentWithFieldsDTO>()
+        for ((componentId, values) in valuesByComponent) {
+            val component = db.hierarchyDao().getComponent(componentId)
+            val componentName = component?.name ?: componentId
+            val componentType = component?.type?.name
+            
+            // Получаем метки полей из шаблона
+            val fieldLabels: Map<String, String> = component?.templateId?.let { templateId ->
+                try {
+                    db.templatesDao().getMaintenanceFieldsForTemplate(templateId)
+                        .associate { it.key to (it.label ?: it.key) }
+                } catch (e: Exception) {
+                    emptyMap()
+                }
+            } ?: emptyMap()
+            
+            // Получаем единицы измерения из шаблона
+            val fieldUnits: Map<String, String?> = component?.templateId?.let { templateId ->
+                try {
+                    db.templatesDao().getMaintenanceFieldsForTemplate(templateId)
+                        .associate { it.key to it.unit }
+                } catch (e: Exception) {
+                    emptyMap()
+                }
+            } ?: emptyMap()
+            
+            // Получаем типы полей из шаблона для определения чекбоксов
+            val fieldTypes: Map<String, com.example.wassertech.data.types.FieldType> = component?.templateId?.let { templateId ->
+                try {
+                    db.templatesDao().getMaintenanceFieldsForTemplate(templateId)
+                        .associate { it.key to it.type }
+                } catch (e: Exception) {
+                    emptyMap()
+                }
+            } ?: emptyMap()
+            
+            val fields = values.mapNotNull { value ->
+                val label = fieldLabels[value.fieldKey] ?: value.fieldKey.substringBefore('_', value.fieldKey)
+                val fieldType = fieldTypes[value.fieldKey]
+                val valueText = when {
+                    value.valueText != null -> value.valueText
+                    value.valueBool != null -> if (value.valueBool == true) "Да" else "Нет"
+                    else -> null
+                }
+                
+                // Определяем класс для чекбоксов
+                val checkboxClass = if (fieldType == com.example.wassertech.data.types.FieldType.CHECKBOX) {
+                    when (valueText) {
+                        "Да" -> " checkbox-yes"
+                        "Нет" -> " checkbox-no"
+                        else -> null
+                    }
+                } else null
+                
+                valueText?.let {
+                    ComponentFieldDTO(
+                        label = label,
+                        value = it,
+                        unit = fieldUnits[value.fieldKey],
+                        checkboxClass = checkboxClass
+                    )
+                }
+            }.sortedBy { it.label.lowercase(Locale.getDefault()) }
+            
+            if (fields.isNotEmpty()) {
+                componentsWithFields.add(
+                    ComponentWithFieldsDTO(
+                        componentName = componentName,
+                        componentType = componentType,
+                        fields = fields
+                    )
+                )
+            }
+        }
+        
+        // Сортируем компоненты по имени
+        componentsWithFields.sortBy { it.componentName.lowercase(Locale.getDefault()) }
+
         ReportDTO(
             reportNumber = "TO-${sessionId.take(8).uppercase()}",
             reportDate = reportDate,
@@ -100,7 +184,9 @@ object ReportAssembler {
             companyConfig = companyConfig,
             contractConfig = contractConfig,
 
-            logoAssetPath = "img/logo-wassertech-bolder.png"
+            logoAssetPath = "img/logo-wassertech-bolder.png",
+            
+            componentsWithFields = componentsWithFields
         )
     }
 }

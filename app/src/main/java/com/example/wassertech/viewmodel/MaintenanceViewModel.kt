@@ -115,6 +115,54 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    /** Загрузка данных существующей сессии для редактирования */
+    fun loadForSession(sessionId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val session = sessionsDao.getSessionById(sessionId) ?: return@launch
+            val installationId = session.installationId ?: return@launch
+            
+            // Загружаем компоненты установки
+            val components = hierarchyDao.observeComponents(installationId).first()
+            
+            // Загружаем существующие значения
+            val existingValues = sessionsDao.getValuesForSession(sessionId)
+            val valuesByComponentAndKey = existingValues.groupBy { it.componentId }
+                .mapValues { (_, vals) -> vals.associateBy { it.fieldKey } }
+
+            val built = components.map { comp ->
+                val fieldList: List<ChecklistUiField> =
+                    comp.templateId?.let { tmplId ->
+                        val maintFields = templatesDao.getMaintenanceFieldsForTemplate(tmplId)
+                        val compValues = valuesByComponentAndKey[comp.id] ?: emptyMap()
+                        
+                        maintFields.map { f ->
+                            val existingValue = compValues[f.key]
+                            ChecklistUiField(
+                                key = f.key,
+                                label = f.label,
+                                type = f.type,
+                                unit = f.unit,
+                                min = f.min,
+                                max = f.max,
+                                boolValue = existingValue?.valueBool,
+                                numberValue = existingValue?.valueText ?: "",
+                                textValue = existingValue?.valueText ?: ""
+                            )
+                        }
+                    } ?: emptyList()
+
+                ComponentSectionUi(
+                    componentId = comp.id,
+                    componentName = comp.name,
+                    fields = fieldList,
+                    expanded = true
+                )
+            }
+
+            _sections.value = built
+        }
+    }
+
     // ---------- Изменение UI-состояния секций/полей (для "правильного" реактивного обновления) ----------
 
     fun toggleSection(componentId: String) {
@@ -216,6 +264,59 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
 
             // атомарно: и сессию, и значения
             sessionsDao.insertSessionWithValues(session, values)
+        }
+    }
+
+    /**
+     * Обновляем существующую сессию ТО.
+     * Время проведения обслуживания (startedAtEpoch) сохраняется из оригинальной сессии.
+     */
+    fun updateSession(
+        sessionId: String,
+        siteId: String,
+        installationId: String,
+        technician: String?,
+        notes: String?
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val existingSession = sessionsDao.getSessionById(sessionId) ?: return@launch
+
+            val session = MaintenanceSessionEntity(
+                id = sessionId,
+                siteId = siteId,
+                installationId = installationId,
+                startedAtEpoch = existingSession.startedAtEpoch, // Сохраняем оригинальное время
+                finishedAtEpoch = existingSession.finishedAtEpoch,
+                technician = technician,
+                notes = notes,
+                synced = false // Помечаем как не синхронизированную после редактирования
+            )
+
+            val values = mutableListOf<MaintenanceValueEntity>()
+            _sections.value.forEach { sec ->
+                sec.fields.forEach { f ->
+                    val (textValue, boolValue) = when (f.type) {
+                        FieldType.CHECKBOX -> null to (f.boolValue == true)
+                        FieldType.NUMBER   -> f.numberValue.takeIf { it.isNotBlank() } to null
+                        FieldType.TEXT     -> f.textValue.takeIf { it.isNotBlank() } to null
+                    }
+                    if (textValue != null || boolValue != null) {
+                        values += MaintenanceValueEntity(
+                            id = UUID.randomUUID().toString(),
+                            sessionId = sessionId,
+                            siteId = siteId,
+                            installationId = installationId,
+                            componentId = sec.componentId,
+                            fieldKey = f.key,
+                            valueText = textValue,
+                            valueBool = boolValue
+                        )
+                    }
+                }
+            }
+
+            // атомарно: обновляем сессию и заменяем все значения
+            sessionsDao.updateSessionWithValues(session, values)
         }
     }
 }

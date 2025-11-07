@@ -49,6 +49,9 @@ data class ReportDTO(
     val works: List<String> = emptyList(), // Выполненные работы
     val waterAnalyses: List<WaterAnalysisItem> = emptyList(), // Результаты анализов воды
     val comments: String? = null, // Комментарии и замечания
+    
+    // Поля для v3 шаблона - компоненты с их полями
+    val componentsWithFields: List<ComponentWithFieldsDTO> = emptyList(),
 
     // Конфигурация компании (из JSON)
     val companyConfig: CompanyConfig? = null,
@@ -64,4 +67,17 @@ data class ComponentRowDTO(
     val serial: String?,
     val status: String,
     val notes: String?
+)
+
+data class ComponentFieldDTO(
+    val label: String,
+    val value: String,
+    val unit: String? = null,
+    val checkboxClass: String? = null // "checkbox-yes" или "checkbox-no" для чекбоксов
+)
+
+data class ComponentWithFieldsDTO(
+    val componentName: String,
+    val componentType: String?,
+    val fields: List<ComponentFieldDTO>
 )

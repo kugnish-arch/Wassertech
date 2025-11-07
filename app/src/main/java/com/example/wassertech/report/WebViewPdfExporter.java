@@ -48,23 +48,45 @@ public final class WebViewPdfExporter {
                               final PrintAttributes attrs,
                               final File outFile,
                               final Callback cb) {
+        Log.d(TAG, "export() called, isMainThread: " + (Looper.myLooper() == Looper.getMainLooper()));
+        
         // Ensure we run the WebView drawing on the UI thread.
-        Handler main = new Handler(Looper.getMainLooper());
-        main.post(() -> {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            // Already on main thread, execute directly
+            Log.d(TAG, "Already on main thread, executing directly");
             try {
                 performExport(webView, attrs, outFile);
+                Log.d(TAG, "performExport() completed successfully");
                 cb.onSuccess();
             } catch (Throwable t) {
                 Log.e(TAG, "PDF export failed", t);
                 cb.onError(t);
             }
-        });
+        } else {
+            // Post to main thread
+            Log.d(TAG, "Posting to main thread");
+            Handler main = new Handler(Looper.getMainLooper());
+            main.post(() -> {
+                try {
+                    Log.d(TAG, "Executing performExport() on main thread");
+                    performExport(webView, attrs, outFile);
+                    Log.d(TAG, "performExport() completed successfully");
+                    cb.onSuccess();
+                } catch (Throwable t) {
+                    Log.e(TAG, "PDF export failed", t);
+                    cb.onError(t);
+                }
+            });
+        }
     }
 
     private static void performExport(WebView webView, PrintAttributes attrs, File outFile) throws IOException {
+        Log.d(TAG, "performExport() started");
         if (webView == null) throw new IllegalArgumentException("webView == null");
         if (attrs == null) throw new IllegalArgumentException("attrs == null");
         if (outFile == null) throw new IllegalArgumentException("outFile == null");
+        
+        Log.d(TAG, "WebView width: " + webView.getWidth() + ", height: " + webView.getHeight() + ", contentHeight: " + webView.getContentHeight());
 
         // Compute page size in pixels using densityDpi and mediaSize (mils)
         final PrintAttributes.MediaSize mediaSize = attrs.getMediaSize();
@@ -93,11 +115,30 @@ public final class WebViewPdfExporter {
         // contentHeight (in "CSS pixels"). Convert to device pixels using density (approximation).
         float density = webView.getResources().getDisplayMetrics().density;
         int contentHeightCss = webView.getContentHeight();
+        Log.d(TAG, "contentHeight (CSS): " + contentHeightCss + ", density: " + density);
+        
         if (contentHeightCss <= 0) {
             // if contentHeight not ready, try to use measured height
             contentHeightCss = webView.getMeasuredHeight();
+            Log.d(TAG, "Using measuredHeight as fallback: " + contentHeightCss);
         }
-        int contentHeightPx = Math.max(1, (int) (contentHeightCss * density));
+        
+        // contentHeight возвращается в CSS пикселях (независимо от density)
+        // Нужно конвертировать в device pixels для правильного расчета страниц
+        int measuredHeight = webView.getMeasuredHeight();
+        int contentHeightPx;
+        
+        // contentHeight всегда в CSS пикселях, конвертируем в device pixels
+        if (contentHeightCss > 0) {
+            contentHeightPx = (int) (contentHeightCss * density);
+            Log.d(TAG, "Converted contentHeight from CSS to device pixels: " + contentHeightCss + " -> " + contentHeightPx);
+        } else {
+            // Fallback: используем measuredHeight
+            contentHeightPx = Math.max(1, measuredHeight);
+            Log.d(TAG, "Using measuredHeight as fallback: " + contentHeightPx);
+        }
+        
+        Log.d(TAG, "Final contentHeightPx: " + contentHeightPx + ", measuredHeight: " + measuredHeight + ", density: " + density);
 
         // Calculate scale to fit WebView width into page width
         float scale = (float) pageWidthPx / (float) webViewWidth;
@@ -107,11 +148,13 @@ public final class WebViewPdfExporter {
 
         // Determine number of pages
         int pages = (totalScaledHeightPx + pageHeightPx - 1) / pageHeightPx;
+        Log.d(TAG, "Calculated pages: " + pages + ", totalScaledHeight: " + totalScaledHeightPx + ", pageHeight: " + pageHeightPx);
 
         PdfDocument document = new PdfDocument();
 
         try {
             for (int i = 0; i < pages; i++) {
+                Log.d(TAG, "Rendering page " + (i + 1) + " of " + pages);
                 PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(pageWidthPx, pageHeightPx, i + 1).create();
                 PdfDocument.Page page = document.startPage(pageInfo);
                 Canvas canvas = page.getCanvas();
@@ -136,11 +179,14 @@ public final class WebViewPdfExporter {
 
             // Write the document content to the output file
             outFile.getParentFile().mkdirs();
+            Log.d(TAG, "Writing PDF to file: " + outFile.getAbsolutePath());
             try (FileOutputStream fos = new FileOutputStream(outFile)) {
                 document.writeTo(fos);
+                Log.d(TAG, "PDF written successfully, file size: " + outFile.length() + " bytes");
             }
         } finally {
             document.close();
+            Log.d(TAG, "PDF document closed");
         }
     }
 }

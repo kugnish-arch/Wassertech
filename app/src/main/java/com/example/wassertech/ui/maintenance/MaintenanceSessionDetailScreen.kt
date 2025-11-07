@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PictureAsPdf
@@ -24,16 +25,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.example.wassertech.report.ReportAssembler
 import com.example.wassertech.report.HtmlTemplateEngine
-import com.example.wassertech.report.DocxTemplateEngine
 import com.example.wassertech.report.PdfExporter
-import com.example.wassertech.report.DocxToPdfExporter
 import com.example.wassertech.report.ShareUtils
-import android.util.Log
 
 
 @Composable
 fun MaintenanceSessionDetailScreen(
-    sessionId: String
+    sessionId: String,
+    onNavigateToEdit: (sessionId: String, siteId: String, installationId: String, installationName: String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
@@ -53,7 +52,6 @@ fun MaintenanceSessionDetailScreen(
 
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
-    var useDocxTemplate by remember { mutableStateOf(false) } // Выбор формата шаблона
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(sessionId) {
@@ -127,37 +125,41 @@ fun MaintenanceSessionDetailScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { _ ->
         Column(modifier = Modifier.fillMaxSize()) {
-            // Кнопка "Отчет в PDF" в верхней части экрана
+            // Кнопки в верхней части экрана
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Переключатель формата шаблона
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Кнопка "Внести правки" справа
+                OutlinedButton(
+                    onClick = {
+                        session?.let { s ->
+                            onNavigateToEdit(
+                                sessionId,
+                                s.siteId,
+                                s.installationId ?: "",
+                                installationName
+                            )
+                        }
+                    },
+                    enabled = session != null && session?.installationId != null,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 ) {
-                    Text(
-                        "HTML",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (!useDocxTemplate) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "Редактирование",
+                        modifier = Modifier.size(18.dp)
                     )
-                    Switch(
-                        checked = useDocxTemplate,
-                        onCheckedChange = { useDocxTemplate = it }
-                    )
-                    Text(
-                        "DOCX",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (useDocxTemplate) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Внести правки")
                 }
-                
-                Spacer(Modifier.width(16.dp))
-                
+
+                // Кнопка PDF
                 Button(
                     onClick = {
                         scope.launch {
@@ -175,37 +177,27 @@ fun MaintenanceSessionDetailScreen(
                                 ).apply { mkdirs() }
                                 val out = File(reportsDir, "Report_${dto.reportNumber}.pdf")
 
-                                if (useDocxTemplate) {
-                                    // DOCX шаблон
-                                    val docxBytes = withContext(Dispatchers.IO) {
-                                        DocxTemplateEngine.processTemplate(
-                                            context = context,
-                                            templateAssetPath = "templates/Report_Template_Wassertech.docx",
-                                            dto = dto
-                                        )
-                                    }
-                                    // DOCX -> PDF
-                                    DocxToPdfExporter.exportDocxToPdf(context, docxBytes, out)
-                                } else {
-                                    // HTML шаблон
-                                    val html = withContext(Dispatchers.IO) {
-                                        HtmlTemplateEngine.render(
-                                            context = context,
-                                            templateAssetPath = "templates/maintenance_v2.html",
-                                            dto = dto
-                                        )
-                                    }
-                                    // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
-                                    PdfExporter.exportHtmlToPdf(context, html, out)
+                                // HTML шаблон
+                                val html = withContext(Dispatchers.IO) {
+                                    HtmlTemplateEngine.render(
+                                        context = context,
+                                        templateAssetPath = "templates/maintenance_v3.html",
+                                        dto = dto
+                                    )
                                 }
+                                
+                                // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
+                                PdfExporter.exportHtmlToPdf(context, html, out)
 
                                 // Шарим созданный файл
                                 ShareUtils.sharePdf(context, out)
-                                snackbarHostState.showSnackbar("PDF успешно создан")
-                            } catch (t: Throwable) {
-                                // Логируем ошибку для отладки
-                                Log.e("PDF", "Error creating PDF", t)
                                 
+                                // Показываем информацию об успешной генерации PDF
+                                snackbarHostState.showSnackbar(
+                                    "PDF создан успешно",
+                                    duration = SnackbarDuration.Short
+                                )
+                            } catch (t: Throwable) {
                                 val errorMsg = when {
                                     t is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания (30 сек). Попробуйте еще раз."
                                     t.cause is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания. Попробуйте еще раз."
@@ -244,61 +236,68 @@ fun MaintenanceSessionDetailScreen(
             }
 
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Header card (secondaryContainer)
-                item {
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Header card (secondaryContainer)
+                    item {
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val icon =
-                                    if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
-                                Icon(icon, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(clientName, style = MaterialTheme.typography.titleMedium)
+                            Column(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val icon =
+                                        if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
+                                    Icon(icon, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(clientName, style = MaterialTheme.typography.titleMedium)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Outlined.SettingsApplications,
+                                        contentDescription = null
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        installationName,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                                Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.SettingsApplications, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(installationName, style = MaterialTheme.typography.bodyLarge)
-                            }
-                            Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                }
 
-                items(groups) { g ->
-                    ElevatedCard(Modifier.fillMaxWidth()) {
-                        ListItem(
-                            headlineContent = { Text(g.componentName) },
-                            supportingContent = {
-                                Column(
-                                    Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    g.rows.forEach { row ->
-                                        Text("• ${row.fieldLabel}: ${row.value}")
+                    items(groups) { g ->
+                        ElevatedCard(Modifier.fillMaxWidth()) {
+                            ListItem(
+                                headlineContent = { Text(g.componentName) },
+                                supportingContent = {
+                                    Column(
+                                        Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        g.rows.forEach { row ->
+                                            Text("• ${row.fieldLabel}: ${row.value}")
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
-// Renamed to avoid clash with MaintenanceAllScreen.kt
+
+    // Renamed to avoid clash with MaintenanceAllScreen.kt
 private data class DetailComponentGroup(
     val componentName: String,
     val rows: List<DetailFieldRow>

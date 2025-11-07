@@ -42,10 +42,13 @@ object PdfExporter {
             val a4HeightPx = (a4HeightMm * densityDpi / 25.4f).toInt()
             
             // Создаем невидимый контейнер и добавляем его в Activity
+            // WebView не должен иметь огромную высоту - это вызывает OOM
+            // WebViewPdfExporter использует contentHeight для расчета страниц и рендерит по частям
+            // Достаточно установить разумную высоту (несколько страниц), чтобы contentHeight вычислялся правильно
             val container = FrameLayout(context).apply {
-                layoutParams = ViewGroup.LayoutParams(a4WidthPx, ViewGroup.LayoutParams.WRAP_CONTENT)
+                layoutParams = ViewGroup.LayoutParams(a4WidthPx, a4HeightPx * 3) // Достаточно для вычисления contentHeight
                 visibility = android.view.View.INVISIBLE // Невидимый, но с правильными размерами
-                addView(webView, ViewGroup.LayoutParams(a4WidthPx, ViewGroup.LayoutParams.WRAP_CONTENT))
+                addView(webView, ViewGroup.LayoutParams(a4WidthPx, a4HeightPx * 3))
             }
             
             // Добавляем контейнер в Activity (в корневой ViewGroup)
@@ -63,17 +66,18 @@ object PdfExporter {
             }
             
             // Измеряем контейнер и WebView с правильными размерами
+            // Используем UNSPECIFIED для высоты, чтобы WebView мог определить свою высоту
             container.measure(
                 android.view.View.MeasureSpec.makeMeasureSpec(a4WidthPx, android.view.View.MeasureSpec.EXACTLY),
-                android.view.View.MeasureSpec.makeMeasureSpec(a4HeightPx, android.view.View.MeasureSpec.UNSPECIFIED)
+                android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED)
             )
-            container.layout(0, 0, container.measuredWidth, container.measuredHeight)
+            container.layout(0, 0, a4WidthPx, container.measuredHeight)
             
             webView.measure(
                 android.view.View.MeasureSpec.makeMeasureSpec(a4WidthPx, android.view.View.MeasureSpec.EXACTLY),
-                android.view.View.MeasureSpec.makeMeasureSpec(a4HeightPx, android.view.View.MeasureSpec.UNSPECIFIED)
+                android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED)
             )
-            webView.layout(0, 0, webView.measuredWidth, webView.measuredHeight)
+            webView.layout(0, 0, a4WidthPx, webView.measuredHeight)
 
             try {
                 // Загружаем HTML
@@ -81,23 +85,71 @@ object PdfExporter {
                 awaitWebViewLoaded(webView, baseUrl, html)
                 
                 // Даем время WebView для полного рендеринга контента
-                // Проверяем, что контент действительно загружен
+                // Проверяем, что контент действительно загружен и стабилизировался
                 var attempts = 0
-                while (attempts < 10 && webView.contentHeight == 0) {
-                    delay(200)
+                var lastContentHeight = 0
+                var stableCount = 0
+                
+                while (attempts < 30) {
+                    delay(300)
                     attempts++
-                    Log.d("PDF", "Waiting for contentHeight, attempt $attempts, contentHeight: ${webView.contentHeight}")
+                    val currentHeight = webView.contentHeight
+                    Log.d("PDF", "Waiting for contentHeight, attempt $attempts, contentHeight: $currentHeight")
+                    
+                    if (currentHeight > 0) {
+                        if (currentHeight == lastContentHeight) {
+                            stableCount++
+                            if (stableCount >= 3) {
+                                Log.d("PDF", "Content height stabilized at $currentHeight")
+                                break
+                            }
+                        } else {
+                            stableCount = 0
+                        }
+                        lastContentHeight = currentHeight
+                    }
                 }
                 
                 // Дополнительная задержка для завершения рендеринга
-                delay(1500)
+                delay(2000)
                 
-                // Проверяем, что контент действительно есть
+                // Пересчитываем layout после загрузки контента
+                webView.post {
+                    webView.requestLayout()
+                }
+                delay(1000)
+                
+                // Принудительно пересчитываем размеры WebView на основе contentHeight
                 val finalContentHeight = webView.contentHeight
-                Log.d("PDF", "Final contentHeight: $finalContentHeight, WebView width: ${webView.width}, height: ${webView.height}")
+                val density = context.resources.displayMetrics.density
+                val contentHeightPx = (finalContentHeight * density).toInt()
+                
+                Log.d("PDF", "Final contentHeight (CSS): $finalContentHeight, contentHeightPx: $contentHeightPx")
+                Log.d("PDF", "WebView width: ${webView.width}, height: ${webView.height}, measuredHeight: ${webView.measuredHeight}")
                 
                 if (finalContentHeight == 0) {
                     Log.w("PDF", "Warning: WebView contentHeight is 0 after loading")
+                } else {
+                    // НЕ устанавливаем огромную высоту WebView - это вызывает OOM!
+                    // WebViewPdfExporter использует contentHeight для расчета страниц и рендерит их по частям через Canvas
+                    // Достаточно убедиться, что WebView имеет правильную ширину и contentHeight вычислен
+                    // WebView может иметь небольшую физическую высоту, но contentHeight будет правильным
+                    Log.d("PDF", "ContentHeight ready: $finalContentHeight (CSS), $contentHeightPx (device px)")
+                    Log.d("PDF", "WebView dimensions: width=${webView.width}, height=${webView.height}, contentHeight=${webView.contentHeight}")
+                    
+                    // Убеждаемся, что WebView имеет правильную ширину для рендеринга
+                    if (webView.width != a4WidthPx) {
+                        val webViewParams = webView.layoutParams as? FrameLayout.LayoutParams
+                            ?: FrameLayout.LayoutParams(a4WidthPx, a4HeightPx * 3)
+                        webViewParams.width = a4WidthPx
+                        webView.layoutParams = webViewParams
+                        webView.measure(
+                            android.view.View.MeasureSpec.makeMeasureSpec(a4WidthPx, android.view.View.MeasureSpec.EXACTLY),
+                            android.view.View.MeasureSpec.makeMeasureSpec(a4HeightPx * 3, android.view.View.MeasureSpec.AT_MOST)
+                        )
+                        webView.layout(0, 0, a4WidthPx, webView.measuredHeight)
+                        delay(500)
+                    }
                 }
 
                 val attrs = PrintAttributes.Builder()
@@ -106,29 +158,54 @@ object PdfExporter {
                     .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                     .build()
 
-                Log.d("PDF", "Starting PDF export")
+                Log.d("PDF", "Starting PDF export, contentHeight: ${webView.contentHeight}, width: ${webView.width}")
+                
+                // Убеждаемся, что мы на главном потоке
+                if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+                    throw IllegalStateException("PDF export must be called on main thread")
+                }
+                
                 // Call exporter and suspend until callback с таймаутом
-                withTimeout(20000) { // Таймаут 20 секунд для экспорта
+                withTimeout(60000) { // Увеличен таймаут до 60 секунд для экспорта
                     suspendCancellableCoroutine<Unit> { cont ->
-                        WebViewPdfExporter.export(
-                            webView,
-                            attrs,
-                            outFile,
-                            object : WebViewPdfExporter.Callback {
-                                override fun onSuccess() {
-                                    Log.d("PDF", "PDF export successful")
-                                    if (cont.isActive) cont.resume(Unit)
-                                }
+                        Log.d("PDF", "Calling WebViewPdfExporter.export()")
+                        
+                        try {
+                            WebViewPdfExporter.export(
+                                webView,
+                                attrs,
+                                outFile,
+                                object : WebViewPdfExporter.Callback {
+                                    override fun onSuccess() {
+                                        Log.d("PDF", "PDF export successful, file size: ${outFile.length()} bytes")
+                                        if (cont.isActive) {
+                                            cont.resume(Unit)
+                                        } else {
+                                            Log.w("PDF", "Coroutine is not active, cannot resume")
+                                        }
+                                    }
 
-                                override fun onError(t: Throwable) {
-                                    Log.e("PDF", "PDF export error", t)
-                                    if (cont.isActive) cont.resumeWithException(t)
+                                    override fun onError(t: Throwable) {
+                                        Log.e("PDF", "PDF export error", t)
+                                        if (cont.isActive) {
+                                            cont.resumeWithException(t)
+                                        } else {
+                                            Log.w("PDF", "Coroutine is not active, cannot resume with exception")
+                                        }
+                                    }
                                 }
+                            )
+                            Log.d("PDF", "WebViewPdfExporter.export() called, waiting for callback")
+                        } catch (e: Exception) {
+                            Log.e("PDF", "Exception calling WebViewPdfExporter.export()", e)
+                            if (cont.isActive) {
+                                cont.resumeWithException(e)
                             }
-                        )
+                        }
 
                         // Optional: if coroutine cancelled, there's no cancel in exporter — destroy webview anyway.
                         cont.invokeOnCancellation {
+                            Log.w("PDF", "PDF export coroutine cancelled")
                             try { webView.stopLoading() } catch (_: Exception) {}
                         }
                     }
