@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>Акт ТО № {{doc.number}} от {{doc.date_rus}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root {
+          --brand: #c0182c;        /* акцент как у Wassertech */
+          --ink: #1f2328;
+          --muted: #6b7280;
+          --line: #e5e7eb;
+        }
+        @page { size: A4; margin: 18mm 16mm 16mm; }
+        * { box-sizing: border-box; }
+        html, body { margin:0; padding:0; font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif; color: var(--ink); }
+        body { font-size: 12.5pt; line-height: 1.36; }
+
+        /* Шапка */
+        .header { display: grid; grid-template-columns: 80px 1fr; gap: 16px; align-items: center; margin-bottom: 10mm; }
+        .logo { width: 80px; height: 80px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+        .requisites { font-size: 11.5pt; }
+        .requisites b { font-weight: 600; }
+        .requisites .muted { color: var(--muted); }
+        .requisites .contacts { margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+        /* Заголовок документа */
+        .doc-title { text-align: center; margin: 0 0 8mm; }
+        .doc-title h1 {
+          font-size: 18.5pt; margin: 0 0 4mm; font-weight: 700;
+        }
+        .doc-title .subtitle { color: var(--muted); font-size: 12pt; }
+
+        /* Инфоблоки */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-bottom: 8mm; }
+        .grid .item { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+        .item .label { font-size: 10.5pt; color: var(--muted); margin-bottom: 2px; }
+        .item .value { font-size: 12.5pt; }
+
+        /* Разделы */
+        .section { margin: 0 0 8mm; }
+        .section h2 {
+          font-size: 13.5pt; margin: 0 0 6px;
+          border-left: 4px solid var(--brand); padding-left: 10px; line-height: 1.2;
+        }
+        .section p { margin: 6px 0; }
+        .list { margin: 4px 0 0 0; padding-left: 18px; }
+        .list li { margin: 2px 0; }
+
+        /* Компоненты с полями */
+        .components-grid {
+          display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6mm; margin-top: 6px;
+          align-items: start; /* Выравнивание по верху */
+        }
+        .component-card {
+          margin-bottom: 0; border: 1px solid var(--line); border-radius: 8px;
+          break-inside: avoid; page-break-inside: avoid;
+          min-height: auto; /* Автоматическая высота */
+        }
+        .component-header {
+          background: #f9fafb; padding: 10px 14px; border-bottom: 1px solid var(--line);
+        }
+        .component-header h3 {
+          font-size: 13pt; margin: 0; font-weight: 600;
+        }
+        .component-fields {
+          padding: 8px 12px;
+        }
+        .field-row {
+          display: grid; grid-template-columns: 2fr 1fr; gap: 8px; padding: 3px 0;
+          border-bottom: 1px solid #f3f4f6;
+        }
+        .field-row:last-child { border-bottom: none; }
+        .field-label {
+          font-size: 9pt; color: var(--muted);
+        }
+        .field-value {
+          font-size: 9.5pt; font-weight: 500; text-align: right;
+          display: flex; align-items: center; justify-content: flex-end; gap: 4px;
+        }
+        .field-value .unit {
+          font-size: 8.5pt; color: var(--muted); font-weight: normal; margin-left: 4px;
+        }
+        /* Стили для чекбоксов */
+        .field-value.checkbox-yes {
+          color: #dc2626; font-weight: 600;
+        }
+        .field-value.checkbox-yes::before {
+          content: "✕"; color: #dc2626; font-size: 11pt; margin-right: 2px;
+        }
+        .field-value.checkbox-no {
+          color: #16a34a; font-weight: 600;
+        }
+        .field-value.checkbox-no::before {
+          content: "✓"; color: #16a34a; font-size: 11pt; margin-right: 2px;
+        }
+
+        /* Таблица анализов */
+        table {
+          width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12pt;
+        }
+        th, td {
+          border: 1px solid var(--line); padding: 8px 10px; vertical-align: top;
+        }
+        th { background: #fafafa; text-align: left; font-weight: 600; }
+
+        /* Подписи */
+        .sign-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14mm; align-items: end; }
+        .sign { border-top: 1px solid var(--ink); padding-top: 6px; min-height: 28mm; }
+        .sign .who { font-size: 10.5pt; color: var(--muted); }
+        .sign .name { margin-top: 6px; font-weight: 600; }
+
+        .stamp {
+          position: absolute; right: 16mm; bottom: 26mm;
+          width: 42mm; height: 42mm; border: 2px dashed #cfd4da; border-radius: 50%;
+          display: grid; place-items: center; color: #9aa3ad; font-size: 10pt;
+        }
+        .footer-note { margin-top: 8mm; font-size: 10.5pt; color: var(--muted); }
+    </style>
+</head>
+<body>
+
+<!-- ШАПКА -->
+<header class="header">
+    <img class="logo" src="{{company.logo_data_uri}}" alt="Логотип" />
+    <div class="requisites">
+        <div><b>{{company.legal_name}}</b>, ИНН {{company.inn}}</div>
+        <div class="contacts">
+            <span>+7 {{company.phone1}}</span>
+            <span class="muted">{{company.email}}</span>
+            <span class="muted">{{company.website}}</span>
+        </div>
+    </div>
+</header>
+
+<!-- ЗАГОЛОВОК -->
+<section class="doc-title">
+    <h1>Акт технического обслуживания № {{doc.number}} от {{doc.date_rus}}</h1>
+    <div class="subtitle">по договору № {{contract.number}} от {{contract.date_rus}}</div>
+</section>
+
+<!-- ИНФОБЛОКИ -->
+<section class="grid">
+    <div class="item">
+        <div class="label">Заказчик</div>
+        <div class="value">{{client.name}}</div>
+    </div>
+    <div class="item">
+        <div class="label">Объект</div>
+        <div class="value">{{site.name}}</div>
+    </div>
+    <div class="item">
+        <div class="label">Установка</div>
+        <div class="value">{{installation.name}}</div>
+    </div>
+    <div class="item">
+        <div class="label">Дата обслуживания</div>
+        <div class="value">{{doc.date_rus}}</div>
+    </div>
+</section>
+
+<!-- ВЫПОЛНЕННЫЕ РАБОТЫ -->
+<section class="section">
+    <h2>Выполненные работы</h2>
+    <ul class="list">
+        {{#works}}
+        <li>{{.}}</li>
+        {{/works}}
+
+    </ul>
+</section>
+
+<!-- КОМПОНЕНТЫ С ПОЛЯМИ -->
+<section class="section">
+    <h2>Результаты проверки компонентов</h2>
+    <div class="components-grid">
+        {{#componentsWithFields}}
+        {{#component}}
+        <div class="component-card">
+            <div class="component-header">
+                <h3>{{component.name}}</h3>
+            </div>
+            <div class="component-fields">
+                {{#fields}}
+                <div class="field-row">
+                    <div class="field-label">{{field.label}}</div>
+                    <div class="field-value{{field.checkboxClass}}">
+                        {{field.value}}{{#field.unit}} <span class="unit">{{field.unit}}</span>{{/field.unit}}
+                    </div>
+                </div>
+                {{/fields}}
+            </div>
+        </div>
+        {{/component}}
+        {{/componentsWithFields}}
+    </div>
+</section>
+
+<!-- КОММЕНТАРИИ / ВЫЯВЛЕННЫЕ НЕДОСТАТКИ -->
+{{#comments}}
+<section class="section">
+    <h2>Дополнительные комментарии и замечания</h2>
+    <p>{{comments}}</p>
+</section>
+{{/comments}}
+
+<!-- РЕЗУЛЬТАТЫ АНАЛИЗОВ -->
+{{#water}}
+<section class="section">
+    <h2>Результаты анализов воды</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Показатель</th>
+            <th>Значение</th>
+            <th>Ед. изм.</th>
+            <th>Норма (при наличии)</th>
+        </tr>
+        </thead>
+        <tbody>
+
+        <tr>
+            <td>{{name}}</td>
+            <td>{{value}}</td>
+            <td>{{unit}}</td>
+            <td>{{norm}}</td>
+        </tr>
+
+        </tbody>
+    </table>
+</section>
+{{/water}}
+
+<!-- ИТОГОВАЯ ФОРМУЛИРОВКА (опционально) -->
+{{#conclusion}}
+<section class="section">
+    <h2>Заключение</h2>
+    <p>{{conclusion}}</p>
+</section>
+{{/conclusion}}
+
+<!-- ПОДПИСИ -->
+<section class="sign-row">
+    <div class="sign">
+        <div class="who">Исполнитель</div>
+        <div class="name">{{company.sign_name}} ______________________________ /{{company.sign_short}}/</div>
+    </div>
+</section>
+
+<div class="stamp">М.П.</div>
+
+<div class="footer-note">
+    Настоящий акт составлен в двух экземплярах, по одному для каждой из сторон.
+</div>
+
+</body>
+</html>
+
