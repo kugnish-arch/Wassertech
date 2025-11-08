@@ -669,32 +669,24 @@ private fun SiteRowWithDrag(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Ручка для перетаскивания (только для неархивных)
-        if (!isArchived) {
-            Icon(
-                imageVector = Icons.Filled.Menu,
-                contentDescription = "Перетащить",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier
-                    .size(24.dp)
-                    .pointerInput(site.id) {
+            .then(
+                if (!isArchived) {
+                    Modifier.pointerInput(site.id, index) {
                         detectDragGestures(
                             onDragStart = { 
                                 lastMoveThreshold = 0f
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                val threshold = 40f
+                                if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                     onMoveUp()
-                                    lastMoveThreshold = -60f
-                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                    lastMoveThreshold = -threshold
+                                } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                     onMoveDown()
-                                    lastMoveThreshold = 60f
+                                    lastMoveThreshold = threshold
                                 }
-                                if (dragAmount.y in -60f..60f) {
+                                if (dragAmount.y in -threshold..threshold) {
                                     lastMoveThreshold = dragAmount.y
                                 }
                             },
@@ -703,6 +695,20 @@ private fun SiteRowWithDrag(
                             }
                         )
                     }
+                } else {
+                    Modifier
+                }
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Ручка для перетаскивания (только для неархивных) - визуальная подсказка
+        if (!isArchived) {
+            Icon(
+                imageVector = Icons.Filled.Menu,
+                contentDescription = "Перетащить",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(24.dp)
             )
             Spacer(Modifier.width(8.dp))
         }
@@ -765,32 +771,24 @@ private fun InstallationRowWithDrag(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Ручка для перетаскивания (только для неархивных)
-            if (!isArchived) {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = "Перетащить",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .pointerInput(installation.id, index) {
+                .then(
+                    if (!isArchived) {
+                        Modifier.pointerInput(installation.id, index) {
                             detectDragGestures(
                                 onDragStart = { 
                                     lastMoveThreshold = 0f
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                    val threshold = 40f
+                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                         onMoveUp()
-                                        lastMoveThreshold = -60f
-                                    } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                        lastMoveThreshold = -threshold
+                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                         onMoveDown()
-                                        lastMoveThreshold = 60f
+                                        lastMoveThreshold = threshold
                                     }
-                                    if (dragAmount.y in -60f..60f) {
+                                    if (dragAmount.y in -threshold..threshold) {
                                         lastMoveThreshold = dragAmount.y
                                     }
                                 },
@@ -799,6 +797,20 @@ private fun InstallationRowWithDrag(
                                 }
                             )
                         }
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Ручка для перетаскивания (только для неархивных) - визуальная подсказка
+            if (!isArchived) {
+                Icon(
+                    imageVector = Icons.Filled.Menu,
+                    contentDescription = "Перетащить",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
             }

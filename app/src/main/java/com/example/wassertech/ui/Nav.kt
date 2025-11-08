@@ -27,6 +27,7 @@ import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
 import com.example.wassertech.ui.maintenance.MaintenanceScreen
 import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
 import com.example.wassertech.ui.reports.ReportsScreen
+import com.example.wassertech.ui.about.AboutScreen
 import com.example.wassertech.ui.settings.SettingsScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
@@ -97,6 +98,15 @@ fun AppTopBar(navController: NavHostController) {
                     onClick = {
                         menuOpen = false
                         navController.navigate("settings") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("О программе") },
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate("about") {
                             launchSingleTop = true
                         }
                     }
@@ -322,6 +332,14 @@ private fun AppScaffold(navController: NavHostController) {
                 Column {
                     SectionHeader("Настройки")
                     SettingsScreen()
+                }
+            }
+            
+            // Экран "О программе"
+            composable("about") {
+                Column {
+                    SectionHeader("О программе")
+                    AboutScreen()
                 }
             }
         }

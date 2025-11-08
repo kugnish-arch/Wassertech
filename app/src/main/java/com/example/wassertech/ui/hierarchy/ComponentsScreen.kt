@@ -326,7 +326,7 @@ fun ComponentsScreen(
                     vm.addComponentFromTemplate(
                         installationId = installationId,
                         name = compName,
-                        type = ComponentType.FILTER, // подставь нужный тип при необходимости
+                        type = ComponentType.COMMON, // дефолтный тип
                         templateId = tmpl?.id
                     )
                     showAdd = false

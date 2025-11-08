@@ -4,8 +4,8 @@ import com.example.wassertech.data.types.ComponentType
 
 object TemplateTypeMapper {
     /**
-     * Map template meta (category/name) to existing legacy enum ComponentType.
-     * Keep the mapping conservative: only SOFTENER, RO and FILTER (default).
+     * Map template meta (category/name) to ComponentType.
+     * Returns HEAD if category contains "head", otherwise COMMON.
      */
     fun map(category: String?, name: String): ComponentType {
         val cat = (category ?: "").lowercase()
@@ -13,12 +13,10 @@ object TemplateTypeMapper {
         fun has(s: String) = cat.contains(s) || nm.contains(s)
 
         return when {
-            // умягчение
-            has("soft") || has("softener") || has("умягч") -> ComponentType.SOFTENER
-            // обратный осмос
-            has("ro") || has("osmos") || has("осмос") || has("обратн") -> ComponentType.RO
-            // по умолчанию считаем фильтром
-            else -> ComponentType.FILTER
+            // Заглавный шаблон
+            has("head") -> ComponentType.HEAD
+            // По умолчанию обычный шаблон
+            else -> ComponentType.COMMON
         }
     }
 }

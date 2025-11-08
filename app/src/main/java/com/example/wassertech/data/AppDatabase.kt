@@ -14,10 +14,11 @@ import com.example.wassertech.data.migrations.MIGRATION_1_2
 import com.example.wassertech.data.migrations.MIGRATION_2_3
 import com.example.wassertech.data.migrations.MIGRATION_3_4
 import com.example.wassertech.data.migrations.MIGRATION_4_5
-import com.example.wassertech.data.migrations.MIGRATION_5_6   // ← ДОБАВЛЕНО
+import com.example.wassertech.data.migrations.MIGRATION_5_6
+import com.example.wassertech.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
 
 @Database(
-    version = 6, // ← Обновлено: добавлены поля архивирования в sites и installations
+    version = 7, // ← Обновлено: обновление ComponentType на COMMON/HEAD
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -61,7 +62,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4,
                         MIGRATION_4_5,
-                        MIGRATION_5_6    // ← ДОБАВЛЕНО
+                        MIGRATION_5_6,
+                        MIGRATION_6_7    // ← Обновление ComponentType
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

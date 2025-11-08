@@ -1,7 +1,61 @@
+import java.util.Properties
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+}
+
+// Базовая версия приложения (можно менять вручную)
+val baseVersionName = "0.7.1"
+
+// Файл для хранения build number
+val versionPropertiesFile = file("version.properties")
+
+// Читаем и обновляем build number
+val versionProperties = Properties()
+if (versionPropertiesFile.exists()) {
+    FileInputStream(versionPropertiesFile).use {
+        versionProperties.load(it)
+    }
+}
+
+// Получаем текущий build number или используем 1 по умолчанию
+val currentBuildNumber = (versionProperties.getProperty("buildNumber") ?: "1").toInt()
+
+// Определяем, используется ли автоматическое увеличение или timestamp
+val useTimestamp = false // Установите true, чтобы использовать timestamp вместо автоинкремента
+
+// Вычисляем build number в зависимости от выбранного варианта
+val buildVersionCode: Int = if (useTimestamp) {
+    // Вариант 2: Использовать короткий timestamp (MMddHH - месяц, день, час, всего 6 цифр)
+    // Это означает, что версия будет меняться каждый час
+    SimpleDateFormat("MMddHH", Locale.US).format(Date()).toInt()
+} else {
+    // Вариант 1: Автоматическое увеличение build number (увеличивается при каждой сборке)
+    // Увеличиваем build number и сохраняем в файл
+    val newBuildNumber = currentBuildNumber + 1
+    versionProperties.setProperty("buildNumber", newBuildNumber.toString())
+    FileOutputStream(versionPropertiesFile).use {
+        versionProperties.store(it, 
+            "Автоматически генерируемый файл с номером сборки\nНе редактируйте вручную - файл обновляется автоматически при каждой сборке\n")
+    }
+    
+    println("Build number: $currentBuildNumber -> $newBuildNumber")
+    
+    newBuildNumber
+}
+
+// Формируем версию
+val buildVersionName = "$baseVersionName.$buildVersionCode"
+
+if (!useTimestamp) {
+    println("Version: $buildVersionName")
 }
 
 android {
@@ -12,8 +66,10 @@ android {
         applicationId = "com.example.wassertech"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.5.3"
+        // versionCode автоматически увеличивается при каждой сборке
+        versionCode = buildVersionCode
+        // versionName = базовая версия + build number
+        versionName = buildVersionName
         vectorDrawables.useSupportLibrary = true
     }
 

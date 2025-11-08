@@ -1,13 +1,14 @@
 package com.example.wassertech.ui.templates
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Unarchive
@@ -15,12 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
+import com.example.wassertech.sync.SafeDeletionHelper
 import com.example.wassertech.ui.common.EditDoneBottomBar
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -46,6 +49,9 @@ fun TemplatesScreen(
     // Режим редактирования + локальный порядок для live-перестановки
     var isEditing by remember { mutableStateOf(false) }
     var localOrder by remember(templates) { mutableStateOf(templates.map { it.id }) }
+
+    // Диалог подтверждения удаления
+    var deleteDialogState by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
 
     // Базовый порядок — как в БД (sortOrder ↑, затем title для стабильности)
     val dbOrdered = remember(templates) {
@@ -87,8 +93,12 @@ fun TemplatesScreen(
                 isEditing = isEditing,
                 onEdit = {
                     isEditing = true
-                    // зафиксировать актуальный порядок из БД в локальный
-                    localOrder = dbOrdered.map { it.id }
+                    // зафиксировать актуальный порядок из БД в локальный (включая архивные)
+                    val allTemplatesOrdered = templates.sortedWith(
+                        compareBy<ChecklistTemplateEntity> { it.sortOrder ?: Int.MAX_VALUE }
+                            .thenBy { it.title.lowercase() }
+                    )
+                    localOrder = allTemplatesOrdered.map { it.id }
                 },
                 onDone = {
                     // сохранить локальный порядок в БД
@@ -115,83 +125,50 @@ fun TemplatesScreen(
             )
         ) {
             items(visibleTemplates, key = { it.id }) { t ->
-                ElevatedCard(
-                    modifier = Modifier.padding(bottom = 4.dp),
-                    colors = CardDefaults.elevatedCardColors()
-                ) {
-                    ListItem(
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Outlined.Description,
-                                contentDescription = null
-                            )
-                        },
-                        headlineContent = { Text(t.title) },
-                        trailingContent = {
-                            if (isEditing) {
-                                Row {
-                                    // Вверх
-                                    IconButton(
-                                        onClick = {
-                                            val i = localOrder.indexOf(t.id)
-                                            if (i > 0) {
-                                                val m = localOrder.toMutableList()
-                                                m[i - 1] = m[i].also { m[i] = m[i - 1] }
-                                                localOrder = m
-                                            }
-                                        }
-                                    ) { Icon(Icons.Filled.ArrowUpward, contentDescription = "Вверх") }
-
-                                    // Вниз
-                                    IconButton(
-                                        onClick = {
-                                            val i = localOrder.indexOf(t.id)
-                                            if (i != -1 && i < localOrder.lastIndex) {
-                                                val m = localOrder.toMutableList()
-                                                m[i + 1] = m[i].also { m[i] = m[i + 1] }
-                                                localOrder = m
-                                            }
-                                        }
-                                    ) { Icon(Icons.Filled.ArrowDownward, contentDescription = "Вниз") }
-
-                                    // Архив / Разархивировать
-                                    if (t.isArchived == true) {
-                                        IconButton(
-                                            onClick = {
-                                                scope.launch {
-                                                    val now = System.currentTimeMillis()
-                                                    dao.setTemplateArchived(t.id, false, now, now)
-                                                }
-                                            }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Unarchive,
-                                                contentDescription = "Восстановить",
-                                                tint = Color(0xFF2E7D32) // зелёный
-                                            )
-                                        }
-                                    } else {
-                                        IconButton(
-                                            onClick = {
-                                                scope.launch {
-                                                    val now = System.currentTimeMillis()
-                                                    dao.setTemplateArchived(t.id, true, now, now)
-                                                }
-                                            }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Archive,
-                                                contentDescription = "Архивировать",
-                                                tint = MaterialTheme.colorScheme.error // красный
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier.clickable { onOpenTemplate(t.id) }
-                    )
-                }
+                // Используем индекс из visibleTemplates, если шаблон не найден в localOrder
+                val orderIndex = localOrder.indexOf(t.id)
+                val index = if (orderIndex >= 0) orderIndex else visibleTemplates.indexOf(t)
+                TemplateRowWithDrag(
+                    template = t,
+                    index = index,
+                    isEditing = isEditing,
+                    onMoveUp = {
+                        val i = localOrder.indexOf(t.id)
+                        if (i > 0) {
+                            val m = localOrder.toMutableList()
+                            m[i - 1] = m[i].also { m[i] = m[i - 1] }
+                            localOrder = m
+                        }
+                    },
+                    onMoveDown = {
+                        val i = localOrder.indexOf(t.id)
+                        if (i != -1 && i < localOrder.lastIndex) {
+                            val m = localOrder.toMutableList()
+                            m[i + 1] = m[i].also { m[i] = m[i + 1] }
+                            localOrder = m
+                        }
+                    },
+                    onArchive = {
+                        scope.launch {
+                            val now = System.currentTimeMillis()
+                            dao.setTemplateArchived(t.id, true, now, now)
+                        }
+                    },
+                    onRestore = {
+                        scope.launch {
+                            val now = System.currentTimeMillis()
+                            dao.setTemplateArchived(t.id, false, now, now)
+                        }
+                    },
+                    onDelete = {
+                        deleteDialogState = t
+                    },
+                    onClick = {
+                        if (!isEditing) {
+                            onOpenTemplate(t.id)
+                        }
+                    }
+                )
             }
         }
     }
@@ -223,7 +200,7 @@ fun TemplatesScreen(
                                 val entity = ChecklistTemplateEntity(
                                     id = id,
                                     title = title,
-                                    componentType = ComponentType.FILTER, // дефолт
+                                    componentType = ComponentType.COMMON, // дефолт
                                     sortOrder = nextOrder,
                                     isArchived = false,
                                     archivedAtEpoch = null,
@@ -241,6 +218,156 @@ fun TemplatesScreen(
             dismissButton = {
                 TextButton(onClick = { showCreate = false }) { Text("Отмена") }
             }
+        )
+    }
+
+    // Диалог подтверждения удаления
+    deleteDialogState?.let { template ->
+        AlertDialog(
+            onDismissRequest = { deleteDialogState = null },
+            title = { Text("Подтверждение удаления") },
+            text = {
+                Text(
+                    "Вы уверены, что хотите удалить шаблон \"${template.title}\"?\n\nЭто действие нельзя отменить."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            SafeDeletionHelper.deleteTemplate(db, template.id)
+                            deleteDialogState = null
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteDialogState = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+}
+
+// Компонент для строки шаблона с drag-and-drop
+@Composable
+private fun TemplateRowWithDrag(
+    template: ChecklistTemplateEntity,
+    index: Int,
+    isEditing: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
+    onClick: () -> Unit
+) {
+    var lastMoveThreshold by remember { mutableStateOf(0f) }
+    val isArchived = template.isArchived == true
+
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+            .then(
+                if (isEditing && !isArchived) {
+                    Modifier.pointerInput(template.id, index) {
+                        detectDragGestures(
+                            onDragStart = {
+                                lastMoveThreshold = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                val threshold = 40f
+                                if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
+                                    onMoveUp()
+                                    lastMoveThreshold = -threshold
+                                } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
+                                    onMoveDown()
+                                    lastMoveThreshold = threshold
+                                }
+                                if (dragAmount.y in -threshold..threshold) {
+                                    lastMoveThreshold = dragAmount.y
+                                }
+                            },
+                            onDragEnd = {
+                                lastMoveThreshold = 0f
+                            }
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+            ),
+        colors = CardDefaults.elevatedCardColors()
+    ) {
+        ListItem(
+            leadingContent = {
+                if (isEditing && !isArchived) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = "Перетащить",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = null
+                    )
+                }
+            },
+            headlineContent = {
+                Text(
+                    template.title,
+                    color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                )
+            },
+            trailingContent = {
+                if (isEditing) {
+                    Row {
+                        // Архив / Разархивировать
+                        if (isArchived) {
+                            IconButton(
+                                onClick = onRestore
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Unarchive,
+                                    contentDescription = "Восстановить",
+                                    tint = Color(0xFF2E7D32) // зелёный
+                                )
+                            }
+                            // Кнопка удаления для заархивированных
+                            IconButton(
+                                onClick = onDelete
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = "Удалить",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = onArchive
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Archive,
+                                    contentDescription = "Архивировать",
+                                    tint = MaterialTheme.colorScheme.error // красный
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.clickable(enabled = !isEditing) { onClick() }
         )
     }
 }

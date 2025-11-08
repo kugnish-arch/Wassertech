@@ -19,43 +19,22 @@ object TemplateSeeder {
                 val template = ChecklistTemplateEntity(
                     id = UUID.randomUUID().toString(),
                     title = when (type) {
-                        ComponentType.DOSING -> "Дозирование — базовый"
-                        ComponentType.AERATION -> "Аэрация — базовый"
-                        ComponentType.COMPRESSOR -> "Компрессор — базовый"
-                        ComponentType.FILTER -> "Фильтр — базовый"
-                        ComponentType.SOFTENER -> "Умягчитель — базовый"
-                        ComponentType.RO -> "Обратный осмос — базовый"
+                        ComponentType.COMMON -> "Компонент — базовый"
+                        ComponentType.HEAD -> "Заглавный шаблон — базовый"
                     },
                     componentType = type
                 )
                 templatesDao.upsertTemplate(template)
 
                 val fields: List<ChecklistFieldEntity> = when (type) {
-                    ComponentType.DOSING -> listOf(
-                        field(template.id, "concentration", "Концентрация", "TEXT"),
-                        field(template.id, "flow", "Расход", "NUMBER"),
-                        field(template.id, "level", "Уровень", "NUMBER"),
-                        field(template.id, "injector", "Инжектор", "CHECKBOX")
-                    )
-                    ComponentType.AERATION, ComponentType.COMPRESSOR -> listOf(
-                        field(template.id, "pressure", "Давление", "NUMBER"),
-                        field(template.id, "air_flow", "Расход воздуха", "NUMBER"),
-                        field(template.id, "temperature", "Температура", "NUMBER")
-                    )
-                    ComponentType.FILTER -> listOf(
+                    ComponentType.COMMON -> listOf(
                         field(template.id, "pressure_in", "Давление до", "NUMBER"),
                         field(template.id, "pressure_out", "Давление после", "NUMBER"),
-                        field(template.id, "turbidity", "Мутность", "NUMBER")
+                        field(template.id, "status", "Состояние", "TEXT")
                     )
-                    ComponentType.SOFTENER -> listOf(
-                        field(template.id, "brine_level", "Уровень рассола", "NUMBER"),
-                        field(template.id, "hardness_out", "Жёсткость на выходе", "NUMBER"),
-                        field(template.id, "valve_leak", "Течи клапана", "CHECKBOX")
-                    )
-                    ComponentType.RO -> listOf(
-                        field(template.id, "pressure_in", "Давление до", "NUMBER"),
-                        field(template.id, "pressure_out", "Давление после", "NUMBER"),
-                        field(template.id, "permeate", "Производительность", "NUMBER")
+                    ComponentType.HEAD -> listOf(
+                        field(template.id, "description", "Описание", "TEXT"),
+                        field(template.id, "notes", "Заметки", "TEXT")
                     )
                 }
                 fields.forEach { templatesDao.upsertField(it) }

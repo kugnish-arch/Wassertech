@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.data.AppDatabase
+import com.example.wassertech.data.types.ComponentType
 import com.example.wassertech.data.types.FieldType
 import com.example.wassertech.util.Translit
 import com.example.wassertech.viewmodel.TemplatesViewModel
@@ -43,6 +44,7 @@ fun TemplateEditorScreen(
     val db = remember { AppDatabase.getInstance(ctx) }
 
     var templateTitle by remember { mutableStateOf<String>("Шаблон") }
+    var isHeadTemplate by remember { mutableStateOf(false) }
     
     // Локальный порядок полей для drag-and-drop
     var localFieldOrder by remember(fields.size) { 
@@ -61,11 +63,14 @@ fun TemplateEditorScreen(
 
     LaunchedEffect(templateId) {
         vm.load(templateId)
-        // заголовок шаблона
+        // заголовок шаблона и componentType
         withContext(Dispatchers.IO) {
             try {
-                val title = db.templatesDao().getTemplateTitleById(templateId)
-                if (title != null) templateTitle = title
+                val template = db.templatesDao().getTemplateById(templateId)
+                if (template != null) {
+                    templateTitle = template.title
+                    isHeadTemplate = template.componentType == ComponentType.HEAD
+                }
             } catch (_: Throwable) { }
         }
     }
@@ -87,6 +92,18 @@ fun TemplateEditorScreen(
                         onClick = {
                             scope.launch {
                                 vm.saveAll(localFieldOrder)
+                                // Сохраняем componentType шаблона
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        val template = db.templatesDao().getTemplateById(templateId)
+                                        if (template != null) {
+                                            val updatedTemplate = template.copy(
+                                                componentType = if (isHeadTemplate) ComponentType.HEAD else ComponentType.COMMON
+                                            )
+                                            db.templatesDao().upsertTemplate(updatedTemplate)
+                                        }
+                                    } catch (_: Throwable) { }
+                                }
                                 Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
                                 onSaved()
                             }
@@ -113,6 +130,28 @@ fun TemplateEditorScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Переключатель "Заглавный шаблон" перед всеми полями
+            item {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Заглавный шаблон",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Switch(
+                            checked = isHeadTemplate,
+                            onCheckedChange = { isHeadTemplate = it }
+                        )
+                    }
+                }
+            }
+            
             items(localFieldOrder, key = { it }) { fieldId ->
                 val f = fields.find { it.id == fieldId } ?: return@items
                 val index = localFieldOrder.indexOf(fieldId)

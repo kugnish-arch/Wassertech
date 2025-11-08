@@ -135,12 +135,23 @@ object HtmlTemplateEngine {
                     val componentTemplate = componentBlockMatch.groupValues[1]
                     val fieldBlockMatch = fieldBlockRegex.find(componentTemplate)
                     
-                    // Генерируем HTML для всех компонентов
-                    val componentsHtml = dto.componentsWithFields.mapIndexed { index, component ->
-                        Log.d("HtmlTemplate", "Processing component $index: ${component.componentName} with ${component.fields.size} fields")
+                    // Разделяем компоненты на COMMON и HEAD
+                    val commonComponents = dto.componentsWithFields.filter { it.componentType != "HEAD" }
+                    val headComponents = dto.componentsWithFields.filter { it.componentType == "HEAD" }
+                    
+                    // Функция для генерации HTML компонента
+                    fun generateComponentHtml(component: com.example.wassertech.report.model.ComponentWithFieldsDTO, isHead: Boolean): String {
                         var componentHtml = componentTemplate
                             .replace("{{component.name}}", escapeHtml(component.componentName))
                             .replace("{{component.type}}", escapeHtml(component.componentType ?: ""))
+                        
+                        // Добавляем класс для HEAD компонентов
+                        if (isHead) {
+                            componentHtml = componentHtml.replace(
+                                "class=\"component-card\"",
+                                "class=\"component-card component-card-head\""
+                            )
+                        }
                         
                         // Обрабатываем поля компонента
                         if (fieldBlockMatch != null && component.fields.isNotEmpty()) {
@@ -173,8 +184,33 @@ object HtmlTemplateEngine {
                             componentHtml = componentHtml.replace(fieldBlockRegex, "")
                         }
                         
-                        componentHtml
-                    }.joinToString("\n        ")
+                        return componentHtml
+                    }
+                    
+                    // Генерируем HTML для COMMON компонентов (в 3 колонки)
+                    val commonHtml = if (commonComponents.isNotEmpty()) {
+                        commonComponents.joinToString("\n        ") { component ->
+                            Log.d("HtmlTemplate", "Processing COMMON component: ${component.componentName} with ${component.fields.size} fields")
+                            generateComponentHtml(component, false)
+                        }
+                    } else ""
+                    
+                    // Генерируем HTML для HEAD компонентов (на всю строку)
+                    val headHtml = if (headComponents.isNotEmpty()) {
+                        headComponents.joinToString("\n        ") { component ->
+                            Log.d("HtmlTemplate", "Processing HEAD component: ${component.componentName} with ${component.fields.size} fields")
+                            generateComponentHtml(component, true)
+                        }
+                    } else ""
+                    
+                    // Объединяем HEAD и COMMON компоненты (HEAD сначала)
+                    val componentsHtml = if (headHtml.isNotEmpty() && commonHtml.isNotEmpty()) {
+                        headHtml + "\n        " + commonHtml
+                    } else if (headHtml.isNotEmpty()) {
+                        headHtml
+                    } else {
+                        commonHtml
+                    }
                     
                     Log.d("HtmlTemplate", "Generated components HTML length: ${componentsHtml.length}")
                     

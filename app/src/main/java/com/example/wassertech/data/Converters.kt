@@ -7,8 +7,10 @@ import com.example.wassertech.data.types.Severity
 
 class Converters {
     @TypeConverter
-    fun toComponentType(value: String?): ComponentType? =
-        value?.let { runCatching { ComponentType.valueOf(it) }.getOrNull() }
+    fun toComponentType(value: String?): ComponentType {
+        if (value == null) return ComponentType.COMMON
+        return runCatching { ComponentType.valueOf(value) }.getOrDefault(ComponentType.COMMON)
+    }
 
     @TypeConverter
     fun fromComponentType(value: ComponentType?): String? = value?.name

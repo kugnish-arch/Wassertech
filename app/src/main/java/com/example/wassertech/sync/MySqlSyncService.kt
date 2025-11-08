@@ -1079,7 +1079,7 @@ object MySqlSyncService {
                 com.example.wassertech.data.types.ComponentType.valueOf(typeStr)
             } catch (e: Exception) {
                 // Если тип не найден, используем FILTER как дефолтный
-                com.example.wassertech.data.types.ComponentType.FILTER
+                com.example.wassertech.data.types.ComponentType.COMMON
             }
             
             components.add(
@@ -1154,7 +1154,7 @@ object MySqlSyncService {
                 com.example.wassertech.data.types.ComponentType.valueOf(typeStr)
             } catch (e: Exception) {
                 // Если тип не найден, используем FILTER как дефолтный
-                com.example.wassertech.data.types.ComponentType.FILTER
+                com.example.wassertech.data.types.ComponentType.COMMON
             }
             
             templates.add(

@@ -81,7 +81,18 @@ object ReportAssembler {
         for ((componentId, values) in valuesByComponent) {
             val component = db.hierarchyDao().getComponent(componentId)
             val componentName = component?.name ?: componentId
-            val componentType = component?.type?.name
+            
+            // Получаем componentType из шаблона (COMMON или HEAD)
+            var componentType: String? = "COMMON" // По умолчанию COMMON
+            component?.templateId?.let { templateId ->
+                try {
+                    val template = db.templatesDao().getTemplateById(templateId)
+                    componentType = template?.componentType?.name ?: "COMMON"
+                } catch (e: Exception) {
+                    // Если шаблон не найден, используем COMMON по умолчанию
+                    componentType = "COMMON"
+                }
+            }
             
             // Получаем метки полей из шаблона
             val fieldLabels: Map<String, String> = component?.templateId?.let { templateId ->
