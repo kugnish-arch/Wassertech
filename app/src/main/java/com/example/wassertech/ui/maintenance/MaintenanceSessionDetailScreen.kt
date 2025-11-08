@@ -170,12 +170,13 @@ fun MaintenanceSessionDetailScreen(
                                     ReportAssembler.assemble(context, sessionId)
                                 }
 
-                                // Путь для PDF
+                                // Путь для PDF (заменяем "/" на "_" в номере отчета для имени файла)
                                 val reportsDir = File(
                                     context.getExternalFilesDir(null),
                                     "Reports"
                                 ).apply { mkdirs() }
-                                val out = File(reportsDir, "Report_${dto.reportNumber}.pdf")
+                                val fileName = "Report_${dto.reportNumber.replace("/", "_")}.pdf"
+                                val out = File(reportsDir, fileName)
 
                                 // HTML шаблон
                                 val html = withContext(Dispatchers.IO) {
@@ -187,7 +188,7 @@ fun MaintenanceSessionDetailScreen(
                                 }
                                 
                                 // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
-                                PdfExporter.exportHtmlToPdf(context, html, out)
+                                PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)
 
                                 // Шарим созданный файл
                                 ShareUtils.sharePdf(context, out)

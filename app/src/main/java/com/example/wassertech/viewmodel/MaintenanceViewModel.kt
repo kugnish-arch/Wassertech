@@ -33,7 +33,8 @@ data class ComponentSectionUi(
     val componentId: String,
     val componentName: String,
     val fields: List<ChecklistUiField>,
-    val expanded: Boolean = true
+    val expanded: Boolean = false,  // По умолчанию свернуто
+    val isHeadComponent: Boolean = false  // Является ли компонент заглавным
 )
 
 // ---------- ViewModel ----------
@@ -103,11 +104,18 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     } ?: emptyList()
 
+                // Определяем, является ли компонент заглавным через шаблон
+                val isHead = comp.templateId?.let { tmplId ->
+                    val template = templatesDao.getTemplateById(tmplId)
+                    template?.componentType == com.example.wassertech.data.types.ComponentType.HEAD
+                } ?: false
+
                 ComponentSectionUi(
                     componentId = comp.id,
                     componentName = comp.name,
                     fields = fieldList,
-                    expanded = true
+                    expanded = false,  // По умолчанию свернуто
+                    isHeadComponent = isHead
                 )
             }
 
@@ -151,11 +159,18 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     } ?: emptyList()
 
+                // Определяем, является ли компонент заглавным через шаблон
+                val isHead = comp.templateId?.let { tmplId ->
+                    val template = templatesDao.getTemplateById(tmplId)
+                    template?.componentType == com.example.wassertech.data.types.ComponentType.HEAD
+                } ?: false
+
                 ComponentSectionUi(
                     componentId = comp.id,
                     componentName = comp.name,
                     fields = fieldList,
-                    expanded = true
+                    expanded = false,  // По умолчанию свернуто
+                    isHeadComponent = isHead
                 )
             }
 

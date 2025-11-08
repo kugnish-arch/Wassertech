@@ -51,8 +51,8 @@ val buildVersionCode: Int = if (useTimestamp) {
     newBuildNumber
 }
 
-// Формируем версию
-val buildVersionName = "$baseVersionName.$buildVersionCode"
+// Формируем версию (разделяем двоеточием)
+val buildVersionName = "$baseVersionName:$buildVersionCode"
 
 if (!useTimestamp) {
     println("Version: $buildVersionName")

@@ -22,8 +22,8 @@ object PdfExporter {
      * Note: webView will be created and destroyed inside this call. Call from a coroutine (Dispatcher.Main
      * if you want WebView on UI thread is recommended, but WebViewPdfExporter posts to main internally).
      */
-    suspend fun exportHtmlToPdf(context: Context, html: String, outFile: File) {
-        withTimeout(30000) { // Таймаут 30 секунд
+    suspend fun exportHtmlToPdf(context: Context, html: String, outFile: File, reportNumber: String? = null) {
+        withTimeout(40000) { // Таймаут 40 секунд
             // Получаем Activity для добавления WebView в иерархию View
             val activity = context as? Activity
             if (activity == null) {
@@ -175,6 +175,7 @@ object PdfExporter {
                                 webView,
                                 attrs,
                                 outFile,
+                                reportNumber,
                                 object : WebViewPdfExporter.Callback {
                                     override fun onSuccess() {
                                         Log.d("PDF", "PDF export successful, file size: ${outFile.length()} bytes")

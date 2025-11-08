@@ -24,11 +24,16 @@ object HtmlTemplateEngine {
             html = html.replace("{{company.sign_short}}", escapeHtml(company.sign_short))
         }
         
-        // Логотип как data URI
-        dto.logoAssetPath?.let { path ->
-            val logoDataUri = CompanyConfigLoader.logoToDataUri(context, path)
-            html = html.replace("{{company.logo_data_uri}}", logoDataUri)
-        }
+        // Логотип как data URI (используем logo-wassertech.png)
+        val logoDataUri = CompanyConfigLoader.logoToDataUri(context, "img/logo-wassertech.png")
+        html = html.replace("{{company.logo_data_uri}}", logoDataUri)
+        
+        // Подпись и печать как data URI
+        val signatureDataUri = CompanyConfigLoader.logoToDataUri(context, "img/signature.png")
+        html = html.replace("{{company.signature_data_uri}}", signatureDataUri)
+        
+        val stampDataUri = CompanyConfigLoader.logoToDataUri(context, "img/stamp.png")
+        html = html.replace("{{company.stamp_data_uri}}", stampDataUri)
         
         // Документ
         html = html.replace("{{doc.number}}", escapeHtml(dto.reportNumber))
@@ -116,7 +121,7 @@ object HtmlTemplateEngine {
             html = html.replace(Regex("\\{\\{#conclusion\\}\\}([\\s\\S]*?)\\{\\{/conclusion\\}\\}"), "")
         }
         
-        // Компоненты с полями
+        // Компоненты с полями - новая логика с разделами для HEAD компонентов
         // Ищем блок {{#componentsWithFields}}...{{/componentsWithFields}}
         val componentsBlockRegex = Regex("\\{\\{#componentsWithFields\\}\\}([\\s\\S]*?)\\{\\{/componentsWithFields\\}\\}")
         // Внутри ищем блок {{#component}}...{{/component}}
@@ -135,23 +140,28 @@ object HtmlTemplateEngine {
                     val componentTemplate = componentBlockMatch.groupValues[1]
                     val fieldBlockMatch = fieldBlockRegex.find(componentTemplate)
                     
-                    // Разделяем компоненты на COMMON и HEAD
-                    val commonComponents = dto.componentsWithFields.filter { it.componentType != "HEAD" }
-                    val headComponents = dto.componentsWithFields.filter { it.componentType == "HEAD" }
-                    
                     // Функция для генерации HTML компонента
-                    fun generateComponentHtml(component: com.example.wassertech.report.model.ComponentWithFieldsDTO, isHead: Boolean): String {
+                    fun generateComponentHtml(
+                        component: com.example.wassertech.report.model.ComponentWithFieldsDTO,
+                        isHead: Boolean,
+                        hideHeader: Boolean = false
+                    ): String {
                         var componentHtml = componentTemplate
                             .replace("{{component.name}}", escapeHtml(component.componentName))
                             .replace("{{component.type}}", escapeHtml(component.componentType ?: ""))
                         
-                        // Добавляем класс для HEAD компонентов
+                        // Добавляем классы
+                        var classAttr = "component-card"
                         if (isHead) {
-                            componentHtml = componentHtml.replace(
-                                "class=\"component-card\"",
-                                "class=\"component-card component-card-head\""
-                            )
+                            classAttr += " component-card-head"
                         }
+                        if (hideHeader) {
+                            classAttr += " component-card-no-header"
+                        }
+                        componentHtml = componentHtml.replace(
+                            "class=\"component-card\"",
+                            "class=\"$classAttr\""
+                        )
                         
                         // Обрабатываем поля компонента
                         if (fieldBlockMatch != null && component.fields.isNotEmpty()) {
@@ -187,50 +197,128 @@ object HtmlTemplateEngine {
                         return componentHtml
                     }
                     
-                    // Генерируем HTML для COMMON компонентов (в 3 колонки)
-                    val commonHtml = if (commonComponents.isNotEmpty()) {
-                        commonComponents.joinToString("\n        ") { component ->
-                            Log.d("HtmlTemplate", "Processing COMMON component: ${component.componentName} with ${component.fields.size} fields")
-                            generateComponentHtml(component, false)
-                        }
-                    } else ""
+                    // Разделяем компоненты на группы:
+                    // 1. HEAD компоненты в начале
+                    // 2. COMMON компоненты в середине
+                    // 3. HEAD компоненты в конце
                     
-                    // Генерируем HTML для HEAD компонентов (на всю строку)
-                    val headHtml = if (headComponents.isNotEmpty()) {
-                        headComponents.joinToString("\n        ") { component ->
-                            Log.d("HtmlTemplate", "Processing HEAD component: ${component.componentName} with ${component.fields.size} fields")
-                            generateComponentHtml(component, true)
+                    // Находим HEAD компоненты в начале
+                    val headAtStart = mutableListOf<com.example.wassertech.report.model.ComponentWithFieldsDTO>()
+                    var startIndex = 0
+                    for (component in dto.componentsWithFields) {
+                        if (component.componentType == "HEAD") {
+                            headAtStart.add(component)
+                            startIndex++
+                        } else {
+                            break
                         }
-                    } else ""
-                    
-                    // Объединяем HEAD и COMMON компоненты (HEAD сначала)
-                    val componentsHtml = if (headHtml.isNotEmpty() && commonHtml.isNotEmpty()) {
-                        headHtml + "\n        " + commonHtml
-                    } else if (headHtml.isNotEmpty()) {
-                        headHtml
-                    } else {
-                        commonHtml
                     }
                     
-                    Log.d("HtmlTemplate", "Generated components HTML length: ${componentsHtml.length}")
+                    // Находим HEAD компоненты в конце
+                    val headAtEnd = mutableListOf<com.example.wassertech.report.model.ComponentWithFieldsDTO>()
+                    var endIndex = dto.componentsWithFields.size - 1
+                    for (i in dto.componentsWithFields.size - 1 downTo 0) {
+                        val component = dto.componentsWithFields[i]
+                        if (component.componentType == "HEAD") {
+                            headAtEnd.add(0, component) // Добавляем в начало списка для сохранения порядка
+                            endIndex = i - 1
+                        } else {
+                            break
+                        }
+                    }
                     
-                    // Заменяем весь блок componentsWithFields на сгенерированный HTML
-                    // Сохраняем контекст вокруг блока component (например, <div class="components-grid">)
+                    // Проверяем, не пересекаются ли HEAD в начале и конце
+                    // Если startIndex > endIndex + 1, значит все компоненты HEAD
+                    val allHead = startIndex > endIndex + 1
+                    
+                    // Если все компоненты HEAD, они должны быть только в начале
+                    if (allHead) {
+                        headAtEnd.clear()
+                        endIndex = dto.componentsWithFields.size - 1
+                    }
+                    
+                    // COMMON компоненты - это все компоненты между HEAD в начале и конце
+                    val commonOnly = if (!allHead && startIndex <= endIndex) {
+                        dto.componentsWithFields.filterIndexed { index, component ->
+                            // Пропускаем HEAD компоненты в начале и конце
+                            // Оставляем только COMMON компоненты между ними
+                            index >= startIndex && index <= endIndex && component.componentType != "HEAD"
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    
+                    // Генерируем HTML для разделов
+                    val sectionsHtml = StringBuilder()
+                    
+                    // 1. Раздел HEAD компонентов в начале
+                    if (headAtStart.isNotEmpty()) {
+                        val firstHeadName = headAtStart.first().componentName
+                        sectionsHtml.append("<!-- HEAD компоненты в начале -->\n")
+                        sectionsHtml.append("<section class=\"section head-components-section\">\n")
+                        sectionsHtml.append("    <h2 class=\"section-header-red\">${escapeHtml(firstHeadName)}</h2>\n")
+                        sectionsHtml.append("    <div class=\"components-grid\">\n")
+                        
+                        headAtStart.forEachIndexed { index, component ->
+                            val hideHeader = index == 0 // Первый компонент без заголовка
+                            sectionsHtml.append("        ")
+                            sectionsHtml.append(generateComponentHtml(component, true, hideHeader))
+                            sectionsHtml.append("\n")
+                        }
+                        
+                        sectionsHtml.append("    </div>\n")
+                        sectionsHtml.append("</section>\n\n")
+                    }
+                    
+                    // 2. Раздел COMMON компонентов
+                    if (commonOnly.isNotEmpty()) {
+                        sectionsHtml.append("<!-- COMMON компоненты -->\n")
+                        sectionsHtml.append("<section class=\"section\">\n")
+                        sectionsHtml.append("    <h2 class=\"section-header-red\">Результаты проверки компонентов</h2>\n")
+                        sectionsHtml.append("    <div class=\"components-grid\">\n")
+                        
+                        commonOnly.forEach { component ->
+                            sectionsHtml.append("        ")
+                            sectionsHtml.append(generateComponentHtml(component, false))
+                            sectionsHtml.append("\n")
+                        }
+                        
+                        sectionsHtml.append("    </div>\n")
+                        sectionsHtml.append("</section>\n\n")
+                    }
+                    
+                    // 3. Раздел HEAD компонентов в конце
+                    if (headAtEnd.isNotEmpty()) {
+                        val firstHeadName = headAtEnd.first().componentName
+                        sectionsHtml.append("<!-- HEAD компоненты в конце -->\n")
+                        sectionsHtml.append("<section class=\"section head-components-section\">\n")
+                        sectionsHtml.append("    <h2 class=\"section-header-red\">${escapeHtml(firstHeadName)}</h2>\n")
+                        sectionsHtml.append("    <div class=\"components-grid\">\n")
+                        
+                        headAtEnd.forEachIndexed { index, component ->
+                            val hideHeader = index == 0 // Первый компонент без заголовка
+                            sectionsHtml.append("        ")
+                            sectionsHtml.append(generateComponentHtml(component, true, hideHeader))
+                            sectionsHtml.append("\n")
+                        }
+                        
+                        sectionsHtml.append("    </div>\n")
+                        sectionsHtml.append("</section>\n\n")
+                    }
+                    
+                    // Заменяем весь блок componentsWithFields
                     val componentRange = componentBlockMatch.range
                     val beforeComponent = componentsBlockContent.substring(0, componentRange.first)
                     val afterComponent = componentsBlockContent.substring(componentRange.last + 1)
-                    val finalComponentsContent = beforeComponent + componentsHtml + afterComponent
                     
-                    Log.d("HtmlTemplate", "Before component: '${beforeComponent.take(50)}...'")
-                    Log.d("HtmlTemplate", "After component: '...${afterComponent.takeLast(50)}'")
-                    Log.d("HtmlTemplate", "Final content length: ${finalComponentsContent.length}")
+                    // Удаляем старую структуру секции, оставляем только контент разделов
+                    val finalContent = sectionsHtml.toString()
                     
-                    // Заменяем весь блок componentsWithFields на сгенерированный HTML
-                    // Используем replace с Regex для замены всего блока
-                    val htmlBeforeReplace = html.length
-                    html = componentsBlockRegex.replace(html, finalComponentsContent)
-                    val htmlAfterReplace = html.length
-                    Log.d("HtmlTemplate", "HTML length before: $htmlBeforeReplace, after: $htmlAfterReplace")
+                    Log.d("HtmlTemplate", "Generated sections HTML length: ${finalContent.length}")
+                    Log.d("HtmlTemplate", "Head at start: ${headAtStart.size}, Common: ${commonOnly.size}, Head at end: ${headAtEnd.size}")
+                    
+                    // Заменяем весь блок componentsWithFields
+                    html = componentsBlockRegex.replace(html, finalContent)
                 } else {
                     // Если не найден блок component, удаляем весь блок componentsWithFields
                     html = html.replace(componentsBlockRegex, "")

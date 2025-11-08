@@ -48,10 +48,10 @@ fun MaintenanceScreen(
     var technician by remember { mutableStateOf<String?>(null) }
     var notes by remember { mutableStateOf<String?>(null) }
 
-    // локальные свёртки по componentId
+    // локальные свёртки по componentId (по умолчанию все свернуты)
     val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
     LaunchedEffect(sections) {
-        sections.forEach { sec -> expandedMap.putIfAbsent(sec.componentId, true) }
+        sections.forEach { sec -> expandedMap.putIfAbsent(sec.componentId, false) }
     }
 
     Scaffold(
@@ -124,11 +124,32 @@ fun MaintenanceScreen(
                 } else {
                     sections.forEach { sec ->
                         key(sec.componentId) {
-                            ElevatedCard(Modifier.fillMaxWidth()) {
+                            // Выделяем заглавные компоненты цветом
+                            val cardColors = if (sec.isHeadComponent) {
+                                CardDefaults.elevatedCardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                )
+                            } else {
+                                CardDefaults.elevatedCardColors()
+                            }
+                            
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = cardColors
+                            ) {
                                 Column(Modifier.fillMaxWidth()) {
                                     // заголовок секции
                                     ListItem(
-                                        headlineContent = { Text(sec.componentName) },
+                                        headlineContent = { 
+                                            Text(
+                                                sec.componentName,
+                                                color = if (sec.isHeadComponent) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+                                            )
+                                        },
                                         trailingContent = {
                                             val expanded = expandedMap[sec.componentId] == true
                                             TextButton(onClick = {

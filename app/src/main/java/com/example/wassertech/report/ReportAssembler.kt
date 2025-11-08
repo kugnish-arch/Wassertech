@@ -48,10 +48,13 @@ object ReportAssembler {
         }
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val dateFmtRus = SimpleDateFormat("dd.MM.yyyy", Locale("ru"))
+        val dateFmtRus = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
         val reportDate = session.startedAtEpoch?.let { dateFmt.format(Date(it)) } ?: "Не указана"
         val reportDateRus = session.startedAtEpoch?.let { dateFmtRus.format(Date(it)) } ?: ""
         val nextDate = null // нет поля nextMaintenance в сущности MaintenanceSessionEntity
+        
+        // Генерируем номер отчета в формате АXXXXX/mmyy
+        val reportNumber = ReportNumberGenerator.generateReportNumber(context)
 
         // Составляем строки наблюдений: выбираем текстовое представление значения
         val observationTexts = observations.mapNotNull { o ->
@@ -167,7 +170,7 @@ object ReportAssembler {
         componentsWithFields.sortBy { it.componentName.lowercase(Locale.getDefault()) }
 
         ReportDTO(
-            reportNumber = "TO-${sessionId.take(8).uppercase()}",
+            reportNumber = reportNumber,  // Используем новый формат номера
             reportDate = reportDate,
             reportDateRus = reportDateRus,
 
