@@ -121,15 +121,27 @@ public final class WebViewPdfExporter {
                 try {
                     if (result.hasError) {
                         Log.e(TAG, "Ошибка замера: " + result.errorMessage);
+                        boolean isFallback = false;
                         if (result.debugJson != null) {
                             try {
                                 Log.e(TAG, "Debug JS info: " + result.debugJson.toString());
+                                // Проверяем, является ли это fallback
+                                if (result.debugJson.has("fallback") && result.debugJson.getBoolean("fallback")) {
+                                    isFallback = true;
+                                    String reason = result.debugJson.optString("reason", "unknown");
+                                    long elapsedMs = result.debugJson.optLong("elapsedMs", 0);
+                                    Log.w(TAG, "FALLBACK DETECTED: reason=" + reason + ", elapsed=" + elapsedMs + "ms");
+                                }
                             } catch (Exception e) {
                                 Log.e(TAG, "Failed to log debug info", e);
                             }
                         }
-                        // Даже при ошибке пытаемся экспортировать с fallback данными
-                        Log.w(TAG, "Measurement had errors, but continuing with fallback data...");
+                        // Даже при ошибке (включая fallback) пытаемся экспортировать с fallback данными
+                        if (isFallback) {
+                            Log.w(TAG, "Using fallback measurements for PDF export (JS measurement failed)");
+                        } else {
+                            Log.w(TAG, "Measurement had errors, but continuing with available data...");
+                        }
                     }
 
                     Log.d(TAG, "Замер завершён: Высота CSS = " + result.contentHeightCss +
@@ -169,10 +181,6 @@ public final class WebViewPdfExporter {
     private static void performExport(WebView webView, PrintAttributes attrs, File outFile, String reportNumber,
                                      PdfContentMeasurer.MeasurementResult measurementResult) throws IOException {
         Log.d(TAG, "Starting performExport, contentHeight: " + measurementResult.contentHeightCss + " CSS px");
-
-        // Получаем размеры страницы из PrintAttributes
-        int pageWidthPx = (int) (attrs.getMediaSize().getWidthMils() / 1000f * 72f); // Convert mils to points, then to pixels
-        int pageHeightPx = (int) (attrs.getMediaSize().getHeightMils() / 1000f * 72f);
         
         // Используем фиксированные размеры A4 в CSS пикселях
         float pageHeightCss = A4_HEIGHT_CSS;
@@ -243,68 +251,118 @@ public final class WebViewPdfExporter {
             // Debug линии отключены (убраны синие и зеленые линии)
             // PdfDebugDrawer.drawDebugLines(...) - закомментировано
             
+            // Добавляем колонтитул с номером акта и страницы в правом нижнем углу
+            int totalPages = pageBoundaries.size() - 1;
+            android.graphics.Paint footerPaint = new android.graphics.Paint();
+            footerPaint.setColor(0xFF6B7280); // Серый цвет (--muted)
+            float footerTextSize = 32f * density / 2.625f; // Примерно 11pt
+            footerPaint.setTextSize(footerTextSize);
+            footerPaint.setTextAlign(android.graphics.Paint.Align.RIGHT);
+            footerPaint.setAntiAlias(true);
+            footerPaint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.NORMAL));
+            
+            // Без отступов - впритык к краю
+            // В Canvas drawText координата Y - это baseline текста, поэтому нужно учесть высоту текста
+            // Чтобы текст был виден, ставим Y на высоту текста от низа (минимальный отступ для видимости)
+            String footerText = "Акт №" + reportNumber + " - Страница " + (pageIndex + 1) + " из " + totalPages;
+            android.graphics.Paint.FontMetrics fontMetrics = footerPaint.getFontMetrics();
+            float textHeight = fontMetrics.descent - fontMetrics.ascent; // Высота текста
+            float footerY = pageHeightDevicePxActual - fontMetrics.descent; // Baseline текста впритык к низу (с учетом descent)
+            float footerX = pageWidthDevicePx; // Впритык к правому краю
+            float footerBaselineY = footerY; // Сохраняем для использования в надписи "Продолжение"
+            
+            canvas.drawText(footerText, footerX, footerY, footerPaint);
+            Log.d(TAG, "Added footer on page " + (pageIndex + 1) + ": " + footerText + 
+                  " at Y=" + footerY + " (page height=" + pageHeightDevicePxActual + ", text height=" + textHeight + ")");
+            
             // Добавляем надпись "Продолжение отчёта смотри на странице Nx..." 
             // если есть большое пустое пространство внизу страницы (не на последней странице)
             if (pageIndex < pageBoundaries.size() - 2) { // Не последняя страница
                 // Находим последний элемент на текущей странице
+                // Учитываем, что элементы могут частично выходить за границы страницы
                 float lastElementEndCss = pageStartCss;
                 
-                // Проверяем компоненты на текущей странице
+                // Проверяем компоненты на текущей странице (даже если они частично выходят)
                 for (PdfBoundaryModels.ComponentBoundary comp : measurementResult.componentBoundaries) {
-                    if (comp.topCss >= pageStartCss && comp.topCss < pageEndCss) {
-                        // Компонент попадает на эту страницу
-                        if (comp.bottomCss > lastElementEndCss) {
-                            lastElementEndCss = comp.bottomCss;
+                    // Компонент считается на странице, если он пересекается с диапазоном страницы
+                    if (comp.topCss < pageEndCss && comp.bottomCss > pageStartCss) {
+                        // Берем максимальную позицию элемента в пределах страницы
+                        float elementEndOnPage = Math.min(comp.bottomCss, pageEndCss);
+                        if (elementEndOnPage > lastElementEndCss) {
+                            lastElementEndCss = elementEndOnPage;
                         }
                     }
                 }
                 
                 // Проверяем заголовки секций на текущей странице
                 for (PdfBoundaryModels.SectionHeaderBoundary header : measurementResult.sectionHeaderBoundaries) {
-                    if (header.topCss >= pageStartCss && header.topCss < pageEndCss) {
-                        // Заголовок попадает на эту страницу
-                        if (header.bottomCss > lastElementEndCss) {
-                            lastElementEndCss = header.bottomCss;
+                    if (header.topCss < pageEndCss && header.bottomCss > pageStartCss) {
+                        float elementEndOnPage = Math.min(header.bottomCss, pageEndCss);
+                        if (elementEndOnPage > lastElementEndCss) {
+                            lastElementEndCss = elementEndOnPage;
                         }
                     }
                 }
                 
                 // Вычисляем пустое пространство внизу страницы (в CSS пикселях)
-                float emptySpaceCss = pageEndCss - lastElementEndCss;
+                // Учитываем место для колонтитула (примерно 30px CSS для текста)
+                float footerSpaceCss = 30f;
+                float effectivePageEndCss = pageEndCss - footerSpaceCss;
+                float emptySpaceCss = effectivePageEndCss - lastElementEndCss;
                 
-                // Минимальный размер пустого пространства для вставки надписи: 80px CSS (примерно 20mm)
-                // И максимальный размер: если пространство слишком большое (больше 200px), точно вставляем
-                float minEmptySpaceCss = 80f; // Минимум для вставки надписи
-                float maxEmptySpaceCss = 200f; // Если больше этого, точно вставляем
+                // Минимальный размер пустого пространства для вставки надписи: 80px CSS
+                float minEmptySpaceCss = 80f;
+                
+                Log.d(TAG, "Page " + (pageIndex + 1) + ": lastElementEnd=" + lastElementEndCss + 
+                      " CSS, pageEnd=" + pageEndCss + " CSS, emptySpace=" + emptySpaceCss + " CSS");
                 
                 if (emptySpaceCss >= minEmptySpaceCss) {
                     // Конвертируем позицию последнего элемента в device пиксели относительно начала страницы
-                    // (на canvas координаты начинаются с 0 для каждой страницы)
                     float lastElementEndDevicePx = (lastElementEndCss - pageStartCss) * density;
                     
-                    // Вычисляем позицию для надписи: немного выше центра пустого пространства
-                    float continuationTextY = lastElementEndDevicePx + (emptySpaceCss * density) * 0.4f;
+                    // Вычисляем позицию для надписи: в середине пустого пространства, но выше колонтитула
+                    float emptySpaceDevicePx = emptySpaceCss * density;
+                    // Размещаем надпись на 1/3 от конца последнего элемента (примерно в центре пустого пространства)
+                    float continuationTextY = lastElementEndDevicePx + emptySpaceDevicePx * 0.35f;
                     
-                    // Проверяем, что надпись влезает на страницу
-                    if (continuationTextY < pageHeightDevicePxActual - 20) {
-                        // Рисуем надпись
+                    // Минимальное расстояние от колонтитула: примерно 40px device
+                    // Колонтитул теперь без отступов, используем footerBaselineY из блока колонтитула
+                    float minDistanceFromFooter = 40f * density / 2.625f;
+                    float footerStartY = footerBaselineY; // Baseline колонтитула (уже вычислено выше)
+                    
+                    // Проверяем, что надпись не перекрывается с колонтитулом и помещается на страницу
+                    if (continuationTextY < footerStartY - minDistanceFromFooter && 
+                        continuationTextY > lastElementEndDevicePx + 20f * density / 2.625f) {
+                        // Рисуем надпись с более заметным стилем
                         android.graphics.Paint textPaint = new android.graphics.Paint();
                         textPaint.setColor(0xFF6B7280); // Серый цвет (--muted)
-                        textPaint.setTextSize(28f * density / 2.625f); // 10pt в device пикселях (примерно)
+                        textPaint.setTextSize(36f * density / 2.625f); // 12pt - увеличен размер
                         textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
                         textPaint.setAntiAlias(true);
                         textPaint.setStyle(android.graphics.Paint.Style.FILL);
-                        textPaint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.NORMAL));
+                        textPaint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.ITALIC));
                         
                         int nextPageNumber = pageIndex + 2; // Номер следующей страницы
                         String continuationText = "Продолжение отчёта смотри на странице " + nextPageNumber + "...";
                         
                         // Рисуем текст по центру страницы по горизонтали
-                        canvas.drawText(continuationText, pageWidthDevicePx / 2f, continuationTextY, textPaint);
+                        float textX = pageWidthDevicePx / 2f;
+                        canvas.drawText(continuationText, textX, continuationTextY, textPaint);
                         
-                        Log.d(TAG, "Added continuation text on page " + (pageIndex + 1) + 
-                              ": empty space=" + emptySpaceCss + " CSS px, text Y=" + continuationTextY + " device px");
+                        Log.d(TAG, "✓ Added continuation text on page " + (pageIndex + 1) + 
+                              ": empty space=" + emptySpaceCss + " CSS px (" + emptySpaceDevicePx + " device px), " +
+                              "text Y=" + continuationTextY + " device px, " +
+                              "footer starts at " + footerStartY + " device px");
+                    } else {
+                        Log.d(TAG, "✗ Skipped continuation text on page " + (pageIndex + 1) + 
+                              ": text Y=" + continuationTextY + " device px, " +
+                              "last element end=" + lastElementEndDevicePx + " device px, " +
+                              "footer starts at " + footerStartY + " device px, " +
+                              "min distance=" + minDistanceFromFooter + " device px");
                     }
+                } else {
+                    Log.d(TAG, "✗ Skipped continuation text on page " + (pageIndex + 1) + 
+                          ": empty space too small (" + emptySpaceCss + " CSS px < " + minEmptySpaceCss + " CSS px minimum)");
                 }
             }
             

@@ -9,6 +9,9 @@ import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.SettingsApplications
+import androidx.compose.ui.graphics.Color
+import com.example.wassertech.ui.common.AppFloatingActionButton
+import com.example.wassertech.ui.common.FABTemplate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -120,127 +123,125 @@ fun MaintenanceSessionDetailScreen(
         return
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { _ ->
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Кнопки в верхней части экрана
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Кнопка "Внести правки" справа
-                OutlinedButton(
-                    onClick = {
-                        session?.let { s ->
-                            onNavigateToEdit(
-                                sessionId,
-                                s.siteId,
-                                s.installationId ?: "",
-                                installationName
-                            )
-                        }
-                    },
-                    enabled = session != null && session?.installationId != null,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "Редактирование",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Внести правки")
+    // Функция для создания PDF
+    val createPdf: () -> Unit = {
+        scope.launch {
+            exporting = true
+            try {
+                // Подготовка DTO на IO потоке
+                val dto = withContext(Dispatchers.IO) {
+                    ReportAssembler.assemble(context, sessionId)
                 }
 
-                // Кнопка PDF
-                Button(
+                // Путь для PDF (заменяем "/" на "_" в номере отчета для имени файла)
+                val reportsDir = File(
+                    context.getExternalFilesDir(null),
+                    "Reports"
+                ).apply { mkdirs() }
+                val fileName = "Report_${dto.reportNumber.replace("/", "_")}.pdf"
+                val out = File(reportsDir, fileName)
+
+                // HTML шаблон
+                val html = withContext(Dispatchers.IO) {
+                    HtmlTemplateEngine.render(
+                        context = context,
+                        templateAssetPath = "templates/maintenance_v3.html",
+                        dto = dto
+                    )
+                }
+                
+                // Сохраняем HTML рядом с PDF
+                val htmlFile = File(reportsDir, fileName.replace(".pdf", ".html"))
+                htmlFile.writeText(html, Charsets.UTF_8)
+                Log.d("PDF", "HTML saved to: ${htmlFile.absolutePath}")
+                
+                // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
+                PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)
+
+                // Шарим созданный файл
+                ShareUtils.sharePdf(context, out)
+                
+                // Показываем информацию об успешной генерации PDF
+                snackbarHostState.showSnackbar(
+                    "PDF создан успешно",
+                    duration = SnackbarDuration.Short
+                )
+            } catch (t: Throwable) {
+                val errorMsg = when {
+                    t is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания (30 сек). Попробуйте еще раз."
+                    t.cause is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания. Попробуйте еще раз."
+                    t.message?.contains("WebView") == true -> "Ошибка загрузки HTML: ${t.message}"
+                    t.message?.contains("timeout") == true -> "Превышено время ожидания. Попробуйте еще раз."
+                    t.message?.contains("Renderer process") == true -> "Ошибка рендеринга PDF. Попробуйте еще раз."
+                    else -> "Ошибка при создании PDF: ${t.message ?: t.javaClass.simpleName}"
+                }
+                snackbarHostState.showSnackbar(errorMsg)
+            } finally {
+                exporting = false
+            }
+        }
+    }
+
+    // Функция для редактирования
+    val navigateToEdit: () -> Unit = {
+        session?.let { s ->
+            onNavigateToEdit(
+                sessionId,
+                s.siteId,
+                s.installationId ?: "",
+                installationName
+            )
+        }
+    }
+
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        floatingActionButton = {
+            // Два FABа: черный Edit сверху, красный PDF снизу
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                // Черный FAB для редактирования (сверху) - скрываем во время экспорта
+                if (!exporting) {
+                    AppFloatingActionButton(
+                        template = FABTemplate(
+                            icon = Icons.Filled.Edit,
+                            containerColor = Color(0xFF1E1E1E), // Черный цвет
+                            contentColor = Color.White,
+                            onClick = navigateToEdit
+                        )
+                    )
+                }
+                
+                // Красный FAB для PDF (снизу) - показываем CircularProgressIndicator во время экспорта
+                FloatingActionButton(
                     onClick = {
-                        scope.launch {
-                            exporting = true
-                            try {
-                                // Подготовка DTO на IO потоке
-                                val dto = withContext(Dispatchers.IO) {
-                                    ReportAssembler.assemble(context, sessionId)
-                                }
-
-                                // Путь для PDF (заменяем "/" на "_" в номере отчета для имени файла)
-                                val reportsDir = File(
-                                    context.getExternalFilesDir(null),
-                                    "Reports"
-                                ).apply { mkdirs() }
-                                val fileName = "Report_${dto.reportNumber.replace("/", "_")}.pdf"
-                                val out = File(reportsDir, fileName)
-
-                                // HTML шаблон
-                                val html = withContext(Dispatchers.IO) {
-                                    HtmlTemplateEngine.render(
-                                        context = context,
-                                        templateAssetPath = "templates/maintenance_v3.html",
-                                        dto = dto
-                                    )
-                                }
-                                
-                                // Сохраняем HTML рядом с PDF
-                                val htmlFile = File(reportsDir, fileName.replace(".pdf", ".html"))
-                                htmlFile.writeText(html, Charsets.UTF_8)
-                                Log.d("PDF", "HTML saved to: ${htmlFile.absolutePath}")
-                                
-                                // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
-                                PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)
-
-                                // Шарим созданный файл
-                                ShareUtils.sharePdf(context, out)
-                                
-                                // Показываем информацию об успешной генерации PDF
-                                snackbarHostState.showSnackbar(
-                                    "PDF создан успешно",
-                                    duration = SnackbarDuration.Short
-                                )
-                            } catch (t: Throwable) {
-                                val errorMsg = when {
-                                    t is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания (30 сек). Попробуйте еще раз."
-                                    t.cause is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания. Попробуйте еще раз."
-                                    t.message?.contains("WebView") == true -> "Ошибка загрузки HTML: ${t.message}"
-                                    t.message?.contains("timeout") == true -> "Превышено время ожидания. Попробуйте еще раз."
-                                    t.message?.contains("Renderer process") == true -> "Ошибка рендеринга PDF. Попробуйте еще раз."
-                                    else -> "Ошибка при создании PDF: ${t.message ?: t.javaClass.simpleName}"
-                                }
-                                snackbarHostState.showSnackbar(errorMsg)
-                            } finally {
-                                exporting = false
-                            }
+                        if (!exporting) {
+                            createPdf()
                         }
                     },
-                    enabled = !exporting,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    containerColor = Color(0xFFD32F2F), // Красный цвет
+                    contentColor = Color.White
                 ) {
                     if (exporting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = Color.White
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Создание PDF...")
                     } else {
                         Icon(
-                            Icons.Outlined.PictureAsPdf,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            imageVector = Icons.Outlined.PictureAsPdf,
+                            contentDescription = "Создать PDF"
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Отчет в PDF")
                     }
                 }
             }
-
+        }
+    ) { _ ->
+        Column(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),

@@ -169,6 +169,26 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+    
+    /** Изменить объект установки. */
+    fun moveInstallationToSite(installationId: String, newSiteId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val inst = hierarchyDao.getInstallation(installationId)
+            if (inst != null) {
+                hierarchyDao.updateInstallation(inst.copy(siteId = newSiteId))
+            }
+        }
+    }
+    
+    /** Переименовать установку и изменить объект. */
+    fun updateInstallation(installationId: String, newName: String, newSiteId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val inst = hierarchyDao.getInstallation(installationId)
+            if (inst != null) {
+                hierarchyDao.updateInstallation(inst.copy(name = newName, siteId = newSiteId))
+            }
+        }
+    }
 
     fun reorderInstallations(list: List<InstallationEntity>) {
         viewModelScope.launch(Dispatchers.IO) { hierarchyDao.updateInstallations(list) }

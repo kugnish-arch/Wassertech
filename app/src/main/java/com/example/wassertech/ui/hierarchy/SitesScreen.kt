@@ -22,6 +22,10 @@ fun SitesScreen(
     var showAdd by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(TextFieldValue("")) }
     var addr by remember { mutableStateOf(TextFieldValue("")) }
+    
+    // Получаем клиента для отображения имени в шапке
+    val client by vm.client(clientId).collectAsState(initial = null)
+    val clientName = client?.name ?: "Клиент"
 
     Scaffold(
         floatingActionButton = {
@@ -29,7 +33,34 @@ fun SitesScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding)) {
-            LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Шапка экрана - приведена к единому виду с другими экранами
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(
+                        text = clientName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Объекты",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                    )
+                }
+            }
+            
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(sites, key = { it.id }) { s ->
                     ElevatedCard(onClick = { onOpenSite(s.id) }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {

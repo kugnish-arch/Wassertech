@@ -164,20 +164,27 @@ private fun AppScaffold(navController: NavHostController) {
     
     // Состояние редактирования для разных экранов
     var clientsEditing by remember { mutableStateOf(false) }
-    var otherEditing by remember { mutableStateOf(false) }
+    var clientDetailEditing by remember { mutableStateOf(false) }
+    var installationEditing by remember { mutableStateOf(false) }
+    var templatesEditing by remember { mutableStateOf(false) }
+    
+    // Определяем текущее состояние редактирования и функцию переключения
+    val (currentEditing, toggleEditing) = remember(currentRoute) {
+        when {
+            currentRoute == "clients" -> clientsEditing to { clientsEditing = !clientsEditing }
+            currentRoute?.startsWith("client/") == true -> clientDetailEditing to { clientDetailEditing = !clientDetailEditing }
+            currentRoute?.startsWith("installation/") == true -> installationEditing to { installationEditing = !installationEditing }
+            currentRoute?.startsWith("templates") == true -> templatesEditing to { templatesEditing = !templatesEditing }
+            else -> false to { }
+        }
+    }
     
     Scaffold(
         topBar = { 
             AppTopBar(
                 navController = navController,
-                isEditing = if (currentRoute == "clients") clientsEditing else otherEditing,
-                onToggleEdit = if (showEditToggle) {
-                    if (currentRoute == "clients") {
-                        { clientsEditing = !clientsEditing }
-                    } else {
-                        { otherEditing = !otherEditing }
-                    }
-                } else null
+                isEditing = currentEditing,
+                onToggleEdit = if (showEditToggle) toggleEditing else null
             )
         },
         bottomBar = {
@@ -244,6 +251,8 @@ private fun AppScaffold(navController: NavHostController) {
                 val clientId = bse.arguments?.getString("clientId") ?: return@composable
                 ClientDetailScreen(
                     clientId = clientId,
+                    isEditing = clientDetailEditing,
+                    onToggleEdit = { clientDetailEditing = !clientDetailEditing },
                     onOpenSite = { siteId -> navController.navigate("site/$siteId") },
                     onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
                 )
@@ -267,6 +276,8 @@ private fun AppScaffold(navController: NavHostController) {
                 val installationId = bse.arguments?.getString("installationId") ?: return@composable
                 ComponentsScreen(
                     installationId = installationId,
+                    isEditing = installationEditing,
+                    onToggleEdit = { installationEditing = !installationEditing },
                     onStartMaintenance = { /* ... */ },
                     onStartMaintenanceAll = { siteId, installationName ->
                         navController.navigate(

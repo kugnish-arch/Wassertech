@@ -45,6 +45,8 @@ private data class SiteDeleteDialogState(
 @Composable
 fun ClientDetailScreen(
     clientId: String,
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
     onOpenSite: (String) -> Unit,
     onOpenInstallation: (String) -> Unit,
     vm: HierarchyViewModel = viewModel()
@@ -72,20 +74,65 @@ fun ClientDetailScreen(
     // В начало экрана (рядом с другими collectAsState):
     val all by vm.clients(includeArchived = true).collectAsState(initial = emptyList())
 
-    // Режим редактирования (как на экране "Клиенты")
-    var isEditing by remember { mutableStateOf(false) }
+    // Режим редактирования - используем переданное состояние из топбара
     var includeArchived by remember { mutableStateOf(false) }
     var includeArchivedBeforeEdit by remember { mutableStateOf<Boolean?>(null) }
+    
+    // Синхронизируем локальное состояние с переданным isEditing
+    LaunchedEffect(isEditing) {
+        if (isEditing) {
+            includeArchivedBeforeEdit = includeArchived
+            if (!includeArchived) includeArchived = true
+        } else {
+            if (includeArchivedBeforeEdit == false && includeArchived) {
+                includeArchived = false
+            }
+            includeArchivedBeforeEdit = null
+        }
+    }
 
     // Данные с учетом архивирования
     val sitesIncludingArchived by vm.sites(clientId, includeArchived = true).collectAsState(initial = emptyList())
     val sitesToShow = if (includeArchived) sitesIncludingArchived else sites
 
+    // Локальный порядок установок по объектам (siteId -> List<installationId>)
+    var localInstallationOrders by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+
     // Локальный порядок сайтов (для drag-and-drop)
     var localOrder by remember(clientId, sitesToShow) { mutableStateOf(sitesToShow.map { it.id }) }
-    LaunchedEffect(sitesToShow) { if (!isEditing) localOrder = sitesToShow.map { it.id } }
+    LaunchedEffect(sitesToShow, isEditing) { 
+        if (!isEditing) {
+            localOrder = sitesToShow.map { it.id }
+        } else {
+            // При входе в режим редактирования инициализируем порядок
+            localOrder = sitesToShow.map { it.id }
+            // Инициализация локального порядка установок
+            scope.launch(Dispatchers.IO) {
+                val orders = mutableMapOf<String, List<String>>()
+                sitesToShow.forEach { site ->
+                    // Загружаем установки заново, включая архивные
+                    val installations = vm.installations(site.id, includeArchived = true).first()
+                    orders[site.id] = installations.map { it.id }
+                }
+                localInstallationOrders = orders
+            }
+        }
+    }
+    
+    // Сохранение порядка при выходе из режима редактирования
+    LaunchedEffect(isEditing) {
+        if (!isEditing && localOrder.isNotEmpty()) {
+            // сохраняем порядок сайтов
+            vm.reorderSites(clientId, localOrder)
+            // сохраняем порядок установок для каждого объекта
+            scope.launch {
+                localInstallationOrders.forEach { (siteId: String, orderIds: List<String>) ->
+                    vm.reorderInstallations(siteId, orderIds)
+                }
+            }
+        }
+    }
 
-    // Локальный порядок установок по объектам (siteId -> List<installationId>)
     // Получаем все установки заранее для всех сайтов (включая архивные в режиме редактирования)
     var allInstallations by remember { mutableStateOf<Map<String, List<InstallationEntity>>>(emptyMap()) }
     LaunchedEffect(sitesToShow, includeArchived, isEditing) {
@@ -99,7 +146,6 @@ fun ClientDetailScreen(
             allInstallations = installationsMap
         }
     }
-    var localInstallationOrders by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
     
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<SiteDeleteDialogState?>(null) }
@@ -173,46 +219,7 @@ fun ClientDetailScreen(
             }
         },
 
-        // Нижняя кнопка "Изменить/Готово" слева, как на экране "Клиенты"
-        bottomBar = {
-            EditDoneBottomBar(
-                isEditing = isEditing,
-                onEdit = {
-                    includeArchivedBeforeEdit = includeArchived
-                    if (!includeArchived) includeArchived = true
-                    // включаем режим редактирования
-                    isEditing = true
-                    // сброс локального порядка на актуальный
-                    localOrder = sitesToShow.map { it.id }
-                    // Инициализация локального порядка установок
-                    scope.launch(Dispatchers.IO) {
-                        val orders = mutableMapOf<String, List<String>>()
-                        sitesToShow.forEach { site ->
-                            // Загружаем установки заново, включая архивные
-                            val installations = vm.installations(site.id, includeArchived = true).first()
-                            orders[site.id] = installations.map { it.id }
-                        }
-                        localInstallationOrders = orders
-                    }
-                },
-                onDone = {
-                    // сохраняем порядок сайтов
-                    vm.reorderSites(clientId, localOrder)
-                    // сохраняем порядок установок для каждого объекта
-                    scope.launch {
-                        localInstallationOrders.forEach { (siteId, orderIds) ->
-                            vm.reorderInstallations(siteId, orderIds)
-                        }
-                    }
-                    if (includeArchivedBeforeEdit == false && includeArchived) {
-                        includeArchived = false
-                    }
-                    includeArchivedBeforeEdit = null
-                    isEditing = false
-                },
-                actions = emptyList() // или можно добавить действия справа, если нужно
-            )
-        }
+        // Ботомбар убран - используется переключатель в топбаре
 
     ) { paddingValues ->
         Column(
@@ -244,7 +251,7 @@ fun ClientDetailScreen(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         clientName,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
 
@@ -273,14 +280,14 @@ fun ClientDetailScreen(
                             text = "Группа: $groupName",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
-                            modifier = Modifier.padding(start = 50.dp, top = 2.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(start = 48.dp, top = 2.dp, bottom = 4.dp) // Выравнивание на уровне имени клиента (иконка 24dp + отступ 8dp + еще 16dp для совпадения)
                         )
                     } else {
                         Text(
                             text = "Без группы",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(start = 50.dp, top = 2.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(start = 48.dp, top = 2.dp, bottom = 4.dp)
                         )
                     }
                 }
@@ -683,30 +690,32 @@ private fun SiteRowWithDrag(
             .fillMaxWidth()
             .then(
                 if (!isArchived) {
-                    Modifier.pointerInput(site.id, index) {
-                        detectDragGestures(
-                            onDragStart = { 
-                                lastMoveThreshold = 0f
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                val threshold = 40f
-                                if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                    onMoveUp()
-                                    lastMoveThreshold = -threshold
-                                } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                    onMoveDown()
-                                    lastMoveThreshold = threshold
+                    Modifier
+                        .pointerInput(site.id, index) {
+                            detectDragGestures(
+                                onDragStart = { 
+                                    lastMoveThreshold = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    // Уменьшаем порог для лучшей чувствительности на реальных устройствах
+                                    val threshold = 30f
+                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
+                                        onMoveUp()
+                                        lastMoveThreshold = -threshold
+                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
+                                        onMoveDown()
+                                        lastMoveThreshold = threshold
+                                    }
+                                    if (dragAmount.y in -threshold..threshold) {
+                                        lastMoveThreshold = dragAmount.y
+                                    }
+                                },
+                                onDragEnd = {
+                                    lastMoveThreshold = 0f
                                 }
-                                if (dragAmount.y in -threshold..threshold) {
-                                    lastMoveThreshold = dragAmount.y
-                                }
-                            },
-                            onDragEnd = {
-                                lastMoveThreshold = 0f
-                            }
-                        )
-                    }
+                            )
+                        }
                 } else {
                     Modifier
                 }
@@ -785,30 +794,32 @@ private fun InstallationRowWithDrag(
                 .fillMaxWidth()
                 .then(
                     if (!isArchived) {
-                        Modifier.pointerInput(installation.id, index) {
-                            detectDragGestures(
-                                onDragStart = { 
-                                    lastMoveThreshold = 0f
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    val threshold = 40f
-                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                        onMoveUp()
-                                        lastMoveThreshold = -threshold
-                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                        onMoveDown()
-                                        lastMoveThreshold = threshold
+                        Modifier
+                            .pointerInput(installation.id, index) {
+                                detectDragGestures(
+                                    onDragStart = { 
+                                        lastMoveThreshold = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        // Уменьшаем порог для лучшей чувствительности на реальных устройствах
+                                        val threshold = 30f
+                                        if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
+                                            onMoveUp()
+                                            lastMoveThreshold = -threshold
+                                        } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
+                                            onMoveDown()
+                                            lastMoveThreshold = threshold
+                                        }
+                                        if (dragAmount.y in -threshold..threshold) {
+                                            lastMoveThreshold = dragAmount.y
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        lastMoveThreshold = 0f
                                     }
-                                    if (dragAmount.y in -threshold..threshold) {
-                                        lastMoveThreshold = dragAmount.y
-                                    }
-                                },
-                                onDragEnd = {
-                                    lastMoveThreshold = 0f
-                                }
-                            )
-                        }
+                                )
+                            }
                     } else {
                         Modifier
                     }

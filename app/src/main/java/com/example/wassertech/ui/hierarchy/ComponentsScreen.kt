@@ -14,6 +14,8 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.material3.*
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +41,8 @@ import androidx.compose.ui.graphics.Color
 @Composable
 fun ComponentsScreen(
     installationId: String,
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
     onStartMaintenance: (String) -> Unit, // пока не используем для одиночного компонента
     onStartMaintenanceAll: (siteId: String, installationName: String) -> Unit,
     onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {},   // навигация в историю ТО
@@ -74,13 +78,43 @@ fun ComponentsScreen(
     }
 
     // --- Локальные UI-состояния ---
-    var isEditing by remember { mutableStateOf(false) }
-
+    // Используем переданное состояние редактирования из топбара
     // локальный порядок (живой) — отрисовываем список по нему
-    var localOrder by remember(components) { mutableStateOf(components.map { it.id } ) }
+    var localOrder by remember(components, isEditing) { 
+        mutableStateOf(components.map { it.id }) 
+    }
+    
+    // Синхронизируем локальный порядок при изменении состояния редактирования
+    LaunchedEffect(isEditing, components) {
+        if (!isEditing) {
+            localOrder = components.map { it.id }
+        } else {
+            // При входе в режим редактирования фиксируем текущий порядок
+            localOrder = components.map { it.id }
+        }
+    }
+    
+    // Сохранение порядка при выходе из режима редактирования
+    LaunchedEffect(isEditing) {
+        if (!isEditing && localOrder.isNotEmpty()) {
+            vm.reorderComponents(installationId, localOrder)
+        }
+    }
 
     var showEdit by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf(TextFieldValue("")) }
+    var editSitePickerExpanded by remember { mutableStateOf(false) }
+    var editSelectedSiteIndex by remember { mutableStateOf(0) }
+    
+    // Получаем список всех объектов клиента для выбора в диалоге редактирования
+    val allSites by remember(installation, allClients) {
+        val clientId = site?.clientId
+        if (clientId != null) {
+            vm.sites(clientId, includeArchived = false)
+        } else {
+            flowOf(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
 
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
@@ -103,21 +137,8 @@ fun ComponentsScreen(
                     }
                 )
             )
-        },
-        bottomBar = {
-            EditDoneBottomBar(
-                isEditing = isEditing,
-                onEdit = {
-                    isEditing = true
-                    localOrder = components.map { it.id } // фиксируем актуальный порядок в момент входа в редактирование
-                },
-                onDone = {
-                    // сохраняем новый порядок компонентов в БД
-                    vm.reorderComponents(installationId, localOrder)
-                    isEditing = false
-                }
-            )
         }
+        // Ботомбар убран - используется переключатель в топбаре
     ) { padding ->
         val layoutDirection = LocalLayoutDirection.current
 
@@ -152,15 +173,10 @@ fun ComponentsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SettingsApplications,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Spacer(Modifier.width(8.dp))
+                        // Иконка убрана по требованию
                         Text(
                             text = instName,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.weight(1f)
                         )
@@ -168,6 +184,10 @@ fun ComponentsScreen(
                             IconButton(
                                 onClick = {
                                     editName = TextFieldValue(installation?.name ?: "")
+                                    // Находим индекс текущего объекта в списке всех объектов
+                                    val currentSiteId = installation?.siteId
+                                    editSelectedSiteIndex = allSites.indexOfFirst { it.id == currentSiteId }
+                                        .takeIf { it >= 0 } ?: 0
                                     showEdit = true
                                 },
                                 enabled = installation != null
@@ -298,18 +318,50 @@ fun ComponentsScreen(
             onDismissRequest = { showEdit = false },
             title = { Text("Редактировать установку") },
             text = {
-                OutlinedTextField(
-                    value = editName,
-                    onValueChange = { editName = it },
-                    label = { Text("Название установки") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Название установки") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = editSitePickerExpanded,
+                        onExpandedChange = { editSitePickerExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = allSites.getOrNull(editSelectedSiteIndex)?.name ?: "Выберите объект",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Объект") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = editSitePickerExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = editSitePickerExpanded,
+                            onDismissRequest = { editSitePickerExpanded = false }
+                        ) {
+                            allSites.forEachIndexed { index, s ->
+                                DropdownMenuItem(
+                                    text = { Text(s.name) },
+                                    onClick = {
+                                        editSelectedSiteIndex = index
+                                        editSitePickerExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     val newTitle = editName.text.trim()
-                    if (newTitle.isNotEmpty()) {
-                        vm.renameInstallation(installationId, newTitle)
+                    val newSiteId = allSites.getOrNull(editSelectedSiteIndex)?.id
+                    if (newTitle.isNotEmpty() && newSiteId != null) {
+                        vm.updateInstallation(installationId, newTitle, newSiteId)
                     }
                     showEdit = false
                 }) { Text("Сохранить") }

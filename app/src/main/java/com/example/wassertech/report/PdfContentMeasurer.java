@@ -140,11 +140,10 @@ public class PdfContentMeasurer {
                 // Игнорируем ошибки создания debug объекта
             }
             
-            callback.onResult(MeasurementResult.success(
+            // Fallback должен возвращать error, но с данными для экспорта
+            callback.onResult(MeasurementResult.error(
+                "JS measurement timeout, using fallback",
                 cssHeight > 0 ? cssHeight : fallbackHeight,
-                cssWidth > 0 ? cssWidth : 794,
-                new ArrayList<>(), // Пустые границы компонентов
-                new ArrayList<>(), // Пустые границы секций
                 fallbackDebug
             ));
         };
@@ -189,6 +188,7 @@ public class PdfContentMeasurer {
             "      return JSON.stringify({error: 'No root element', debugMsgs: ['No root']}); " +
             "    } " +
             "    console.log('Root found, measuring...'); " +
+            "    var rootRect = root.getBoundingClientRect(); " +
             "    var cssWidth = Math.max(root.scrollWidth || 0, root.offsetWidth || 0, root.clientWidth || 0); " +
             "    var cssHeight = Math.max(root.scrollHeight || 0, root.offsetHeight || 0, root.clientHeight || 0); " +
             "    console.log('Size: ' + cssWidth + 'x' + cssHeight); " +
@@ -207,22 +207,40 @@ public class PdfContentMeasurer {
             "      var sectionHeaders = root.querySelectorAll('h2.section-header-red'); " +
             "      for (var i = 0; i < sectionHeaders.length; i++) { " +
             "        var h = sectionHeaders[i]; " +
-            "        result.sectionHeaderBounds.push({top: h.offsetTop, bottom: h.offsetTop + h.offsetHeight}); " +
+            "        var hRect = h.getBoundingClientRect(); " +
+            "        var top = hRect.top - rootRect.top + root.scrollTop; " +
+            "        var bottom = top + hRect.height; " +
+            "        result.sectionHeaderBounds.push({top: Math.round(top), bottom: Math.round(bottom)}); " +
             "      } " +
             "      var components = root.querySelectorAll('.component-card'); " +
             "      for (var i = 0; i < components.length; i++) { " +
             "        var c = components[i]; " +
-            "        var top = c.offsetTop; " +
-            "        var bottom = top + c.offsetHeight; " +
+            "        var cRect = c.getBoundingClientRect(); " +
+            "        var top = cRect.top - rootRect.top + root.scrollTop; " +
+            "        var bottom = top + cRect.height; " +
             "        var header = c.querySelector('.component-header'); " +
             "        var fields = c.querySelector('.component-fields'); " +
+            "        var headerTop = top; " +
+            "        var headerBottom = top; " +
+            "        var fieldsTop = top; " +
+            "        var fieldsBottom = bottom; " +
+            "        if (header) { " +
+            "          var hRect = header.getBoundingClientRect(); " +
+            "          headerTop = hRect.top - rootRect.top + root.scrollTop; " +
+            "          headerBottom = headerTop + hRect.height; " +
+            "        } " +
+            "        if (fields) { " +
+            "          var fRect = fields.getBoundingClientRect(); " +
+            "          fieldsTop = fRect.top - rootRect.top + root.scrollTop; " +
+            "          fieldsBottom = fieldsTop + fRect.height; " +
+            "        } " +
             "        result.componentBounds.push({ " +
-            "          top: top, " +
-            "          bottom: bottom, " +
-            "          headerTop: header ? header.offsetTop : top, " +
-            "          headerBottom: header ? header.offsetTop + header.offsetHeight : top, " +
-            "          fieldsTop: fields ? fields.offsetTop : top, " +
-            "          fieldsBottom: fields ? fields.offsetTop + fields.offsetHeight : bottom " +
+            "          top: Math.round(top), " +
+            "          bottom: Math.round(bottom), " +
+            "          headerTop: Math.round(headerTop), " +
+            "          headerBottom: Math.round(headerBottom), " +
+            "          fieldsTop: Math.round(fieldsTop), " +
+            "          fieldsBottom: Math.round(fieldsBottom) " +
             "        }); " +
             "      } " +
             "      result.debug.componentCount = components.length; " +
@@ -292,8 +310,12 @@ public class PdfContentMeasurer {
                     fallbackDebug.put("webViewHeight", fallbackHeight);
                     fallbackDebug.put("cssHeight", cssHeight);
                 } catch (Exception e) {}
-                callback.onResult(MeasurementResult.success(cssHeight, cssWidth > 0 ? cssWidth : 794, 
-                    new ArrayList<>(), new ArrayList<>(), fallbackDebug));
+                // Fallback должен возвращать error, но с данными для экспорта
+                callback.onResult(MeasurementResult.error(
+                    "JS returned null, using fallback",
+                    cssHeight,
+                    fallbackDebug
+                ));
                 return;
             }
             
