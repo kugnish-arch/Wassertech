@@ -240,16 +240,73 @@ public final class WebViewPdfExporter {
             // Освобождаем память
             bitmap.recycle();
             
-            // Рисуем debug линии (если нужно)
-            PdfDebugDrawer.drawDebugLines(
-                    canvas,
-                    pageWidthDevicePx,
-                    pageHeightDevicePxActual,
-                    density,
-                    measurementResult.componentBoundaries,
-                    measurementResult.sectionHeaderBoundaries,
-                    pageBoundaries
-            );
+            // Debug линии отключены (убраны синие и зеленые линии)
+            // PdfDebugDrawer.drawDebugLines(...) - закомментировано
+            
+            // Добавляем надпись "Продолжение отчёта смотри на странице Nx..." 
+            // если есть большое пустое пространство внизу страницы (не на последней странице)
+            if (pageIndex < pageBoundaries.size() - 2) { // Не последняя страница
+                // Находим последний элемент на текущей странице
+                float lastElementEndCss = pageStartCss;
+                
+                // Проверяем компоненты на текущей странице
+                for (PdfBoundaryModels.ComponentBoundary comp : measurementResult.componentBoundaries) {
+                    if (comp.topCss >= pageStartCss && comp.topCss < pageEndCss) {
+                        // Компонент попадает на эту страницу
+                        if (comp.bottomCss > lastElementEndCss) {
+                            lastElementEndCss = comp.bottomCss;
+                        }
+                    }
+                }
+                
+                // Проверяем заголовки секций на текущей странице
+                for (PdfBoundaryModels.SectionHeaderBoundary header : measurementResult.sectionHeaderBoundaries) {
+                    if (header.topCss >= pageStartCss && header.topCss < pageEndCss) {
+                        // Заголовок попадает на эту страницу
+                        if (header.bottomCss > lastElementEndCss) {
+                            lastElementEndCss = header.bottomCss;
+                        }
+                    }
+                }
+                
+                // Вычисляем пустое пространство внизу страницы (в CSS пикселях)
+                float emptySpaceCss = pageEndCss - lastElementEndCss;
+                
+                // Минимальный размер пустого пространства для вставки надписи: 80px CSS (примерно 20mm)
+                // И максимальный размер: если пространство слишком большое (больше 200px), точно вставляем
+                float minEmptySpaceCss = 80f; // Минимум для вставки надписи
+                float maxEmptySpaceCss = 200f; // Если больше этого, точно вставляем
+                
+                if (emptySpaceCss >= minEmptySpaceCss) {
+                    // Конвертируем позицию последнего элемента в device пиксели относительно начала страницы
+                    // (на canvas координаты начинаются с 0 для каждой страницы)
+                    float lastElementEndDevicePx = (lastElementEndCss - pageStartCss) * density;
+                    
+                    // Вычисляем позицию для надписи: немного выше центра пустого пространства
+                    float continuationTextY = lastElementEndDevicePx + (emptySpaceCss * density) * 0.4f;
+                    
+                    // Проверяем, что надпись влезает на страницу
+                    if (continuationTextY < pageHeightDevicePxActual - 20) {
+                        // Рисуем надпись
+                        android.graphics.Paint textPaint = new android.graphics.Paint();
+                        textPaint.setColor(0xFF6B7280); // Серый цвет (--muted)
+                        textPaint.setTextSize(28f * density / 2.625f); // 10pt в device пикселях (примерно)
+                        textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
+                        textPaint.setAntiAlias(true);
+                        textPaint.setStyle(android.graphics.Paint.Style.FILL);
+                        textPaint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.NORMAL));
+                        
+                        int nextPageNumber = pageIndex + 2; // Номер следующей страницы
+                        String continuationText = "Продолжение отчёта смотри на странице " + nextPageNumber + "...";
+                        
+                        // Рисуем текст по центру страницы по горизонтали
+                        canvas.drawText(continuationText, pageWidthDevicePx / 2f, continuationTextY, textPaint);
+                        
+                        Log.d(TAG, "Added continuation text on page " + (pageIndex + 1) + 
+                              ": empty space=" + emptySpaceCss + " CSS px, text Y=" + continuationTextY + " device px");
+                    }
+                }
+            }
             
             // Завершаем страницу
             pdfDocument.finishPage(page);

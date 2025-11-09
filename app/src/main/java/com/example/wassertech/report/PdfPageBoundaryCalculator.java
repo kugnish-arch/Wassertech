@@ -49,12 +49,25 @@ public class PdfPageBoundaryCalculator {
             
             // Check if any section header would be split by this page boundary
             // Priority 1: Section headers should not be separated from their content
+            // NEW LOGIC: If the first component of a section doesn't fit on current page,
+            // the break should be BEFORE the section header (header moves with components)
             PdfBoundaryModels.SectionHeaderBoundary splitSectionHeader = null;
             float closestSectionHeaderTop = Float.MAX_VALUE;
             
-            // Check if idealPageEnd falls inside any section header
-            // Also check if idealPageEnd is very close to a section header (within 10px) - we should break before it
+            // Find the first component after each section header
+            // If that component doesn't fit on current page, break before the header
             for (PdfBoundaryModels.SectionHeaderBoundary header : sectionHeaderBoundaries) {
+                // Find the first component that comes after this header
+                PdfBoundaryModels.ComponentBoundary firstComponentAfterHeader = null;
+                for (PdfBoundaryModels.ComponentBoundary comp : componentBoundaries) {
+                    if (comp.topCss > header.bottomCss) {
+                        // This component comes after the header
+                        if (firstComponentAfterHeader == null || comp.topCss < firstComponentAfterHeader.topCss) {
+                            firstComponentAfterHeader = comp;
+                        }
+                    }
+                }
+                
                 // Check if idealPageEnd falls inside the header
                 if (idealPageEnd > header.topCss && idealPageEnd < header.bottomCss) {
                     // Page boundary falls inside section header - move before header
@@ -69,6 +82,29 @@ public class PdfPageBoundaryCalculator {
                         splitSectionHeader = header;
                         closestSectionHeaderTop = header.topCss;
                         Log.d(TAG, "    -> Section header is very close to break point: " + header.toString() + " (idealPageEnd=" + idealPageEnd + " is within 10px)");
+                    }
+                } else if (firstComponentAfterHeader != null) {
+                    // Check if the first component after this header doesn't fit on current page
+                    // If the component would be split or is too close to the page boundary,
+                    // we should break BEFORE the header so header and components stay together
+                    boolean componentWouldBreak = firstComponentAfterHeader.wouldBreakInside(idealPageEnd);
+                    boolean componentTooClose = idealPageEnd > firstComponentAfterHeader.topCss - 50 && idealPageEnd < firstComponentAfterHeader.topCss + 50;
+                    
+                    // Also check if there's a large gap between header and first component
+                    // If the gap would be split, break before header
+                    boolean gapWouldBeSplit = idealPageEnd > header.bottomCss && idealPageEnd < firstComponentAfterHeader.topCss;
+                    
+                    // If first component doesn't fit, break before header
+                    if ((componentWouldBreak || componentTooClose || gapWouldBeSplit) && 
+                        header.topCss >= currentPageStart && header.topCss < closestSectionHeaderTop) {
+                        splitSectionHeader = header;
+                        closestSectionHeaderTop = header.topCss;
+                        Log.d(TAG, "    -> Section header '" + header.toString() + "' first component doesn't fit: " + 
+                              firstComponentAfterHeader.toString() + 
+                              " (componentWouldBreak=" + componentWouldBreak + 
+                              ", componentTooClose=" + componentTooClose + 
+                              ", gapWouldBeSplit=" + gapWouldBeSplit + ")");
+                        Log.d(TAG, "      -> Breaking BEFORE header to keep header with components");
                     }
                 }
             }
