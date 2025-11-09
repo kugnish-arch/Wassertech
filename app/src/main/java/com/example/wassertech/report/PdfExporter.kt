@@ -57,12 +57,22 @@ object PdfExporter {
             
             // Настраиваем WebView
             webView.settings.apply {
-                javaScriptEnabled = false
+                javaScriptEnabled = true  // ВКЛЮЧАЕМ JavaScript для измерения границ компонентов!
                 domStorageEnabled = false
                 loadWithOverviewMode = true
                 useWideViewPort = true
                 setSupportZoom(false)
                 builtInZoomControls = false
+            }
+            
+            // Включаем логирование JavaScript console.log в logcat
+            webView.webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    consoleMessage?.let {
+                        Log.d("WebViewJS", "${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}")
+                    }
+                    return true
+                }
             }
             
             // Измеряем контейнер и WebView с правильными размерами

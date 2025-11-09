@@ -32,9 +32,7 @@ import com.example.wassertech.ui.settings.SettingsScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
-import com.example.wassertech.ui.theme.Dimens
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import com.example.wassertech.ui.common.SectionHeader
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -346,18 +344,4 @@ private fun AppScaffold(navController: NavHostController) {
     }
 }
 
-@Composable
-private fun SectionHeader(title: String) {
-    Surface(tonalElevation = 1.dp) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-    }
-    // ЕДИНЫЙ зазор под сабнавбаром
-    Spacer(Modifier.height(Dimens.SubNavbarGap))
-}
+

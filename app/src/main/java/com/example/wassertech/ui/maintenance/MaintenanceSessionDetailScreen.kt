@@ -27,7 +27,7 @@ import com.example.wassertech.report.ReportAssembler
 import com.example.wassertech.report.HtmlTemplateEngine
 import com.example.wassertech.report.PdfExporter
 import com.example.wassertech.report.ShareUtils
-
+import android.util.Log;
 
 @Composable
 fun MaintenanceSessionDetailScreen(
@@ -186,6 +186,11 @@ fun MaintenanceSessionDetailScreen(
                                         dto = dto
                                     )
                                 }
+                                
+                                // Сохраняем HTML рядом с PDF
+                                val htmlFile = File(reportsDir, fileName.replace(".pdf", ".html"))
+                                htmlFile.writeText(html, Charsets.UTF_8)
+                                Log.d("PDF", "HTML saved to: ${htmlFile.absolutePath}")
                                 
                                 // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
                                 PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)
