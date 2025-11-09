@@ -158,15 +158,16 @@ fun ClientDetailScreen(
                         options = listOf(
                             FABOption(
                                 label = "Установка",
-                                icon = Icons.Filled.Add,
+                                icon = Icons.Filled.SettingsApplications,
                                 onClick = { showAddInstallation = true }
                             ),
                             FABOption(
                                 label = "Объект",
-                                icon = Icons.Filled.Add,
+                                icon = Icons.Filled.Business,
                                 onClick = { showAddSite = true }
                             )
-                        )
+                        ),
+                        optionsColor = Color(0xFF1E1E1E) // Черный цвет для выпрыгивающих кнопок
                     )
                 )
             }

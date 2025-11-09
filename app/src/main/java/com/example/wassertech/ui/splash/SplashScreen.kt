@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.example.wassertech.R
@@ -75,8 +77,12 @@ private fun SplashAnimatedLogoV2(
     wipeProgress: Float
 ) {
     // Геометрия логотипа
-    var logoW by remember { mutableStateOf(0f) }
-    var logoH by remember { mutableStateOf(0f) }
+    var wasserW by remember { mutableStateOf(0f) }
+    var wasserH by remember { mutableStateOf(0f) }
+    var techW by remember { mutableStateOf(0f) }
+    var techH by remember { mutableStateOf(0f) }
+    var totalW by remember { mutableStateOf(0f) }
+    var totalH by remember { mutableStateOf(0f) }
 
     // Смещение вправо ~ на треть ширины экрана
     Box(
@@ -97,94 +103,121 @@ private fun SplashAnimatedLogoV2(
                     .wrapContentSize()
                     .scale(scale)
                     .alpha(alpha)
+                    .onGloballyPositioned {
+                        totalW = it.size.width.toFloat()
+                        totalH = it.size.height.toFloat()
+                    }
             ) {
-                // Слой: полотно для графики
-                Box(
-                    modifier = Modifier
-                        .wrapContentSize()
-                        .onGloballyPositioned {
-                            logoW = it.size.width.toFloat()
-                            logoH = it.size.height.toFloat()
-                        }
+                // Row для размещения wasser и tech рядом
+                Row(
+                    modifier = Modifier.wrapContentSize(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 1) WASSER (красный) — статичен
-                    Image(
-                        painter = painterResource(R.drawable.logo_wasser_red),
-                        contentDescription = "wasser (red)",
-                        contentScale = ContentScale.Fit
-                    )
-
-                    // 2) TECH (чёрный) — базовый слой
-                    Image(
-                        painter = painterResource(R.drawable.logo_tech_black),
-                        contentDescription = "tech (black)",
-                        contentScale = ContentScale.Fit
-                    )
-
-                    // 3) Вертикальная КРАСНАЯ линия: растёт сверху вниз
-                    Canvas(
-                        modifier = Modifier.matchParentSize()
+                    // 1) WASSER (красный) — слева
+                    Box(
+                        modifier = Modifier
+                            .wrapContentSize()
+                            .onGloballyPositioned {
+                                wasserW = it.size.width.toFloat()
+                                wasserH = it.size.height.toFloat()
+                            }
                     ) {
-                        val xLine = (logoW * 0.63f) // позиция разделения между "wasser" и "tech"
-                        val yEnd = logoH * lineProgress
-                        drawLine(
-                            color = BrandRed,
-                            start = Offset(xLine, 0f),
-                            end = Offset(xLine, yEnd),
-                            strokeWidth = 6f,
-                            cap = StrokeCap.Round
+                        Image(
+                            painter = painterResource(R.drawable.logo_wasser_red),
+                            contentDescription = "wasser (red)",
+                            contentScale = ContentScale.Fit
                         )
                     }
 
-                    // 4) ГРАФИТОВЫЙ ФОН: наползает справа налево от красной линии
-                    Canvas(
-                        modifier = Modifier.matchParentSize()
-                    ) {
-                        val xLine = (logoW * 0.63f)
-                        val startX = xLine
-                        val wipeX = startX + (logoW - startX) * wipeProgress
-                        drawRect(
-                            color = Graphite,
-                            topLeft = Offset(startX, 0f),
-                            size = Size(
-                                width = (wipeX - startX).coerceAtLeast(0f),
-                                height = logoH
-                            )
-                        )
-                    }
-
-                    // 5) TECH (белый) — проявляем ТОЛЬКО В ЗОНЕ графитового фона
-                    // Белый TECH, обрезанный расширяющимся прямоугольником
-                    if (logoW > 0 && logoH > 0) {
-                        val xLine = logoW * 0.63f
-                        val wipeWidth = (logoW - xLine) * wipeProgress
-                        
+                    // 2) Вертикальная КРАСНАЯ линия: растёт сверху вниз между wasser и tech
+                    if (wasserH > 0) {
                         Box(
                             modifier = Modifier
-                                .matchParentSize()
-                                .clipToBounds()
+                                .width(6.dp)
+                                .height(wasserH.dp * lineProgress)
                         ) {
-                            // Белый TECH изображение с клиппингом через draw modifier
+                            Canvas(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                val lineHeight = wasserH * lineProgress
+                                drawLine(
+                                    color = BrandRed,
+                                    start = Offset(size.width / 2, 0f),
+                                    end = Offset(size.width / 2, lineHeight),
+                                    strokeWidth = 6f,
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                        }
+                    }
+
+                    // 3) TECH (чёрный) — базовый слой справа, с той же высотой что и wasser
+                    Box(
+                        modifier = Modifier
+                            .wrapContentSize()
+                            .onGloballyPositioned {
+                                techW = it.size.width.toFloat()
+                                techH = it.size.height.toFloat()
+                            }
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.logo_tech_black),
+                            contentDescription = "tech (black)",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.height(if (wasserH > 0) wasserH.dp else Dp.Unspecified)
+                        )
+
+                        // 4) ГРАФИТОВЫЙ ФОН: наползает справа налево на tech (поверх чёрного tech)
+                        if (techW > 0 && techH > 0) {
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .drawWithContent {
-                                        val clipRight = xLine + wipeWidth
-                                        clipRect(
-                                            left = xLine,
-                                            top = 0f,
-                                            right = clipRight,
-                                            bottom = logoH
-                                        ) {
-                                            this@drawWithContent.drawContent()
-                                        }
-                                    }
+                                    .clipToBounds()
                             ) {
-                                Image(
-                                    painter = painterResource(R.drawable.logo_tech_white),
-                                    contentDescription = "tech (white masked)",
-                                    contentScale = ContentScale.Fit
-                                )
+                                Canvas(
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    drawRect(
+                                        color = Graphite,
+                                        topLeft = Offset(0f, 0f),
+                                        size = Size(
+                                            width = techW * wipeProgress,
+                                            height = techH
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // 5) TECH (белый) — проявляем ТОЛЬКО В ЗОНЕ графитового фона (поверх графита)
+                        if (techW > 0 && techH > 0 && wipeProgress > 0f) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clipToBounds()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .drawWithContent {
+                                            val clipRight = techW * wipeProgress
+                                            clipRect(
+                                                left = 0f,
+                                                top = 0f,
+                                                right = clipRight,
+                                                bottom = techH
+                                            ) {
+                                                this@drawWithContent.drawContent()
+                                            }
+                                        }
+                                ) {
+                                    Image(
+                                        painter = painterResource(R.drawable.logo_tech_white),
+                                        contentDescription = "tech (white masked)",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.height(techH.dp)
+                                    )
+                                }
                             }
                         }
                     }

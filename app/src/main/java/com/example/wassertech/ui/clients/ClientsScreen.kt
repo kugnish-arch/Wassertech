@@ -211,7 +211,7 @@ fun ClientsScreen(
                     options = listOf(
                         FABOption(
                             label = "Клиент",
-                            icon = Icons.Filled.Add,
+                            icon = Icons.Filled.Person,
                             onClick = {
                                 onAddClient()
                                 createClientDialog = true
@@ -219,12 +219,13 @@ fun ClientsScreen(
                         ),
                         FABOption(
                             label = "Группа",
-                            icon = Icons.Filled.Add,
+                            icon = Icons.Filled.Group,
                             onClick = {
                                 createGroupDialog = true
                             }
                         )
-                    )
+                    ),
+                    optionsColor = Color(0xFF1E1E1E) // Черный цвет для выпрыгивающих кнопок
                 )
             )
         }

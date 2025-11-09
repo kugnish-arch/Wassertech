@@ -1,5 +1,7 @@
 package com.example.wassertech.report;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.webkit.WebView;
 
@@ -8,11 +10,23 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PdfContentMeasurer {
     private static final String TAG = "PdfContentMeasurer";
+    
+    public interface MeasurementCallback {
+        void onResult(MeasurementResult result);
+    }
+
+    /**
+     * RUN THIS FIRST for DOM test. Log will show "found"/"not found".
+     */
+    public static void debugPrintRoot(WebView webView) {
+        webView.evaluateJavascript("document.getElementById('print-root') ? 'found' : 'not found';", value -> {
+            Log.d(TAG, "print-root existence: " + value);
+        });
+    }
 
     public static class MeasurementResult {
         public final int contentHeightCss;
@@ -50,180 +64,325 @@ public class PdfContentMeasurer {
         }
     }
 
-    public static MeasurementResult measureContent(WebView webView) {
-        try {
-            // Не убирайте, это может влиять на рендер!
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        final String measureJs = "(function() { " +
-                "  try { " +
-                "    var root = document.getElementById('print-root') || document.body;" +
-                "    var debugMsg = [];" +
-                "    if (!root) { debugMsg.push('print-root not found'); return JSON.stringify({error: 'print-root not found', debugMsgs: debugMsg}); } " +
-
-                "    debugMsg.push('Root found: ' + (root ? 'present' : 'missing'));" +
-                "    var rootRect = root.getBoundingClientRect();" +
-                "    var cssWidth = Math.max(root.scrollWidth || 0, root.offsetWidth || 0, root.clientWidth || 0, rootRect.width || 0);" +
-                "    var cssHeight = Math.max(root.scrollHeight || 0, root.offsetHeight || 0, root.clientHeight || 0, rootRect.height || 0);" +
-                "    debugMsg.push('Root size: width=' + cssWidth + ', height=' + cssHeight);" +
-
-                "    debugMsg.push('HTML length: ' + (root.innerHTML ? root.innerHTML.length : 'n/a'));" +
-
-                "    var sectionHeaders = Array.from(root.querySelectorAll('h2.section-header-red'));" +
-                "    debugMsg.push('Found ' + sectionHeaders.length + ' section headers');" +
-                "    var sectionHeaderBounds = [];" +
-                "    for (var i = 0; i < sectionHeaders.length; i++) { " +
-                "      var header = sectionHeaders[i];" +
-                "      var top = header.offsetTop;" +
-                "      var bottom = top + header.offsetHeight;" +
-                "      debugMsg.push('SectionHeader['+i+']: text=' + (header.textContent||'').substring(0,30) + ', top=' + top + ', bottom=' + bottom);" +
-                "      sectionHeaderBounds.push({top: top, bottom: bottom});" +
-                "    }" +
-
-                "    var components = Array.from(root.querySelectorAll('.component-card'));" +
-                "    debugMsg.push('Found ' + components.length + ' component cards');" +
-                "    var componentBounds = [];" +
-                "    for (var i = 0; i < components.length; i++) { " +
-                "      var comp = components[i];" +
-                "      var top = comp.offsetTop;" +
-                "      var bottom = top + comp.offsetHeight;" +
-                "      var header = comp.querySelector('.component-header');" +
-                "      var fields = comp.querySelector('.component-fields');" +
-
-                "      var headerTop = top, headerBottom = top, fieldsTop = top, fieldsBottom = bottom;" +
-                "      if (header) { headerTop = header.offsetTop; headerBottom = headerTop + header.offsetHeight; }" +
-                "      if (fields) { fieldsTop = fields.offsetTop; fieldsBottom = fieldsTop + fields.offsetHeight; }" +
-                "      var compName = header ? header.textContent : 'no name';" +
-                "      debugMsg.push('Component[' + i + ']: name=' + (compName||'').substring(0,30) + ', top=' + top + ', bottom=' + bottom);" +
-                "      componentBounds.push({top: top, bottom: bottom, height: bottom-top, headerTop: headerTop, headerBottom: headerBottom, fieldsTop: fieldsTop, fieldsBottom: fieldsBottom});" +
-                "    }" +
-
-                "    return JSON.stringify({ " +
-                "      cssWidth: cssWidth," +
-                "      cssHeight: cssHeight," +
-                "      dpr: window.devicePixelRatio || 1," +
-                "      innerH: window.innerHeight || 0," +
-                "      componentBounds: componentBounds," +
-                "      sectionHeaderBounds: sectionHeaderBounds," +
-                "      debug: { debugMsgs: debugMsg, sectionHeaderCount: sectionHeaders.length, componentCount: components.length, rootScrollTop: root.scrollTop, rootOffsetTop: root.offsetTop } " +
-                "    });" +
-                "  } catch(e) { " +
-                "    var debugError = 'JavaScript error: ' + e.toString();" +
-                "    return JSON.stringify({error: debugError, stack: e.stack, debugMsgs: [debugError]});" +
-                "  } " +
-                "})();";
-
-        String jsResult = null;
-        try {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final String[] resultHolder = new String[1];
-
-            Log.d(TAG, "Executing JS measurement...");
-
-            webView.evaluateJavascript(measureJs, value -> {
-                resultHolder[0] = value;
-                latch.countDown();
+    /**
+     * Асинхронное измерение контента WebView.
+     * ВАЖНО: Вызывайте только после WebView.onPageFinished, на главном потоке!
+     * 
+     * @param webView WebView для измерения
+     * @param callback Callback для получения результата
+     * @param timeoutMs Таймаут в миллисекундах (по умолчанию 10000)
+     * @return Runnable для отмены таймаута (если нужно)
+     */
+    public static Runnable measureContentAsync(WebView webView, MeasurementCallback callback, long timeoutMs) {
+        // Проверяем, что мы на главном потоке
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Log.e(TAG, "measureContentAsync must be called on main thread!");
+            Handler mainHandler = new Handler(Looper.getMainLooper());
+            mainHandler.post(() -> {
+                callback.onResult(MeasurementResult.error("Must be called on main thread", 
+                    webView.getContentHeight(), null));
             });
-
-            boolean completed = latch.await(3, TimeUnit.SECONDS);
-            if (completed && resultHolder[0] != null && !resultHolder[0].equals("null")) {
-                jsResult = resultHolder[0];
-                if (jsResult.startsWith("\"") && jsResult.endsWith("\"")) {
-                    jsResult = jsResult.substring(1, jsResult.length() - 1);
-                    jsResult = jsResult.replace("\\\"", "\"").replace("\\\\", "\\");
-                }
-                Log.d(TAG, "JS finished, result length: " + jsResult.length());
-                Log.d(TAG, "JS raw: " + jsResult);
-            } else {
-                Log.e(TAG, "JS evaluation timed out or null. completed=" + completed + ", result=" + resultHolder[0]);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            Log.e(TAG, "Interrupted while waiting for JS result", e);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to execute JS", e);
+            return () -> {};
         }
 
-        if (jsResult != null && !jsResult.isEmpty() && !jsResult.equals("null")) {
+        final long startTime = System.currentTimeMillis();
+        final AtomicBoolean expired = new AtomicBoolean(false);
+        final Handler mainHandler = new Handler(Looper.getMainLooper());
+        
+        // Проверяем готовность WebView
+        Log.d(TAG, "WebView state: progress=" + webView.getProgress() + 
+              ", contentHeight=" + webView.getContentHeight() + 
+              ", isMainThread=" + (Looper.myLooper() == Looper.getMainLooper()));
+
+        // Проверяем, что JavaScript включен
+        android.webkit.WebSettings settings = webView.getSettings();
+        if (!settings.getJavaScriptEnabled()) {
+            Log.e(TAG, "JavaScript is disabled in WebView settings!");
+            callback.onResult(MeasurementResult.error("JavaScript is disabled", 
+                webView.getContentHeight(), null));
+            return () -> {};
+        }
+        Log.d(TAG, "JavaScript is enabled: " + settings.getJavaScriptEnabled());
+
+        // Функция для создания fallback результата
+        Runnable createFallbackResult = () -> {
+            if (expired.getAndSet(true)) {
+                Log.d(TAG, "Fallback already executed, ignoring");
+                return;
+            }
+            long elapsed = System.currentTimeMillis() - startTime;
+            Log.w(TAG, "Using fallback after " + elapsed + "ms: WebView.getContentHeight()");
+            
+            // WebView.getContentHeight() возвращает высоту в CSS пикселях (не device pixels!)
+            // Это важно - не нужно делить на density
+            int fallbackHeight = webView.getContentHeight();
+            int fallbackWidth = webView.getWidth();
+            
+            // Но width в device pixels, конвертируем в CSS
+            float density = webView.getContext().getResources().getDisplayMetrics().density;
+            int cssWidth = (int) (fallbackWidth / density);
+            
+            // Высота уже в CSS пикселях (по документации WebView)
+            int cssHeight = fallbackHeight;
+            
+            Log.d(TAG, "Fallback measurements: webViewHeight=" + fallbackHeight + 
+                  " (CSS px), webViewWidth=" + fallbackWidth + " (device px), " +
+                  "cssWidth=" + cssWidth + ", density=" + density);
+            
+            JSONObject fallbackDebug = new JSONObject();
+            try {
+                fallbackDebug.put("fallback", true);
+                fallbackDebug.put("reason", "JS timeout");
+                fallbackDebug.put("elapsedMs", elapsed);
+                fallbackDebug.put("webViewHeight", fallbackHeight);
+                fallbackDebug.put("cssHeight", cssHeight);
+            } catch (Exception e) {
+                // Игнорируем ошибки создания debug объекта
+            }
+            
+            callback.onResult(MeasurementResult.success(
+                cssHeight > 0 ? cssHeight : fallbackHeight,
+                cssWidth > 0 ? cssWidth : 794,
+                new ArrayList<>(), // Пустые границы компонентов
+                new ArrayList<>(), // Пустые границы секций
+                fallbackDebug
+            ));
+        };
+
+        // Устанавливаем таймаут для fallback
+        Runnable timeoutRunnable = () -> {
+            if (!expired.get()) {
+                Log.w(TAG, "Measurement timeout after " + timeoutMs + "ms, using fallback");
+                createFallbackResult.run();
+            }
+        };
+        mainHandler.postDelayed(timeoutRunnable, timeoutMs);
+        
+        // Даём небольшое время для стабилизации рендера (не блокируя поток!)
+        mainHandler.postDelayed(() -> {
+            if (expired.get()) {
+                Log.d(TAG, "Measurement already expired, skipping");
+                return;
+            }
+            
+            Log.d(TAG, "Starting JS measurement after stabilization delay");
+            startMeasurement(webView, callback, expired, startTime, timeoutRunnable, mainHandler);
+        }, 300); // Небольшая задержка для стабилизации, но не блокирующая
+        
+        return timeoutRunnable; // Возвращаем runnable для возможной отмены таймаута
+    }
+    
+    private static void startMeasurement(WebView webView, MeasurementCallback callback, 
+                                       AtomicBoolean expired, long startTime, Runnable timeoutRunnable,
+                                       Handler mainHandler) {
+
+        // Упрощённый JS код с лучшей обработкой ошибок
+        final String measureJs = 
+            "(function() { " +
+            "  'use strict'; " +
+            "  try { " +
+            "    console.log('JS measurement started'); " +
+            "    var root = document.getElementById('print-root'); " +
+            "    if (!root) { root = document.body; } " +
+            "    if (!root) { " +
+            "      console.error('No root element found'); " +
+            "      return JSON.stringify({error: 'No root element', debugMsgs: ['No root']}); " +
+            "    } " +
+            "    console.log('Root found, measuring...'); " +
+            "    var cssWidth = Math.max(root.scrollWidth || 0, root.offsetWidth || 0, root.clientWidth || 0); " +
+            "    var cssHeight = Math.max(root.scrollHeight || 0, root.offsetHeight || 0, root.clientHeight || 0); " +
+            "    console.log('Size: ' + cssWidth + 'x' + cssHeight); " +
+            "    var result = { " +
+            "      cssWidth: cssWidth, " +
+            "      cssHeight: cssHeight, " +
+            "      componentBounds: [], " +
+            "      sectionHeaderBounds: [], " +
+            "      debug: { " +
+            "        debugMsgs: ['Measurement completed'], " +
+            "        rootWidth: cssWidth, " +
+            "        rootHeight: cssHeight " +
+            "      } " +
+            "    }; " +
+            "    try { " +
+            "      var sectionHeaders = root.querySelectorAll('h2.section-header-red'); " +
+            "      for (var i = 0; i < sectionHeaders.length; i++) { " +
+            "        var h = sectionHeaders[i]; " +
+            "        result.sectionHeaderBounds.push({top: h.offsetTop, bottom: h.offsetTop + h.offsetHeight}); " +
+            "      } " +
+            "      var components = root.querySelectorAll('.component-card'); " +
+            "      for (var i = 0; i < components.length; i++) { " +
+            "        var c = components[i]; " +
+            "        var top = c.offsetTop; " +
+            "        var bottom = top + c.offsetHeight; " +
+            "        var header = c.querySelector('.component-header'); " +
+            "        var fields = c.querySelector('.component-fields'); " +
+            "        result.componentBounds.push({ " +
+            "          top: top, " +
+            "          bottom: bottom, " +
+            "          headerTop: header ? header.offsetTop : top, " +
+            "          headerBottom: header ? header.offsetTop + header.offsetHeight : top, " +
+            "          fieldsTop: fields ? fields.offsetTop : top, " +
+            "          fieldsBottom: fields ? fields.offsetTop + fields.offsetHeight : bottom " +
+            "        }); " +
+            "      } " +
+            "      result.debug.componentCount = components.length; " +
+            "      result.debug.sectionHeaderCount = sectionHeaders.length; " +
+            "    } catch(e2) { " +
+            "      console.warn('Error measuring components: ' + e2); " +
+            "      result.debug.componentError = e2.toString(); " +
+            "    } " +
+            "    console.log('JS measurement completed'); " +
+            "    return JSON.stringify(result); " +
+            "  } catch(e) { " +
+            "    console.error('JS measurement error: ' + e); " +
+            "    return JSON.stringify({error: e.toString(), stack: e.stack, debugMsgs: ['Error: ' + e]}); " +
+            "  } " +
+            "})();";
+
+        Log.d(TAG, "Executing JS measurement (async, non-blocking)...");
+        
+        // Сохраняем существующий WebChromeClient, если есть
+        android.webkit.WebChromeClient existingClient = webView.getWebChromeClient();
+        if (existingClient == null) {
+            Log.d(TAG, "Setting WebChromeClient for logging");
+            webView.setWebChromeClient(new android.webkit.WebChromeClient() {
+                @Override
+                public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
+                    Log.d(TAG, "WebView JS: " + consoleMessage.message() + 
+                          " -- From line " + consoleMessage.lineNumber() + 
+                          " of " + consoleMessage.sourceId());
+                    return true;
+                }
+            });
+            } else {
+            Log.d(TAG, "WebChromeClient already set, using existing one");
+        }
+
+        // Выполняем JS асинхронно - callback придет когда будет готово
+        webView.evaluateJavascript(measureJs, value -> {
+            long elapsed = System.currentTimeMillis() - startTime;
+            
+            // Проверяем, не устарел ли callback
+            if (expired.get()) {
+                Log.w(TAG, "JS callback received but measurement already expired (elapsed: " + elapsed + "ms), ignoring");
+                return;
+            }
+            
+            // Отменяем таймаут, так как получили результат
+            mainHandler.removeCallbacks(timeoutRunnable);
+            
+            Log.d(TAG, "JS callback received after " + elapsed + "ms, value=" + 
+                  (value != null ? (value.length() > 100 ? value.substring(0, 100) + "..." : value) : "null"));
+            
+            if (value == null || value.equals("null") || value.isEmpty()) {
+                Log.e(TAG, "JS returned null or empty after " + elapsed + "ms");
+                expired.set(true);
+                // Используем fallback - WebView.getContentHeight() возвращает CSS пиксели
+                int fallbackHeight = webView.getContentHeight();
+                int fallbackWidth = webView.getWidth();
+                float density = webView.getContext().getResources().getDisplayMetrics().density;
+                int cssWidth = (int) (fallbackWidth / density);
+                int cssHeight = fallbackHeight; // Уже в CSS пикселях
+                
+                JSONObject fallbackDebug = new JSONObject();
+                try {
+                    fallbackDebug.put("fallback", true);
+                    fallbackDebug.put("reason", "JS returned null");
+                    fallbackDebug.put("elapsedMs", elapsed);
+                    fallbackDebug.put("webViewHeight", fallbackHeight);
+                    fallbackDebug.put("cssHeight", cssHeight);
+                } catch (Exception e) {}
+                callback.onResult(MeasurementResult.success(cssHeight, cssWidth > 0 ? cssWidth : 794, 
+                    new ArrayList<>(), new ArrayList<>(), fallbackDebug));
+                return;
+            }
+            
+            // Обрабатываем результат
+            String jsResult = value;
+            // Убираем кавычки и экранирование
+            if (jsResult.startsWith("\"") && jsResult.endsWith("\"")) {
+                jsResult = jsResult.substring(1, jsResult.length() - 1);
+                jsResult = jsResult.replace("\\\"", "\"")
+                                  .replace("\\\\", "\\")
+                                  .replace("\\n", "\n")
+                                  .replace("\\r", "\r")
+                                  .replace("\\t", "\t");
+            }
+            
             try {
                 JSONObject json = new JSONObject(jsResult);
 
                 if (json.has("error")) {
                     String errorMsg = json.getString("error");
-                    Log.e(TAG, "JS returned error: " + errorMsg);
-                    if (json.has("stack")) {
-                        Log.e(TAG, "JS stack: " + json.getString("stack"));
-                    }
-                    if (json.has("debugMsgs")) {
-                        Log.e(TAG, "JS debug: " + json.getJSONArray("debugMsgs").toString());
-                    }
-                    return MeasurementResult.error(errorMsg, webView.getContentHeight(),
-                            json.has("debug") ? json.getJSONObject("debug") : null);
+                    Log.e(TAG, "JS returned error after " + elapsed + "ms: " + errorMsg);
+                    expired.set(true);
+                    callback.onResult(MeasurementResult.error(errorMsg, webView.getContentHeight(),
+                            json.has("debug") ? json.getJSONObject("debug") : null));
+                    return;
                 }
 
                 int contentHeightCss = (int) Math.round(json.getDouble("cssHeight"));
                 int contentWidthCss = (int) Math.round(json.getDouble("cssWidth"));
-                Log.d(TAG, "JS measurement result: cssHeight=" + contentHeightCss + " cssWidth=" + contentWidthCss);
+                Log.d(TAG, "JS measurement SUCCESS after " + elapsed + "ms: cssHeight=" + contentHeightCss + " cssWidth=" + contentWidthCss);
 
-                // Additional debug info
+                // Парсим debug info
                 if (json.has("debug")) {
                     JSONObject debug = json.getJSONObject("debug");
-                    Log.d(TAG, "Debug info from JS: " + debug.toString());
                     if (debug.has("debugMsgs")) {
-                        Log.d(TAG, "DebugMsgs: " + debug.getJSONArray("debugMsgs").toString());
+                        JSONArray msgs = debug.getJSONArray("debugMsgs");
+                        Log.d(TAG, "Debug messages from JS (" + msgs.length() + "):");
+                        for (int i = 0; i < msgs.length(); i++) {
+                            Log.d(TAG, "  [" + i + "] " + msgs.getString(i));
+                        }
+                    }
+                    if (debug.has("componentCount")) {
+                        Log.d(TAG, "Components found: " + debug.getInt("componentCount"));
+                    }
+                    if (debug.has("sectionHeaderCount")) {
+                        Log.d(TAG, "Section headers found: " + debug.getInt("sectionHeaderCount"));
                     }
                 }
 
+                // Парсим границы секций
                 List<PdfBoundaryModels.SectionHeaderBoundary> sectionHeaderBoundaries = new ArrayList<>();
                 if (json.has("sectionHeaderBounds")) {
                     JSONArray boundsArray = json.getJSONArray("sectionHeaderBounds");
                     Log.d(TAG, "Parsing " + boundsArray.length() + " section header boundaries...");
                     for (int i = 0; i < boundsArray.length(); i++) {
                         JSONObject bound = boundsArray.getJSONObject(i);
-                        int top = bound.getInt("top");
-                        int bottom = bound.getInt("bottom");
-                        sectionHeaderBoundaries.add(new PdfBoundaryModels.SectionHeaderBoundary(top, bottom));
-                        Log.d(TAG, "  SectionHeader[" + i + "]: top=" + top + ", bottom=" + bottom + " px");
+                        sectionHeaderBoundaries.add(new PdfBoundaryModels.SectionHeaderBoundary(
+                            bound.getInt("top"), bound.getInt("bottom")));
                     }
-                } else {
-                    Log.w(TAG, "No sectionHeaderBounds in JS result");
                 }
 
+                // Парсим границы компонентов
                 List<PdfBoundaryModels.ComponentBoundary> componentBoundaries = new ArrayList<>();
                 if (json.has("componentBounds")) {
                     JSONArray boundsArray = json.getJSONArray("componentBounds");
                     Log.d(TAG, "Parsing " + boundsArray.length() + " components...");
                     for (int i = 0; i < boundsArray.length(); i++) {
                         JSONObject bound = boundsArray.getJSONObject(i);
-                        int top = bound.getInt("top");
-                        int bottom = bound.getInt("bottom");
-                        int headerTop = bound.has("headerTop") ? bound.getInt("headerTop") : top;
-                        int headerBottom = bound.has("headerBottom") ? bound.getInt("headerBottom") : top;
-                        int fieldsTop = bound.has("fieldsTop") ? bound.getInt("fieldsTop") : top;
-                        int fieldsBottom = bound.has("fieldsBottom") ? bound.getInt("fieldsBottom") : bottom;
                         componentBoundaries.add(new PdfBoundaryModels.ComponentBoundary(
-                                top, bottom, headerTop, headerBottom, fieldsTop, fieldsBottom));
-                        Log.d(TAG, "  Component[" + i + "]: top=" + top + ", bottom=" + bottom +
-                                ", header=" + headerTop + "-" + headerBottom +
-                                ", fields=" + fieldsTop + "-" + fieldsBottom + " px");
+                            bound.getInt("top"),
+                            bound.getInt("bottom"),
+                            bound.has("headerTop") ? bound.getInt("headerTop") : bound.getInt("top"),
+                            bound.has("headerBottom") ? bound.getInt("headerBottom") : bound.getInt("top"),
+                            bound.has("fieldsTop") ? bound.getInt("fieldsTop") : bound.getInt("top"),
+                            bound.has("fieldsBottom") ? bound.getInt("fieldsBottom") : bound.getInt("bottom")
+                        ));
                     }
-                } else {
-                    Log.w(TAG, "No componentBounds in JS result");
                 }
 
-                return MeasurementResult.success(contentHeightCss, contentWidthCss,
+                expired.set(true);
+                callback.onResult(MeasurementResult.success(contentHeightCss, contentWidthCss,
                         componentBoundaries, sectionHeaderBoundaries,
-                        json.has("debug") ? json.getJSONObject("debug") : null);
+                        json.has("debug") ? json.getJSONObject("debug") : null));
             } catch (Exception e) {
-                Log.e(TAG, "Failed to parse JS result: " + jsResult, e);
-                return MeasurementResult.error("Failed to parse JS result: " + e.getMessage(), webView.getContentHeight(), null);
+                Log.e(TAG, "Failed to parse JS result after " + elapsed + "ms", e);
+                expired.set(true);
+                callback.onResult(MeasurementResult.error("Failed to parse JS result: " + e.getMessage(), 
+                    webView.getContentHeight(), null));
             }
-        } else {
-            Log.e(TAG, "JS result is null or empty, fallback to WebView.getContentHeight(). Content height: " + webView.getContentHeight());
-            return MeasurementResult.error("JS returned null or empty", webView.getContentHeight(), null);
-        }
+        });
     }
 }

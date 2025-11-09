@@ -3,26 +3,92 @@ package com.example.wassertech.report
 import android.app.Activity
 import android.content.Context
 import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.pdf.PrintedPdfDocument
 import android.webkit.WebView
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.util.Log
+import android.graphics.pdf.PdfDocument
+import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.io.FileOutputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 object PdfExporter {
+    
+    private const val PDF_RENDER_METHOD_KEY = "pdf_render_method"
 
     /**
-     * Renders provided HTML into a PDF file using a WebView and the headless WebViewPdfExporter.
+     * Renders provided HTML into a PDF file using a WebView.
+     * Method can be "bitmap" (via WebViewPdfExporter) or "direct" (via PrintDocumentAdapter).
      *
      * Note: webView will be created and destroyed inside this call. Call from a coroutine (Dispatcher.Main
      * if you want WebView on UI thread is recommended, but WebViewPdfExporter posts to main internally).
      */
-    suspend fun exportHtmlToPdf(context: Context, html: String, outFile: File, reportNumber: String? = null) {
+    suspend fun exportHtmlToPdf(
+        context: Context, 
+        html: String, 
+        outFile: File, 
+        reportNumber: String? = null,
+        method: String? = null // "bitmap" or "direct", null = read from settings
+    ) {
+        val renderMethod = method ?: getPdfRenderMethod(context)
+        
+        if (renderMethod == "direct") {
+            exportHtmlToPdfDirect(context, html, outFile, reportNumber)
+        } else {
+            exportHtmlToPdfBitmap(context, html, outFile, reportNumber)
+        }
+    }
+    
+    private suspend fun getPdfRenderMethod(context: Context): String {
+        return try {
+            val db = com.example.wassertech.data.AppDatabase.getInstance(context)
+            db.settingsDao().getValueSync(PDF_RENDER_METHOD_KEY) ?: "bitmap"
+        } catch (e: Exception) {
+            Log.w("PDF", "Failed to get PDF render method from settings, using bitmap", e)
+            "bitmap"
+        }
+    }
+    
+    /**
+     * Direct method: uses PrintDocumentAdapter (WebView.createPrintDocumentAdapter)
+     * 
+     * NOTE: Due to Android API limitations (LayoutResultCallback and WriteResultCallback 
+     * have package-private constructors), this method currently falls back to bitmap method.
+     * The direct method would require using WebView.print() which shows system print dialog,
+     * so we use bitmap method instead for headless PDF generation.
+     */
+    private suspend fun exportHtmlToPdfDirect(
+        context: Context, 
+        html: String, 
+        outFile: File, 
+        reportNumber: String?
+    ) {
+        // Прямой метод через PrintDocumentAdapter требует создания callbacks,
+        // которые имеют package-private конструкторы и недоступны напрямую.
+        // WebView.print() показывает системный диалог печати, что не подходит для headless экспорта.
+        // Поэтому используем bitmap метод как реализацию "прямого" метода.
+        // В будущем можно реализовать через PdfDocument напрямую, рендеря WebView в Canvas.
+        Log.d("PDF", "Direct method requested, but using bitmap method due to API limitations")
+        exportHtmlToPdfBitmap(context, html, outFile, reportNumber)
+    }
+    
+    /**
+     * Bitmap method: uses WebViewPdfExporter (existing implementation)
+     */
+    private suspend fun exportHtmlToPdfBitmap(
+        context: Context, 
+        html: String, 
+        outFile: File, 
+        reportNumber: String?
+    ) {
         withTimeout(40000) { // Таймаут 40 секунд
             // Получаем Activity для добавления WebView в иерархию View
             val activity = context as? Activity
@@ -217,7 +283,14 @@ object PdfExporter {
                         // Optional: if coroutine cancelled, there's no cancel in exporter — destroy webview anyway.
                         cont.invokeOnCancellation {
                             Log.w("PDF", "PDF export coroutine cancelled")
-                            try { webView.stopLoading() } catch (_: Exception) {}
+                            // WebView методы должны вызываться на главном потоке
+                            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                                try { webView.stopLoading() } catch (_: Exception) {}
+                            } else {
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    try { webView.stopLoading() } catch (_: Exception) {}
+                                }
+                            }
                         }
                     }
                 }

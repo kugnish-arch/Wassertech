@@ -16,9 +16,10 @@ import com.example.wassertech.data.migrations.MIGRATION_3_4
 import com.example.wassertech.data.migrations.MIGRATION_4_5
 import com.example.wassertech.data.migrations.MIGRATION_5_6
 import com.example.wassertech.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
+import com.example.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
 
 @Database(
-    version = 7, // ← Обновлено: обновление ComponentType на COMMON/HEAD
+    version = 8, // ← Обновлено: добавлена таблица settings
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -32,7 +33,8 @@ import com.example.wassertech.data.migrations.MIGRATION_6_7   // ← Обнов�
         MaintenanceValueEntity::class,
         ObservationEntity::class,
         IssueEntity::class,
-        DeletedRecordEntity::class
+        DeletedRecordEntity::class,
+        SettingsEntity::class
     ]
 )
 @TypeConverters(Converters::class)
@@ -45,6 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun clientDao(): ClientDao
     abstract fun archiveDao(): ArchiveDao
     abstract fun deletedRecordsDao(): DeletedRecordsDao
+    abstract fun settingsDao(): SettingsDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -63,7 +66,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7    // ← Обновление ComponentType
+                        MIGRATION_6_7,    // ← Обновление ComponentType
+                        MIGRATION_7_8    // ← Добавление таблицы settings
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()
