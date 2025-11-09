@@ -1,15 +1,15 @@
 
 package com.example.wassertech.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -18,7 +18,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.wassertech.R
 import com.example.wassertech.ui.clients.ClientDetailScreen
 import com.example.wassertech.ui.clients.ClientsRoute
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
@@ -32,83 +31,106 @@ import com.example.wassertech.ui.settings.SettingsScreen
 import com.example.wassertech.ui.templates.TemplateEditorScreen
 import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
-import com.example.wassertech.ui.common.SectionHeader
+import com.example.wassertech.ui.common.NavigationBottomBar
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBar(navController: NavHostController) {
+fun AppTopBar(
+    navController: NavHostController,
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null
+) {
     val backEntry by navController.currentBackStackEntryAsState()
     val route = backEntry?.destination?.route ?: "clients"
     val canNavigateBack = route != "clients" || navController.previousBackStackEntry != null
 
     var menuOpen by remember { mutableStateOf(false) }
 
-    CenterAlignedTopAppBar(
+    // Получаем название страницы из route
+    val pageTitle = remember(route) {
+        when {
+            route.startsWith("clients") -> "Клиенты"
+            route.startsWith("templates") -> "Шаблоны компонентов"
+            route.startsWith("template_editor") -> "Редактор шаблона"
+            route.startsWith("client/") -> "Клиент"
+            route.startsWith("site/") -> "Объект"
+            route.startsWith("installation/") -> "Установка"
+            route.startsWith("maintenance_all") -> "Техническое обслуживание"
+            route.startsWith("maintenance_edit") -> "Редактирование ТО"
+            route.startsWith("maintenance_history") -> "История ТО"
+            route.startsWith("maintenance_session") -> "Детали ТО"
+            route.startsWith("reports") -> "Отчёты ТО"
+            route.startsWith("settings") -> "Настройки"
+            route.startsWith("about") -> "О программе"
+            else -> "Wassertech CRM"
+        }
+    }
+
+    TopAppBar(
         navigationIcon = {
-            if (canNavigateBack) {
-                IconButton(onClick = { navController.navigateUp() }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Назад")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (canNavigateBack) {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    }
+                } else {
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Меню")
+                        }
+                        // Бургер-меню привязано к иконке
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Шаблоны") },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("templates") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Настройки") },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("settings") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("О программе") },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("about") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         },
         title = {
-            Image(
-                painter = painterResource(id = R.drawable.logo_wassertech),
-                contentDescription = "Wassertech"
+            Text(
+                text = pageTitle,
+                style = MaterialTheme.typography.titleLarge
             )
         },
         actions = {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Меню")
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("Клиенты") },
-                    onClick = {
-                        menuOpen = false
-                        navController.navigate("clients") {
-                            popUpTo("clients") { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Шаблоны") },
-                    onClick = {
-                        menuOpen = false
-                        navController.navigate("templates") {
-                            launchSingleTop = true
-                        }
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("История ТО") },
-                    onClick = {
-                        menuOpen = false
-                        navController.navigate("maintenance_history") {
-                            launchSingleTop = true
-                        }
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Настройки") },
-                    onClick = {
-                        menuOpen = false
-                        navController.navigate("settings") {
-                            launchSingleTop = true
-                        }
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("О программе") },
-                    onClick = {
-                        menuOpen = false
-                        navController.navigate("about") {
-                            launchSingleTop = true
-                        }
-                    }
-                )
+            // Переключатель режима редактирования (если доступен)
+            if (onToggleEdit != null) {
+                IconButton(onClick = onToggleEdit) {
+                    Icon(
+                        imageVector = if (isEditing) Icons.Filled.Edit else Icons.Filled.Visibility,
+                        contentDescription = if (isEditing) "Редактирование" else "Просмотр"
+                    )
+                }
             }
         }
     )
@@ -128,33 +150,80 @@ fun AppNavHost() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppScaffold(navController: NavHostController) {
-    Scaffold(topBar = { AppTopBar(navController)}) { innerPadding ->
+    val backEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backEntry?.destination?.route
+    
+    // Определяем, показывать ли переключатель редактирования
+    val showEditToggle = currentRoute?.let { route ->
+        route.startsWith("clients") || 
+        route.startsWith("templates") ||
+        route.startsWith("client/") ||
+        route.startsWith("site/") ||
+        route.startsWith("installation/")
+    } ?: false
+    
+    // Состояние редактирования для разных экранов
+    var clientsEditing by remember { mutableStateOf(false) }
+    var otherEditing by remember { mutableStateOf(false) }
+    
+    Scaffold(
+        topBar = { 
+            AppTopBar(
+                navController = navController,
+                isEditing = if (currentRoute == "clients") clientsEditing else otherEditing,
+                onToggleEdit = if (showEditToggle) {
+                    if (currentRoute == "clients") {
+                        { clientsEditing = !clientsEditing }
+                    } else {
+                        { otherEditing = !otherEditing }
+                    }
+                } else null
+            )
+        },
+        bottomBar = {
+            NavigationBottomBar(
+                currentRoute = currentRoute,
+                onNavigateToClients = {
+                    navController.navigate("clients") {
+                        popUpTo("clients") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToMaintenanceHistory = {
+                    navController.navigate("maintenance_history") {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToReports = {
+                    navController.navigate("reports") {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = "clients",
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("clients") {
-                Column {
-                    SectionHeader("Клиенты")
-                    ClientsRoute(
-                        onClientClick = { clientId ->
-                            navController.navigate("client/$clientId") {
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                ClientsRoute(
+                    isEditing = clientsEditing,
+                    onToggleEdit = { clientsEditing = !clientsEditing },
+                    onClientClick = { clientId ->
+                        navController.navigate("client/$clientId") {
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                    )
-                }
+                    }
+                )
             }
 
             composable("templates") {
-                Column {
-                    SectionHeader("Шаблоны компонентов")
-                    TemplatesScreen(onOpenTemplate = { id ->
-                        navController.navigate("template_editor/$id")
-                    })
-                }
+                TemplatesScreen(onOpenTemplate = { id ->
+                    navController.navigate("template_editor/$id")
+                })
             }
 
             composable(
@@ -173,14 +242,11 @@ private fun AppScaffold(navController: NavHostController) {
                 arguments = listOf(navArgument("clientId") { type = NavType.StringType })
             ) { bse ->
                 val clientId = bse.arguments?.getString("clientId") ?: return@composable
-                Column {
-                    SectionHeader("Клиент")
-                    ClientDetailScreen(
-                        clientId = clientId,
-                        onOpenSite = { siteId -> navController.navigate("site/$siteId") },
-                        onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
-                    )
-                }
+                ClientDetailScreen(
+                    clientId = clientId,
+                    onOpenSite = { siteId -> navController.navigate("site/$siteId") },
+                    onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
+                )
             }
 
             composable(
@@ -188,13 +254,10 @@ private fun AppScaffold(navController: NavHostController) {
                 arguments = listOf(navArgument("siteId") { type = NavType.StringType })
             ) { bse ->
                 val siteId = bse.arguments?.getString("siteId") ?: return@composable
-                Column {
-                    SectionHeader("Объект")
-                    SiteDetailScreen(
-                        siteId = siteId,
-                        onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
-                    )
-                }
+                SiteDetailScreen(
+                    siteId = siteId,
+                    onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
+                )
             }
 
             composable(
@@ -202,21 +265,18 @@ private fun AppScaffold(navController: NavHostController) {
                 arguments = listOf(navArgument("installationId") { type = NavType.StringType })
             ) { bse ->
                 val installationId = bse.arguments?.getString("installationId") ?: return@composable
-                Column {
-                    SectionHeader("Установка")
-                    ComponentsScreen(
-                        installationId = installationId,
-                        onStartMaintenance = { /* ... */ },
-                        onStartMaintenanceAll = { siteId, installationName ->
-                            navController.navigate(
-                                "maintenance_all/$siteId/$installationId/${Uri.encode(installationName)}"
-                            )
-                        },
-                        onOpenMaintenanceHistoryForInstallation = { id ->
-                            navController.navigate("maintenance_history/$id")
-                        }
-                    )
-                }
+                ComponentsScreen(
+                    installationId = installationId,
+                    onStartMaintenance = { /* ... */ },
+                    onStartMaintenanceAll = { siteId, installationName ->
+                        navController.navigate(
+                            "maintenance_all/$siteId/$installationId/${Uri.encode(installationName)}"
+                        )
+                    },
+                    onOpenMaintenanceHistoryForInstallation = { id ->
+                        navController.navigate("maintenance_history/$id")
+                    }
+                )
             }
 
 
@@ -270,15 +330,12 @@ private fun AppScaffold(navController: NavHostController) {
 
             // История ТО (общая)
             composable("maintenance_history") {
-                Column {
-                    SectionHeader("История ТО")
-                    MaintenanceHistoryScreen(
-                        installationId = null,
-                        onBack = { navController.navigateUp() },
-                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
-                        onOpenReports = { navController.navigate("reports") }
-                    )
-                }
+                MaintenanceHistoryScreen(
+                    installationId = null,
+                    onBack = { navController.navigateUp() },
+                    onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
+                    onOpenReports = { navController.navigate("reports") }
+                )
             }
 
             // История ТО по установке
@@ -287,23 +344,17 @@ private fun AppScaffold(navController: NavHostController) {
                 arguments = listOf(navArgument("installationId") { type = NavType.StringType })
             ) { bse ->
                 val installationId = bse.arguments?.getString("installationId")
-                Column {
-                    SectionHeader("История ТО")
-                    MaintenanceHistoryScreen(
-                        installationId = installationId,
-                        onBack = { navController.navigateUp() },
-                        onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
-                        onOpenReports = { navController.navigate("reports") }
-                    )
-                }
+                MaintenanceHistoryScreen(
+                    installationId = installationId,
+                    onBack = { navController.navigateUp() },
+                    onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
+                    onOpenReports = { navController.navigate("reports") }
+                )
             }
             
             // Экран отчётов ТО
             composable("reports") {
-                Column {
-                    SectionHeader("Отчёты ТО")
-                    ReportsScreen()
-                }
+                ReportsScreen()
             }
 
             // Экран деталей ТО
@@ -312,33 +363,24 @@ private fun AppScaffold(navController: NavHostController) {
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
             ) { bse ->
                 val sessionId = bse.arguments?.getString("sessionId") ?: return@composable
-                Column {
-                    SectionHeader("Детали ТО")
-                    MaintenanceSessionDetailScreen(
-                        sessionId = sessionId,
-                        onNavigateToEdit = { sid, siteId, installationId, installationName ->
-                            navController.navigate(
-                                "maintenance_edit/$sid/$siteId/$installationId/${Uri.encode(installationName)}"
-                            )
-                        }
-                    )
-                }
+                MaintenanceSessionDetailScreen(
+                    sessionId = sessionId,
+                    onNavigateToEdit = { sid, siteId, installationId, installationName ->
+                        navController.navigate(
+                            "maintenance_edit/$sid/$siteId/$installationId/${Uri.encode(installationName)}"
+                        )
+                    }
+                )
             }
             
             // Экран настроек
             composable("settings") {
-                Column {
-                    SectionHeader("Настройки")
-                    SettingsScreen()
-                }
+                SettingsScreen()
             }
             
             // Экран "О программе"
             composable("about") {
-                Column {
-                    SectionHeader("О программе")
-                    AboutScreen()
-                }
+                AboutScreen()
             }
         }
     }

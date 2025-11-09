@@ -78,15 +78,6 @@ fun AboutScreen() {
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center
                 )
-                
-                Spacer(Modifier.height(8.dp))
-                
-                Text(
-                    text = "Build: $versionCode",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

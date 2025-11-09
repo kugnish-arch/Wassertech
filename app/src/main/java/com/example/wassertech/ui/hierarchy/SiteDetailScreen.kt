@@ -19,6 +19,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.viewmodel.HierarchyViewModel
 import kotlinx.coroutines.launch
 import com.example.wassertech.data.entities.InstallationEntity
+import com.example.wassertech.ui.common.AppFloatingActionButton
+import com.example.wassertech.ui.common.FABTemplate
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun SiteDetailScreen(
@@ -49,10 +52,13 @@ fun SiteDetailScreen(
 
     Scaffold(
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showAddInst = true; newInstName = TextFieldValue("") },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Установка") }
+            AppFloatingActionButton(
+                template = FABTemplate(
+                    icon = Icons.Filled.Add,
+                    containerColor = Color(0xFFD32F2F), // Красный цвет
+                    contentColor = Color.White,
+                    onClick = { showAddInst = true; newInstName = TextFieldValue("") }
+                )
             )
         }
     ) { padding ->

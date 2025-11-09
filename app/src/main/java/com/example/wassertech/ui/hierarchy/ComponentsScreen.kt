@@ -32,6 +32,9 @@ import com.example.wassertech.viewmodel.ClientsViewModel
 import com.example.wassertech.viewmodel.ClientsViewModelFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import com.example.wassertech.ui.common.AppFloatingActionButton
+import com.example.wassertech.ui.common.FABTemplate
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun ComponentsScreen(
@@ -88,14 +91,17 @@ fun ComponentsScreen(
 
     Scaffold(
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    showAdd = true
-                    newName = TextFieldValue("")
-                    selectedTemplate = allTemplates.firstOrNull()
-                },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Компонент") }
+            AppFloatingActionButton(
+                template = FABTemplate(
+                    icon = Icons.Filled.Add,
+                    containerColor = Color(0xFFD32F2F), // Красный цвет
+                    contentColor = Color.White,
+                    onClick = {
+                        showAdd = true
+                        newName = TextFieldValue("")
+                        selectedTemplate = allTemplates.firstOrNull()
+                    }
+                )
             )
         },
         bottomBar = {

@@ -12,11 +12,12 @@ import com.example.wassertech.viewmodel.ClientsViewModelFactory
 
 @Composable
 fun ClientsRoute(
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
     onClientClick: (String) -> Unit
 ) {
     // Factory-путь (не Hilt)
     val context = LocalContext.current
-    val dao = remember { AppDatabase.getInstance(context).clientDao() }
     val db = AppDatabase.getInstance(context)
     val vm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(db.clientDao(), db))
 
@@ -77,6 +78,10 @@ fun ClientsRoute(
 
         // Удаление
         onDeleteClient = vm::deleteClient,
-        onDeleteGroup = vm::deleteGroup
+        onDeleteGroup = vm::deleteGroup,
+        
+        // Режим редактирования
+        isEditing = isEditing,
+        onToggleEdit = onToggleEdit
     )
 }

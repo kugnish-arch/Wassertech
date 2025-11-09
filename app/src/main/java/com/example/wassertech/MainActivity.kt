@@ -5,9 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.navigation.compose.rememberNavController
 import com.example.wassertech.ui.AppNavHost
+import com.example.wassertech.ui.splash.SplashRouteV2
 import com.example.wassertech.ui.theme.WassertechTheme
 
 class MainActivity : ComponentActivity() {
@@ -16,8 +17,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             WassertechTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    // Use internal AppNavHost with its own AppTopBar (shows back arrow automatically)
-                    AppNavHost()
+                    var showSplash by remember { mutableStateOf(true) }
+                    
+                    if (showSplash) {
+                        SplashRouteV2(
+                            onFinished = { showSplash = false },
+                            totalMs = 1500
+                        )
+                    } else {
+                        // Use internal AppNavHost with its own AppTopBar (shows back arrow automatically)
+                        AppNavHost()
+                    }
                 }
             }
         }

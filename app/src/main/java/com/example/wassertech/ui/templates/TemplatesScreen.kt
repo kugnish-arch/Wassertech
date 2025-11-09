@@ -28,6 +28,9 @@ import com.example.wassertech.ui.common.EditDoneBottomBar
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import com.example.wassertech.ui.common.AppFloatingActionButton
+import com.example.wassertech.ui.common.FABTemplate
+
 
 @Composable
 fun TemplatesScreen(
@@ -79,13 +82,16 @@ fun TemplatesScreen(
 
     Scaffold(
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    newTitle = ""
-                    showCreate = true
-                },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Шаблон") }
+            AppFloatingActionButton(
+                template = FABTemplate(
+                    icon = Icons.Filled.Add,
+                    containerColor = Color(0xFFD32F2F), // Красный цвет
+                    contentColor = Color.White,
+                    onClick = {
+                        newTitle = ""
+                        showCreate = true
+                    }
+                )
             )
         },
         bottomBar = {

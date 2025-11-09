@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import com.example.wassertech.data.entities.ClientEntity
 import com.example.wassertech.data.entities.ClientGroupEntity
 import com.example.wassertech.ui.common.EditDoneBottomBar
+import com.example.wassertech.ui.common.AppFloatingActionButton
+import com.example.wassertech.ui.common.FABTemplate
+import com.example.wassertech.ui.common.FABOption
 
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
 
@@ -37,12 +40,12 @@ fun ClientsScreen(
     groups: List<ClientGroupEntity>,
     clients: List<ClientEntity>,
 
-    selectedGroupId: String?,
+    @Suppress("UNUSED_PARAMETER") selectedGroupId: String?,
     includeArchived: Boolean,
 
-    onSelectAll: () -> Unit,
-    onSelectNoGroup: () -> Unit,
-    onSelectGroup: (String) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onSelectAll: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onSelectNoGroup: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onSelectGroup: (String) -> Unit,
 
     onToggleIncludeArchived: () -> Unit,
     onCreateGroup: (String) -> Unit,
@@ -62,15 +65,19 @@ fun ClientsScreen(
 
     onMoveGroupUp: (groupId: String) -> Unit = {},
     onMoveGroupDown: (groupId: String) -> Unit = {},
-    onMoveClientUp: (clientId: String) -> Unit = {},
-    onMoveClientDown: (clientId: String) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onMoveClientUp: (clientId: String) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onMoveClientDown: (clientId: String) -> Unit = {},
 
     // НОВОЕ: массовая фиксация порядка в БД
     onReorderGroupClients: (groupId: String?, orderedIds: List<String>) -> Unit = { _, _ -> },
 
     // Удаление
     onDeleteClient: (clientId: String) -> Unit = {},
-    onDeleteGroup: (groupId: String) -> Unit = {}
+    onDeleteGroup: (groupId: String) -> Unit = {},
+    
+    // Режим редактирования
+    isEditing: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") onToggleEdit: (() -> Unit)? = null
 ) {
     var createGroupDialog by remember { mutableStateOf(false) }
     var newGroupTitle by remember { mutableStateOf("") }
@@ -83,8 +90,10 @@ fun ClientsScreen(
 
     var expandedSectionId by remember { mutableStateOf(GENERAL_SECTION_ID) }
 
-    var isEditMode by remember { mutableStateOf(false) }
     var includeArchivedBeforeEdit by remember { mutableStateOf<Boolean?>(null) }
+
+    // Используем переданное состояние редактирования или локальное
+    val isEditMode = isEditing
 
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<DeleteDialogState?>(null) }
@@ -101,13 +110,6 @@ fun ClientsScreen(
         groups.associate { g ->
             g.id to (clientsByGroup[g.id] ?: emptyList()).associateBy { it.id }
         }
-    }
-
-
-
-    val generalCount = generalClients.size
-    val countsByGroup = remember(clientsByGroup, groups) {
-        groups.associate { g -> g.id to (clientsByGroup[g.id]?.size ?: 0) }
     }
 
     // ===== ЛОКАЛЬНЫЙ ПОРЯДОК ДЛЯ LIVE-ПЕРЕСТАНОВКИ =====
@@ -171,460 +173,504 @@ fun ClientsScreen(
     var editClientGroupId by remember { mutableStateOf<String?>(null) }
     var editClientGroupPicker by remember { mutableStateOf(false) }
 
-    Scaffold(
-        bottomBar = {
-            EditDoneBottomBar(
-                isEditing = isEditMode,
-                onEdit = {
-                    includeArchivedBeforeEdit = includeArchived
-                    if (!includeArchived) onToggleIncludeArchived()
-                    isEditMode = true
-                    // Зафиксировать локальные порядки по актуальным данным (уже сделано в remember)
-                    crossGroupMoves.clear()
-                },
-                onDone = {
-                    // 1) Сначала применяем переносы между группами
-                    if (crossGroupMoves.isNotEmpty()) {
-                        crossGroupMoves.forEach { (clientId, targetGroupId) ->
-                            onAssignClientGroup(clientId, targetGroupId)
-                        }
-                        crossGroupMoves.clear()
-                    }
-                    // 2) Затем сохраняем порядок в каждой группе (включая «Общую»)
-                    onReorderGroupClients(null, localOrderGeneral)
-                    groups.forEach { g ->
-                        onReorderGroupClients(g.id, localOrderByGroup[g.id] ?: emptyList())
-                    }
-
-                    if (includeArchivedBeforeEdit == false && includeArchived) {
-                        onToggleIncludeArchived()
-                    }
-                    includeArchivedBeforeEdit = null
-                    isEditMode = false
-                },
-                actions = emptyList()
-            )
-        },
-        floatingActionButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        onAddClient()
-                        createClientDialog = true
-                    },
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Клиент")
+    // Обработка изменений режима редактирования
+    LaunchedEffect(isEditMode) {
+        if (isEditMode) {
+            includeArchivedBeforeEdit = includeArchived
+            if (!includeArchived) onToggleIncludeArchived()
+            crossGroupMoves.clear()
+        } else {
+            // 1) Сначала применяем переносы между группами
+            if (crossGroupMoves.isNotEmpty()) {
+                crossGroupMoves.forEach { (clientId, targetGroupId) ->
+                    onAssignClientGroup(clientId, targetGroupId)
                 }
-                ExtendedFloatingActionButton(onClick = { createGroupDialog = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Группа")
-                }
+                crossGroupMoves.clear()
             }
+            // 2) Затем сохраняем порядок в каждой группе (включая «Общую»)
+            onReorderGroupClients(null, localOrderGeneral)
+            groups.forEach { g ->
+                onReorderGroupClients(g.id, localOrderByGroup[g.id] ?: emptyList())
+            }
+
+            if (includeArchivedBeforeEdit == false && includeArchived) {
+                onToggleIncludeArchived()
+            }
+            includeArchivedBeforeEdit = null
+        }
+    }
+
+    Scaffold(
+        floatingActionButton = {
+            AppFloatingActionButton(
+                template = FABTemplate(
+                    icon = Icons.Filled.Add,
+                    containerColor = Color(0xFFD32F2F), // Красный цвет
+                    contentColor = Color.White,
+                    onClick = { }, // Не используется, так как есть опции
+                    options = listOf(
+                        FABOption(
+                            label = "Клиент",
+                            icon = Icons.Filled.Add,
+                            onClick = {
+                                onAddClient()
+                                createClientDialog = true
+                            }
+                        ),
+                        FABOption(
+                            label = "Группа",
+                            icon = Icons.Filled.Add,
+                            onClick = {
+                                createGroupDialog = true
+                            }
+                        )
+                    )
+                )
+            )
         }
     ) { innerPadding ->
         val layoutDir = LocalLayoutDirection.current
 
-        LazyColumn(
-            modifier = Modifier
-                .padding(
-                    top = 0.dp,
-                    start = innerPadding.calculateStartPadding(layoutDir),
-                    end = innerPadding.calculateEndPadding(layoutDir),
-                )
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
-        ) {
-            // ===== «Общая» секция =====
-            item(key = "header_general") {
-                GroupHeader(
-                    title = "Общая",
-                    count = localOrderGeneral.size,
-                    isExpanded = expandedSectionId == GENERAL_SECTION_ID,
-                    isArchived = false,
-                    canArchive = false,
-                    showActions = isEditMode,
-                    onArchive = {},
-                    onRestore = {},
-                    onToggle = {
-                        expandedSectionId =
-                            if (expandedSectionId == GENERAL_SECTION_ID) "" else GENERAL_SECTION_ID
-                    },
-                    onMoveUp = {},
-                    onMoveDown = {},
-                )
-            }
-            if (expandedSectionId == GENERAL_SECTION_ID) {
-                //val generalById = remember(clients) { generalClients.associateBy { it.id } }
-                if (localOrderGeneral.isEmpty()) {
-                    item(key = "general_empty") { EmptyGroupStub(indent = 16.dp) }
-                } else {
-                    items(
-                        items = localOrderGeneral,
-                        key = { it }
-                    ) { clientId ->
-                        val client = generalById[clientId] ?: return@items
-                        ClientRowWithEdit(
-                            client = client,
-                            groupId = null,
-                            groups = groups,
-                            isEditMode = isEditMode,
-                            onClick = { onClientClick(client.id) },
-                            onArchive = { onArchiveClient(client.id) },
-                            onRestore = { onRestoreClient(client.id) },
-                            onMoveUp = { moveIdWithin(null, client.id, up = true) },
-                            onMoveDown = { moveIdWithin(null, client.id, up = false) },
-                            onMoveToGroup = { targetGroupId -> moveIdToGroup(client.id, null, targetGroupId) },
-                            onEditName = {
-                                editClientId = client.id
-                                editClientName = client.name
-                                editClientGroupId = client.clientGroupId
-                            },
-                            onDelete = {
-                                deleteDialogState = DeleteDialogState(isClient = true, id = client.id, name = client.name)
-                            },
-                            modifier = Modifier.animateContentSize()
-                        )
-                        Divider()
+        // Проверяем, есть ли клиенты или группы
+        val hasAnyData = groups.isNotEmpty() || clients.isNotEmpty()
+
+        if (!hasAnyData && !isEditMode) {
+            // Показываем подсказку для пустого состояния
+            EmptyStateHint()
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(
+                        top = 0.dp,
+                        start = innerPadding.calculateStartPadding(layoutDir),
+                        end = innerPadding.calculateEndPadding(layoutDir),
+                    )
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
+            ) {
+                // ===== «Общая» секция =====
+                item(key = "header_general") {
+                    GroupHeader(
+                        title = "Общая",
+                        count = localOrderGeneral.size,
+                        isExpanded = expandedSectionId == GENERAL_SECTION_ID,
+                        isArchived = false,
+                        canArchive = false,
+                        showActions = isEditMode,
+                        onArchive = {},
+                        onRestore = {},
+                        onToggle = {
+                            expandedSectionId =
+                                if (expandedSectionId == GENERAL_SECTION_ID) "" else GENERAL_SECTION_ID
+                        },
+                        onMoveUp = {},
+                        onMoveDown = {},
+                    )
+                }
+                if (expandedSectionId == GENERAL_SECTION_ID) {
+                    //val generalById = remember(clients) { generalClients.associateBy { it.id } }
+                    if (localOrderGeneral.isEmpty()) {
+                        item(key = "general_empty") { EmptyGroupStub(indent = 16.dp) }
+                    } else {
+                        items(
+                            items = localOrderGeneral,
+                            key = { it }
+                        ) { clientId ->
+                            val client = generalById[clientId] ?: return@items
+                            ClientRowWithEdit(
+                                client = client,
+                                groupId = null,
+                                groups = groups,
+                                isEditMode = isEditMode,
+                                onClick = { onClientClick(client.id) },
+                                onArchive = { onArchiveClient(client.id) },
+                                onRestore = { onRestoreClient(client.id) },
+                                onMoveUp = { moveIdWithin(null, client.id, up = true) },
+                                onMoveDown = { moveIdWithin(null, client.id, up = false) },
+                                onMoveToGroup = { targetGroupId: String? ->
+                                    moveIdToGroup(
+                                        client.id,
+                                        null,
+                                        targetGroupId
+                                    )
+                                },
+                                onEditName = {
+                                    editClientId = client.id
+                                    editClientName = client.name
+                                    editClientGroupId = client.clientGroupId
+                                },
+                                onDelete = {
+                                    deleteDialogState = DeleteDialogState(
+                                        isClient = true,
+                                        id = client.id,
+                                        name = client.name
+                                    )
+                                },
+                                modifier = Modifier.animateContentSize()
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+
+                // ===== Группы =====
+                items(
+                    items = groups,
+                    key = { "header_${it.id}" }
+                ) { group ->
+                    val groupId = group.id
+                    GroupHeader(
+                        title = group.title,
+                        count = (localOrderByGroup[groupId] ?: emptyList()).size,
+                        isExpanded = expandedSectionId == groupId,
+                        isArchived = group.isArchived == true,
+                        canArchive = true,
+                        showActions = isEditMode,
+                        onArchive = { onArchiveGroup(groupId) },
+                        onRestore = { onRestoreGroup(groupId) },
+                        onToggle = {
+                            expandedSectionId = if (expandedSectionId == groupId) "" else groupId
+                        },
+                        onMoveUp = { onMoveGroupUp(groupId) },
+                        onMoveDown = { onMoveGroupDown(groupId) },
+                        onEdit = {
+                            editGroupId = groupId
+                            editGroupTitle = group.title
+                        },
+                        onDelete = {
+                            deleteDialogState = DeleteDialogState(
+                                isClient = false,
+                                id = groupId,
+                                name = group.title
+                            )
+                        },
+                        modifier = Modifier.animateContentSize()
+                    )
+
+                    if (expandedSectionId == groupId) {
+                        val listIds = localOrderByGroup[groupId] ?: emptyList()
+                        if (listIds.isEmpty()) {
+                            Column {
+                                EmptyGroupStub(indent = 16.dp)
+                                HorizontalDivider()
+                            }
+                        } else {
+                            val byId = byGroupIdMap[groupId] ?: emptyMap()
+                            Column {
+                                listIds.forEach { cid ->
+                                    val client = byId[cid] ?: return@forEach
+                                    ClientRowWithEdit(
+                                        client = client,
+                                        groupId = groupId,
+                                        groups = groups,
+                                        isEditMode = isEditMode,
+                                        onClick = { onClientClick(client.id) },
+                                        onArchive = { onArchiveClient(client.id) },
+                                        onRestore = { onRestoreClient(client.id) },
+                                        onMoveUp = { moveIdWithin(groupId, client.id, up = true) },
+                                        onMoveDown = {
+                                            moveIdWithin(
+                                                groupId,
+                                                client.id,
+                                                up = false
+                                            )
+                                        },
+                                        onMoveToGroup = { targetGroupId: String? ->
+                                            moveIdToGroup(
+                                                client.id,
+                                                groupId,
+                                                targetGroupId
+                                            )
+                                        },
+                                        onEditName = {
+                                            editClientId = client.id
+                                            editClientName = client.name
+                                            editClientGroupId = client.clientGroupId
+                                        },
+                                        onDelete = {
+                                            deleteDialogState = DeleteDialogState(
+                                                isClient = true,
+                                                id = client.id,
+                                                name = client.name
+                                            )
+                                        },
+                                modifier = Modifier.animateContentSize()
+                            )
+                            HorizontalDivider()
+                        }
                     }
                 }
             }
-
-            // ===== Группы =====
-            items(
-                items = groups,
-                key = { "header_${it.id}" }
-            ) { group ->
-                val groupId = group.id
-                GroupHeader(
-                    title = group.title,
-                    count = (localOrderByGroup[groupId] ?: emptyList()).size,
-                    isExpanded = expandedSectionId == groupId,
-                    isArchived = group.isArchived == true,
-                    canArchive = true,
-                    showActions = isEditMode,
-                    onArchive = { onArchiveGroup(groupId) },
-                    onRestore = { onRestoreGroup(groupId) },
-                    onToggle = {
-                        expandedSectionId = if (expandedSectionId == groupId) "" else groupId
-                    },
-                    onMoveUp = { onMoveGroupUp(groupId) },
-                    onMoveDown = { onMoveGroupDown(groupId) },
-                    onEdit = {
-                        editGroupId = groupId
-                        editGroupTitle = group.title
-                    },
-                    onDelete = {
-                        deleteDialogState = DeleteDialogState(isClient = false, id = groupId, name = group.title)
-                    },
-                    modifier = Modifier.animateContentSize()
-                )
-
-                if (expandedSectionId == groupId) {
-                    val listIds = localOrderByGroup[groupId] ?: emptyList()
-                    if (listIds.isEmpty()) {
-                        Column {
-                            EmptyGroupStub(indent = 16.dp)
-                            Divider()
-                        }
-                    } else {
-                        val byId = byGroupIdMap[groupId] ?: emptyMap()
-                        Column {
-                            listIds.forEach { cid ->
-                                val client = byId[cid] ?: return@forEach
-                                ClientRowWithEdit(
-                                    client = client,
-                                    groupId = groupId,
-                                    groups = groups,
-                                    isEditMode = isEditMode,
-                                    onClick = { onClientClick(client.id) },
-                                    onArchive = { onArchiveClient(client.id) },
-                                    onRestore = { onRestoreClient(client.id) },
-                                    onMoveUp = { moveIdWithin(groupId, client.id, up = true) },
-                                    onMoveDown = { moveIdWithin(groupId, client.id, up = false) },
-                                    onMoveToGroup = { targetGroupId -> moveIdToGroup(client.id, groupId, targetGroupId) },
-                                    onEditName = {
-                                        editClientId = client.id
-                                        editClientName = client.name
-                                        editClientGroupId = client.clientGroupId
-                                    },
-                                    onDelete = {
-                                        deleteDialogState = DeleteDialogState(isClient = true, id = client.id, name = client.name)
-                                    },
-                                    modifier = Modifier.animateContentSize()
-                                )
-                                Divider()
-                            }
-                        }
-                    }
                 }
             }
         }
-    }
 
-    // ===== Диалоги =====
+        // ===== Диалоги =====
 
-    // Создание группы
-    if (createGroupDialog) {
-        AlertDialog(
-            onDismissRequest = { createGroupDialog = false },
-            title = { Text("Новая группа") },
-            text = {
-                OutlinedTextField(
-                    value = newGroupTitle,
-                    onValueChange = { newGroupTitle = it },
-                    singleLine = true,
-                    label = { Text("Название группы") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val title = newGroupTitle.trim()
-                        if (title.isNotEmpty()) {
-                            onCreateGroup(title)
-                            newGroupTitle = ""
-                            createGroupDialog = false
-                        }
-                    }
-                ) { Text("Создать") }
-            },
-            dismissButton = {
-                TextButton(onClick = { createGroupDialog = false }) { Text("Отмена") }
-            }
-        )
-    }
-
-    // Создание клиента
-    if (createClientDialog) {
-        AlertDialog(
-            onDismissRequest = { createClientDialog = false },
-            title = { Text("Новый клиент") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+        // Создание группы
+        if (createGroupDialog) {
+            AlertDialog(
+                onDismissRequest = { createGroupDialog = false },
+                title = { Text("Новая группа") },
+                text = {
                     OutlinedTextField(
-                        value = newClientName,
-                        onValueChange = { newClientName = it },
+                        value = newGroupTitle,
+                        onValueChange = { newGroupTitle = it },
                         singleLine = true,
-                        label = { Text("Имя") },
+                        label = { Text("Название группы") },
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = newClientCorporate,
-                            onCheckedChange = { newClientCorporate = it }
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Корпоративный")
-                    }
-
-                    Box {
-                        OutlinedButton(
-                            onClick = { groupPickerExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val label = when (newClientGroupId) {
-                                null -> "Без группы"
-                                else -> groups.find { it.id == newClientGroupId }?.title ?: "Группа"
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val title = newGroupTitle.trim()
+                            if (title.isNotEmpty()) {
+                                onCreateGroup(title)
+                                newGroupTitle = ""
+                                createGroupDialog = false
                             }
-                            Text(label)
                         }
-                        DropdownMenu(
-                            expanded = groupPickerExpanded,
-                            onDismissRequest = { groupPickerExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Без группы") },
-                                onClick = {
-                                    newClientGroupId = null
-                                    groupPickerExpanded = false
-                                }
+                    ) { Text("Создать") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { createGroupDialog = false }) { Text("Отмена") }
+                }
+            )
+        }
+
+        // Создание клиента
+        if (createClientDialog) {
+            AlertDialog(
+                onDismissRequest = { createClientDialog = false },
+                title = { Text("Новый клиент") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newClientName,
+                            onValueChange = { newClientName = it },
+                            singleLine = true,
+                            label = { Text("Имя") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = newClientCorporate,
+                                onCheckedChange = { newClientCorporate = it }
                             )
-                            if (groups.isNotEmpty()) Divider()
-                            groups.forEach { g ->
+                            Spacer(Modifier.width(8.dp))
+                            Text("Корпоративный")
+                        }
+
+                        Box {
+                            OutlinedButton(
+                                onClick = { groupPickerExpanded = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val label = when (newClientGroupId) {
+                                    null -> "Без группы"
+                                    else -> groups.find { it.id == newClientGroupId }?.title
+                                        ?: "Группа"
+                                }
+                                Text(label)
+                            }
+                            DropdownMenu(
+                                expanded = groupPickerExpanded,
+                                onDismissRequest = { groupPickerExpanded = false }
+                            ) {
                                 DropdownMenuItem(
-                                    text = { Text(g.title) },
+                                    text = { Text("Без группы") },
                                     onClick = {
-                                        newClientGroupId = g.id
+                                        newClientGroupId = null
                                         groupPickerExpanded = false
                                     }
                                 )
+                                if (groups.isNotEmpty()) HorizontalDivider()
+                                groups.forEach { g ->
+                                    DropdownMenuItem(
+                                        text = { Text(g.title) },
+                                        onClick = {
+                                            newClientGroupId = g.id
+                                            groupPickerExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
+                },
+                confirmButton = {
+                    val canSave = newClientName.trim().isNotEmpty()
+                    TextButton(
+                        onClick = {
+                            if (canSave) {
+                                onCreateClient(
+                                    newClientName.trim(),
+                                    newClientCorporate,
+                                    newClientGroupId
+                                )
+                                newClientName = ""
+                                newClientCorporate = false
+                                newClientGroupId = null
+                                createClientDialog = false
+                            }
+                        },
+                        enabled = canSave
+                    ) { Text("Создать") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { createClientDialog = false }) { Text("Отмена") }
                 }
-            },
-            confirmButton = {
-                val canSave = newClientName.trim().isNotEmpty()
-                TextButton(
-                    onClick = {
-                        if (canSave) {
-                            onCreateClient(newClientName.trim(), newClientCorporate, newClientGroupId)
-                            newClientName = ""
-                            newClientCorporate = false
-                            newClientGroupId = null
-                            createClientDialog = false
-                        }
-                    },
-                    enabled = canSave
-                ) { Text("Создать") }
-            },
-            dismissButton = {
-                TextButton(onClick = { createClientDialog = false }) { Text("Отмена") }
-            }
-        )
-    }
+            )
+        }
 
-    // Переименование группы
-    if (editGroupId != null) {
-        AlertDialog(
-            onDismissRequest = { editGroupId = null },
-            title = { Text("Переименовать группу") },
-            text = {
-                OutlinedTextField(
-                    value = editGroupTitle,
-                    onValueChange = { editGroupTitle = it },
-                    singleLine = true,
-                    label = { Text("Новое название группы") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                val canSave = editGroupTitle.trim().isNotEmpty()
-                TextButton(
-                    onClick = {
-                        if (canSave) {
-                            onRenameGroup(editGroupId!!, editGroupTitle.trim())
-                            editGroupId = null
-                        }
-                    },
-                    enabled = canSave
-                ) { Text("Сохранить") }
-            },
-            dismissButton = {
-                TextButton(onClick = { editGroupId = null }) { Text("Отмена") }
-            }
-        )
-    }
-
-    // Редактирование клиента
-    if (editClientId != null) {
-        AlertDialog(
-            onDismissRequest = { editClientId = null },
-            title = { Text("Редактировать клиента") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+        // Переименование группы
+        if (editGroupId != null) {
+            AlertDialog(
+                onDismissRequest = { editGroupId = null },
+                title = { Text("Переименовать группу") },
+                text = {
                     OutlinedTextField(
-                        value = editClientName,
-                        onValueChange = { editClientName = it },
+                        value = editGroupTitle,
+                        onValueChange = { editGroupTitle = it },
                         singleLine = true,
-                        label = { Text("Имя") },
+                        label = { Text("Новое название группы") },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Box {
-                        OutlinedButton(
-                            onClick = { editClientGroupPicker = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val label = when (editClientGroupId) {
-                                null -> "Без группы"
-                                else -> groups.find { it.id == editClientGroupId }?.title ?: "Группа"
+                },
+                confirmButton = {
+                    val canSave = editGroupTitle.trim().isNotEmpty()
+                    TextButton(
+                        onClick = {
+                            if (canSave) {
+                                onRenameGroup(editGroupId!!, editGroupTitle.trim())
+                                editGroupId = null
                             }
-                            Text(label)
-                        }
-                        DropdownMenu(
-                            expanded = editClientGroupPicker,
-                            onDismissRequest = { editClientGroupPicker = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Без группы") },
-                                onClick = {
-                                    editClientGroupId = null
-                                    editClientGroupPicker = false
+                        },
+                        enabled = canSave
+                    ) { Text("Сохранить") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { editGroupId = null }) { Text("Отмена") }
+                }
+            )
+        }
+
+        // Редактирование клиента
+        if (editClientId != null) {
+            AlertDialog(
+                onDismissRequest = { editClientId = null },
+                title = { Text("Редактировать клиента") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = editClientName,
+                            onValueChange = { editClientName = it },
+                            singleLine = true,
+                            label = { Text("Имя") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Box {
+                            OutlinedButton(
+                                onClick = { editClientGroupPicker = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val label = when (editClientGroupId) {
+                                    null -> "Без группы"
+                                    else -> groups.find { it.id == editClientGroupId }?.title
+                                        ?: "Группа"
                                 }
-                            )
-                            if (groups.isNotEmpty()) Divider()
-                            groups.forEach { g ->
+                                Text(label)
+                            }
+                            DropdownMenu(
+                                expanded = editClientGroupPicker,
+                                onDismissRequest = { editClientGroupPicker = false }
+                            ) {
                                 DropdownMenuItem(
-                                    text = { Text(g.title) },
+                                    text = { Text("Без группы") },
                                     onClick = {
-                                        editClientGroupId = g.id
+                                        editClientGroupId = null
                                         editClientGroupPicker = false
                                     }
                                 )
+                                if (groups.isNotEmpty()) HorizontalDivider()
+                                groups.forEach { g ->
+                                    DropdownMenuItem(
+                                        text = { Text(g.title) },
+                                        onClick = {
+                                            editClientGroupId = g.id
+                                            editClientGroupPicker = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
+                },
+                confirmButton = {
+                    val canSave = editClientName.trim().isNotEmpty()
+                    TextButton(
+                        onClick = {
+                            if (canSave) {
+                                onRenameClientName(editClientId!!, editClientName.trim())
+                                onAssignClientGroup(editClientId!!, editClientGroupId)
+                                editClientId = null
+                            }
+                        },
+                        enabled = canSave
+                    ) { Text("Сохранить") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { editClientId = null }) { Text("Отмена") }
                 }
-            },
-            confirmButton = {
-                val canSave = editClientName.trim().isNotEmpty()
-                TextButton(
-                    onClick = {
-                        if (canSave) {
-                            onRenameClientName(editClientId!!, editClientName.trim())
-                            onAssignClientGroup(editClientId!!, editClientGroupId)
-                            editClientId = null
-                        }
-                    },
-                    enabled = canSave
-                ) { Text("Сохранить") }
-            },
-            dismissButton = {
-                TextButton(onClick = { editClientId = null }) { Text("Отмена") }
-            }
-        )
-    }
+            )
+        }
 
-    // Диалог подтверждения удаления
-    deleteDialogState?.let { state ->
-        AlertDialog(
-            onDismissRequest = { deleteDialogState = null },
-            title = { Text("Подтверждение удаления") },
-            text = {
-                Text(
-                    if (state.isClient) {
-                        "Вы уверены, что хотите удалить клиента \"${state.name}\"?\n\nЭто действие нельзя отменить."
-                    } else {
-                        "Вы уверены, что хотите удалить группу \"${state.name}\"?\n\nВсе клиенты из этой группы будут перемещены в \"Общую\". Это действие нельзя отменить."
-                    }
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
+        // Диалог подтверждения удаления
+        deleteDialogState?.let { state ->
+            AlertDialog(
+                onDismissRequest = { deleteDialogState = null },
+                title = { Text("Подтверждение удаления") },
+                text = {
+                    Text(
                         if (state.isClient) {
-                            onDeleteClient(state.id)
+                            "Вы уверены, что хотите удалить клиента \"${state.name}\"?\n\nЭто действие нельзя отменить."
                         } else {
-                            onDeleteGroup(state.id)
+                            "Вы уверены, что хотите удалить группу \"${state.name}\"?\n\nВсе клиенты из этой группы будут перемещены в \"Общую\". Это действие нельзя отменить."
                         }
-                        deleteDialogState = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
                     )
-                ) {
-                    Text("Удалить")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (state.isClient) {
+                                onDeleteClient(state.id)
+                            } else {
+                                onDeleteGroup(state.id)
+                            }
+                            deleteDialogState = null
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Удалить")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deleteDialogState = null }) {
+                        Text("Отмена")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteDialogState = null }) {
-                    Text("Отмена")
-                }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -638,7 +684,7 @@ private fun GroupHeader(
     isArchived: Boolean,
     canArchive: Boolean,
     showActions: Boolean,
-    onArchive: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onArchive: () -> Unit,
     onRestore: () -> Unit,
     onToggle: () -> Unit,
     onMoveUp: () -> Unit,
@@ -671,9 +717,9 @@ private fun GroupHeader(
                     .size(20.dp)
                     .pointerInput("group_$title") {
                         detectDragGestures(
-                            onDragStart = { 
+                            onDragStart = {
                                 lastMoveThreshold = 0f
-                                onDragStart?.invoke() 
+                                onDragStart?.invoke()
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
@@ -724,10 +770,18 @@ private fun GroupHeader(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onRestore) {
-                        Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить группу", tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Icon(
+                            Icons.Filled.Unarchive,
+                            contentDescription = "Восстановить группу",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Удалить группу", tint = MaterialTheme.colorScheme.error)
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "Удалить группу",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -753,9 +807,43 @@ private fun EmptyGroupStub(indent: Dp) {
 }
 
 @Composable
+private fun EmptyStateHint() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Иконка лампочки
+            Icon(
+                imageVector = Icons.Filled.Lightbulb,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = "Начните с клиентов",
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Text(
+                text = "Создайте клиента или группу клиентов, чтобы добавить их объекты и установки. После этого вы сможете проводить и сохранять техническое обслуживание, а также формировать PDF-отчёты прямо в приложении.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun ClientRowWithEdit(
     client: ClientEntity,
-    groupId: String?,
+    @Suppress("UNUSED_PARAMETER") groupId: String?,
     groups: List<ClientGroupEntity>,
     isEditMode: Boolean,
     onClick: () -> Unit,
@@ -790,9 +878,9 @@ private fun ClientRowWithEdit(
                     .size(24.dp)
                     .pointerInput(client.id) {
                         detectDragGestures(
-                            onDragStart = { 
+                            onDragStart = {
                                 lastMoveThreshold = 0f
-                                onDragStart?.invoke() 
+                                onDragStart?.invoke()
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
@@ -818,8 +906,12 @@ private fun ClientRowWithEdit(
             )
             Spacer(Modifier.width(8.dp))
         }
-        val icon = if (client.isCorporate == true) Icons.Filled.Business else Icons.Filled.Person
-        Icon(icon, contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент")
+        val icon =
+            if (client.isCorporate == true) Icons.Filled.Business else Icons.Filled.Person
+        Icon(
+            icon,
+            contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент"
+        )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -841,6 +933,15 @@ private fun ClientRowWithEdit(
                 )
             }
         }
+        // Иконка навигации справа (когда не в режиме редактирования)
+        if (!isEditMode) {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = "Открыть",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
         if (isEditMode) {
             if (client.isArchived == true) {
                 Row(
@@ -848,20 +949,36 @@ private fun ClientRowWithEdit(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onRestore) {
-                        Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить клиента", tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(
+                            Icons.Filled.Unarchive,
+                            contentDescription = "Восстановить клиента",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Удалить клиента", tint = MaterialTheme.colorScheme.error)
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "Удалить клиента",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             } else {
                 IconButton(onClick = onEditName) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Редактировать клиента", tint = MaterialTheme.colorScheme.onSurface)
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = "Редактировать клиента",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 // Меню «Переместить в…»
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Ещё", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "Ещё",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
@@ -871,7 +988,7 @@ private fun ClientRowWithEdit(
                                 onMoveToGroup(null)
                             }
                         )
-                        if (groups.isNotEmpty()) Divider()
+                        if (groups.isNotEmpty()) HorizontalDivider()
                         groups.forEach { g ->
                             DropdownMenuItem(
                                 text = { Text("Переместить в: ${g.title}") },
@@ -881,7 +998,7 @@ private fun ClientRowWithEdit(
                                 }
                             )
                         }
-                        Divider()
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text("Архивировать") },
                             onClick = {
@@ -895,3 +1012,4 @@ private fun ClientRowWithEdit(
         }
     }
 }
+

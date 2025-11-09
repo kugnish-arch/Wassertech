@@ -30,6 +30,10 @@ import com.example.wassertech.ui.common.EditDoneBottomBar
 import com.example.wassertech.ui.common.BarAction
 import com.example.wassertech.data.entities.SiteEntity
 import com.example.wassertech.data.entities.InstallationEntity
+import com.example.wassertech.ui.common.AppFloatingActionButton
+import com.example.wassertech.ui.common.FABTemplate
+import com.example.wassertech.ui.common.FABOption
+import androidx.compose.material.icons.filled.Add
 
 private data class SiteDeleteDialogState(
     val isSite: Boolean,
@@ -145,19 +149,26 @@ fun ClientDetailScreen(
         // FAB — только вне режима редактирования
         floatingActionButton = {
             if (!isEditing) {
-                Row(modifier = Modifier.padding(end = 8.dp)) {
-                    // "+ Установка" — акцентный цвет как у FAB "Клиент"
-                    ExtendedFloatingActionButton(
-                        onClick = { showAddInstallation = true },
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        content = { Text("+ Установка") }
+                AppFloatingActionButton(
+                    template = FABTemplate(
+                        icon = Icons.Filled.Add,
+                        containerColor = Color(0xFFD32F2F), // Красный цвет
+                        contentColor = Color.White,
+                        onClick = { }, // Не используется, так как есть опции
+                        options = listOf(
+                            FABOption(
+                                label = "Установка",
+                                icon = Icons.Filled.Add,
+                                onClick = { showAddInstallation = true }
+                            ),
+                            FABOption(
+                                label = "Объект",
+                                icon = Icons.Filled.Add,
+                                onClick = { showAddSite = true }
+                            )
+                        )
                     )
-                    Spacer(Modifier.width(8.dp))
-                    ExtendedFloatingActionButton(
-                        onClick = { showAddSite = true },
-                        content = { Text("+ Объект") }
-                    )
-                }
+                )
             }
         },
 
