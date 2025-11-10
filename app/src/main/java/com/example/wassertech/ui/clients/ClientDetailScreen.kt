@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
@@ -434,15 +436,21 @@ fun ClientDetailScreen(
                                 // Анимированное содержимое установок
                                 AnimatedVisibility(
                                     visible = isExpanded,
-                                    enter = expandVertically(animationSpec = tween(300)),
-                                    exit = shrinkVertically(animationSpec = tween(300))
+                                    enter = expandVertically(
+                                        animationSpec = tween(300),
+                                        expandFrom = Alignment.Top
+                                    ) + fadeIn(animationSpec = tween(300)),
+                                    exit = shrinkVertically(
+                                        animationSpec = tween(300),
+                                        shrinkTowards = Alignment.Top
+                                    ) + fadeOut(animationSpec = tween(300))
                                 ) {
                                     val installationsFlow = vm.installations(s.id, includeArchived = false)
                                     val installations by installationsFlow.collectAsState(initial = emptyList())
                                     Column(
                                         modifier = Modifier
-                                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                                            .animateContentSize(),
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         if (installations.isEmpty()) {

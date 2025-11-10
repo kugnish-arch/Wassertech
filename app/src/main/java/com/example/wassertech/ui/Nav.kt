@@ -25,6 +25,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.Alignment
 import com.example.wassertech.ui.clients.ClientDetailScreen
 import com.example.wassertech.ui.clients.ClientsRoute
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
@@ -40,6 +43,30 @@ import com.example.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
 import com.example.wassertech.ui.common.NavigationBottomBar
 
+// Вспомогательные функции для анимаций переходов
+private fun slideInFromRight() = slideInHorizontally(
+    initialOffsetX = { fullWidth -> fullWidth },
+    animationSpec = tween(300)
+) + fadeIn(animationSpec = tween(300))
+
+private fun slideOutToLeft() = slideOutHorizontally(
+    targetOffsetX = { fullWidth -> -fullWidth },
+    animationSpec = tween(300)
+) + fadeOut(animationSpec = tween(300))
+
+private fun slideInFromLeft() = slideInHorizontally(
+    initialOffsetX = { fullWidth -> -fullWidth },
+    animationSpec = tween(300)
+) + fadeIn(animationSpec = tween(300))
+
+private fun slideOutToRight() = slideOutHorizontally(
+    targetOffsetX = { fullWidth -> fullWidth },
+    animationSpec = tween(300)
+) + fadeOut(animationSpec = tween(300))
+
+// Легкий fade transition для некоторых экранов
+private fun fadeInTransition() = fadeIn(animationSpec = tween(300))
+private fun fadeOutTransition() = fadeOut(animationSpec = tween(300))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -268,7 +295,13 @@ private fun AppScaffold(navController: NavHostController) {
             startDestination = "clients",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("clients") {
+            composable(
+                route = "clients",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
                 ClientsRoute(
                     isEditing = clientsEditing,
                     onToggleEdit = { clientsEditing = !clientsEditing },
@@ -281,7 +314,13 @@ private fun AppScaffold(navController: NavHostController) {
                 )
             }
 
-            composable("templates") {
+            composable(
+                route = "templates",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
                 TemplatesScreen(
                     isEditing = templatesEditing,
                     onToggleEdit = { templatesEditing = !templatesEditing },
@@ -292,8 +331,12 @@ private fun AppScaffold(navController: NavHostController) {
             }
 
             composable(
-                "template_editor/{templateId}",
-                arguments = listOf(navArgument("templateId") { type = NavType.StringType })
+                route = "template_editor/{templateId}",
+                arguments = listOf(navArgument("templateId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val id = bse.arguments?.getString("templateId") ?: return@composable
                 TemplateEditorScreen(
@@ -303,8 +346,12 @@ private fun AppScaffold(navController: NavHostController) {
             }
 
             composable(
-                "client/{clientId}",
-                arguments = listOf(navArgument("clientId") { type = NavType.StringType })
+                route = "client/{clientId}",
+                arguments = listOf(navArgument("clientId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val clientId = bse.arguments?.getString("clientId") ?: return@composable
                 ClientDetailScreen(
@@ -317,8 +364,12 @@ private fun AppScaffold(navController: NavHostController) {
             }
 
             composable(
-                "site/{siteId}",
-                arguments = listOf(navArgument("siteId") { type = NavType.StringType })
+                route = "site/{siteId}",
+                arguments = listOf(navArgument("siteId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val siteId = bse.arguments?.getString("siteId") ?: return@composable
                 SiteDetailScreen(
@@ -330,8 +381,12 @@ private fun AppScaffold(navController: NavHostController) {
             }
 
             composable(
-                "installation/{installationId}",
-                arguments = listOf(navArgument("installationId") { type = NavType.StringType })
+                route = "installation/{installationId}",
+                arguments = listOf(navArgument("installationId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val installationId = bse.arguments?.getString("installationId") ?: return@composable
                 ComponentsScreen(
@@ -358,7 +413,11 @@ private fun AppScaffold(navController: NavHostController) {
                     navArgument("siteId") { type = NavType.StringType },
                     navArgument("installationId") { type = NavType.StringType },
                     navArgument("installationName") { type = NavType.StringType }
-                )
+                ),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val siteId = bse.arguments?.getString("siteId")!!
                 val installationId = bse.arguments?.getString("installationId")!!
@@ -382,7 +441,11 @@ private fun AppScaffold(navController: NavHostController) {
                     navArgument("siteId") { type = NavType.StringType },
                     navArgument("installationId") { type = NavType.StringType },
                     navArgument("installationName") { type = NavType.StringType }
-                )
+                ),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val sessionId = bse.arguments?.getString("sessionId")!!
                 val siteId = bse.arguments?.getString("siteId")!!
@@ -400,7 +463,13 @@ private fun AppScaffold(navController: NavHostController) {
             }
 
             // История ТО (общая)
-            composable("maintenance_history") {
+            composable(
+                route = "maintenance_history",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
                 MaintenanceHistoryScreen(
                     installationId = null,
                     isEditing = maintenanceHistoryEditing,
@@ -413,8 +482,12 @@ private fun AppScaffold(navController: NavHostController) {
 
             // История ТО по установке
             composable(
-                "maintenance_history/{installationId}",
-                arguments = listOf(navArgument("installationId") { type = NavType.StringType })
+                route = "maintenance_history/{installationId}",
+                arguments = listOf(navArgument("installationId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val installationId = bse.arguments?.getString("installationId")
                 MaintenanceHistoryScreen(
@@ -428,7 +501,13 @@ private fun AppScaffold(navController: NavHostController) {
             }
             
             // Экран отчётов ТО
-            composable("reports") {
+            composable(
+                route = "reports",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
                 ReportsScreen(
                     isEditing = reportsEditing,
                     onToggleEdit = { reportsEditing = !reportsEditing }
@@ -437,8 +516,12 @@ private fun AppScaffold(navController: NavHostController) {
 
             // Экран деталей ТО
             composable(
-                "maintenance_session/{sessionId}",
-                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+                route = "maintenance_session/{sessionId}",
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { slideOutToRight() }
             ) { bse ->
                 val sessionId = bse.arguments?.getString("sessionId") ?: return@composable
                 MaintenanceSessionDetailScreen(
@@ -452,12 +535,24 @@ private fun AppScaffold(navController: NavHostController) {
             }
             
             // Экран настроек
-            composable("settings") {
+            composable(
+                route = "settings",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
                 SettingsScreen()
             }
             
             // Экран "О программе"
-            composable("about") {
+            composable(
+                route = "about",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
                 AboutScreen()
             }
         }

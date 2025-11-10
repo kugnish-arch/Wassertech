@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import com.example.wassertech.ui.theme.PdfIconColor
 import androidx.core.content.FileProvider
 import android.content.Intent
 import android.net.Uri
@@ -102,7 +103,7 @@ fun ReportsScreen(
                     painter = painterResource(R.drawable.document_pdf),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = PdfIconColor
                 )
                 Text(
                     "Отчёты ТО отсутствуют",
@@ -213,7 +214,7 @@ fun ReportsScreen(
                                         painterResource(R.drawable.html)
                                     },
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface, // Черный цвет для HTML иконки
+                                    tint = if (isPdf) PdfIconColor else MaterialTheme.colorScheme.onSurface, // Красный для PDF, черный для HTML
                                     modifier = Modifier.size(32.dp)
                                 )
                                 Column(modifier = Modifier.weight(1f)) {

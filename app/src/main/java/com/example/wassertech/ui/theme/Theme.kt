@@ -288,12 +288,23 @@ val SaveIconColor = Color(0xFF4CAF50) // Зеленый цвет для икон
 // Цвет для иконки HTML файлов (зеленый)
 val HtmlIconColor = Color(0xFF4CAF50) // Зеленый цвет для иконки HTML файлов (используется для временной зеленой PDF иконки)
 
+// Цвет для иконки PDF файлов (красный)
+val PdfIconColor = Color(0xFFD32F2F) // Красный цвет для иконки PDF файлов
+
 // Цвет для иконки удаления (корзина) - используется везде, где можно что-то удалить
 val DeleteIcon = Icons.Filled.Delete // Иконка корзины для удаления элементов
 
 // Scrim (подложка) для FAB группы - легкая тень/фон для визуального отделения выпрыгивающих кнопок от списка
 val FABScrimColor = Color.Black.copy(alpha = 0.08f) // Полупрозрачная черная подложка для FAB группы
 val FABScrimElevation = 8.dp // Тень для scrim FAB группы
+
+/* ================== ЦВЕТА ДЛЯ ЭКРАНА КЛИЕНТЫ ================== */
+// Цвета для групп клиентов на экране ClientsScreen
+val ClientsGroupCollapsedBackground = Color(0xFFF3F4F6) // Светлый фон для свёрнутых групп
+val ClientsGroupExpandedBackground = Color(0xFF2E2E2E) // Графитовый фон для активной (открытой) группы
+val ClientsGroupExpandedText = Color(0xFFFFFFFF) // Белый текст для активной группы
+val ClientsGroupBorder = Color(0xFFDADADA) // Тонкий бордер снизу для групп
+val ClientsRowDivider = Color(0xFFDADADA) // Разделительная линия между клиентами в списке
 
 @Composable
 fun WassertechTheme(

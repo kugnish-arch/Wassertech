@@ -133,7 +133,7 @@ fun TemplatesScreen(
             contentPadding = PaddingValues(
                 start = 12.dp,
                 end = 12.dp,
-                top = 0.dp, // минимальный зазор под сабнавбаром
+                top = 8.dp, // стандартный отступ от заголовка до контента
                 bottom = padding.calculateBottomPadding() + 12.dp
             )
         ) {
