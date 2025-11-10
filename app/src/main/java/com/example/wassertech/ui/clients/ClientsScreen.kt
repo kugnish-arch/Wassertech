@@ -1,6 +1,7 @@
 package com.example.wassertech.ui.clients
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -280,38 +281,58 @@ fun ClientsScreen(
                             key = { it }
                         ) { clientId ->
                             val client = generalById[clientId] ?: return@items
-                            ClientRowWithEdit(
-                                client = client,
-                                groupId = null,
-                                groups = groups,
-                                isEditMode = isEditMode,
-                                onClick = { onClientClick(client.id) },
-                                onArchive = { onArchiveClient(client.id) },
-                                onRestore = { onRestoreClient(client.id) },
-                                onMoveUp = { moveIdWithin(null, client.id, up = true) },
-                                onMoveDown = { moveIdWithin(null, client.id, up = false) },
-                                onMoveToGroup = { targetGroupId: String? ->
-                                    moveIdToGroup(
-                                        client.id,
-                                        null,
-                                        targetGroupId
+                            // Карточка с новым стилем: белый фон, тонкая граница, скругление 12dp, elevation 1dp
+                            OutlinedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.outlinedCardColors(
+                                    containerColor = Color.White
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    // Вертикальная линия-акцент слева (цвет зависит от типа клиента)
+                                    val accentColor = if (client.isCorporate == true) Color(0xFFE53935) else Color(0xFF9E9E9E)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .width(4.dp)
+                                            .background(accentColor)
                                     )
-                                },
-                                onEditName = {
-                                    editClientId = client.id
-                                    editClientName = client.name
-                                    editClientGroupId = client.clientGroupId
-                                },
-                                onDelete = {
-                                    deleteDialogState = DeleteDialogState(
-                                        isClient = true,
-                                        id = client.id,
-                                        name = client.name
+                                    ClientRowWithEdit(
+                                        client = client,
+                                        groupId = null,
+                                        groups = groups,
+                                        isEditMode = isEditMode,
+                                        onClick = { onClientClick(client.id) },
+                                        onArchive = { onArchiveClient(client.id) },
+                                        onRestore = { onRestoreClient(client.id) },
+                                        onMoveUp = { moveIdWithin(null, client.id, up = true) },
+                                        onMoveDown = { moveIdWithin(null, client.id, up = false) },
+                                        onMoveToGroup = { targetGroupId: String? ->
+                                            moveIdToGroup(
+                                                client.id,
+                                                null,
+                                                targetGroupId
+                                            )
+                                        },
+                                        onEditName = {
+                                            editClientId = client.id
+                                            editClientName = client.name
+                                            editClientGroupId = client.clientGroupId
+                                        },
+                                        onDelete = {
+                                            deleteDialogState = DeleteDialogState(
+                                                isClient = true,
+                                                id = client.id,
+                                                name = client.name
+                                            )
+                                        },
+                                        modifier = Modifier.animateContentSize()
                                     )
-                                },
-                                modifier = Modifier.animateContentSize()
-                            )
-                            HorizontalDivider()
+                                }
+                            }
                         }
                     }
                 }
@@ -362,46 +383,66 @@ fun ClientsScreen(
                             Column {
                                 listIds.forEach { cid ->
                                     val client = byId[cid] ?: return@forEach
-                                    ClientRowWithEdit(
-                                        client = client,
-                                        groupId = groupId,
-                                        groups = groups,
-                                        isEditMode = isEditMode,
-                                        onClick = { onClientClick(client.id) },
-                                        onArchive = { onArchiveClient(client.id) },
-                                        onRestore = { onRestoreClient(client.id) },
-                                        onMoveUp = { moveIdWithin(groupId, client.id, up = true) },
-                                        onMoveDown = {
-                                            moveIdWithin(
-                                                groupId,
-                                                client.id,
-                                                up = false
+                                    // Карточка с новым стилем: белый фон, тонкая граница, скругление 12dp, elevation 1dp
+                                    OutlinedCard(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.outlinedCardColors(
+                                            containerColor = Color.White
+                                        ),
+                                        border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxWidth()) {
+                                            // Вертикальная линия-акцент слева (цвет зависит от типа клиента)
+                                            val accentColor = if (client.isCorporate == true) Color(0xFFE53935) else Color(0xFF9E9E9E)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .width(4.dp)
+                                                    .background(accentColor)
                                             )
-                                        },
-                                        onMoveToGroup = { targetGroupId: String? ->
-                                            moveIdToGroup(
-                                                client.id,
-                                                groupId,
-                                                targetGroupId
+                                            ClientRowWithEdit(
+                                                client = client,
+                                                groupId = groupId,
+                                                groups = groups,
+                                                isEditMode = isEditMode,
+                                                onClick = { onClientClick(client.id) },
+                                                onArchive = { onArchiveClient(client.id) },
+                                                onRestore = { onRestoreClient(client.id) },
+                                                onMoveUp = { moveIdWithin(groupId, client.id, up = true) },
+                                                onMoveDown = {
+                                                    moveIdWithin(
+                                                        groupId,
+                                                        client.id,
+                                                        up = false
+                                                    )
+                                                },
+                                                onMoveToGroup = { targetGroupId: String? ->
+                                                    moveIdToGroup(
+                                                        client.id,
+                                                        groupId,
+                                                        targetGroupId
+                                                    )
+                                                },
+                                                onEditName = {
+                                                    editClientId = client.id
+                                                    editClientName = client.name
+                                                    editClientGroupId = client.clientGroupId
+                                                },
+                                                onDelete = {
+                                                    deleteDialogState = DeleteDialogState(
+                                                        isClient = true,
+                                                        id = client.id,
+                                                        name = client.name
+                                                    )
+                                                },
+                                                modifier = Modifier.animateContentSize()
                                             )
-                                        },
-                                        onEditName = {
-                                            editClientId = client.id
-                                            editClientName = client.name
-                                            editClientGroupId = client.clientGroupId
-                                        },
-                                        onDelete = {
-                                            deleteDialogState = DeleteDialogState(
-                                                isClient = true,
-                                                id = client.id,
-                                                name = client.name
-                                            )
-                                        },
-                                modifier = Modifier.animateContentSize()
-                            )
-                            HorizontalDivider()
-                        }
-                    }
+                                        }
+                                    }
+                                }
+                            }
                 }
             }
                 }
@@ -483,7 +524,8 @@ fun ClientsScreen(
                             }
                             DropdownMenu(
                                 expanded = groupPickerExpanded,
-                                onDismissRequest = { groupPickerExpanded = false }
+                                onDismissRequest = { groupPickerExpanded = false },
+                                modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Без группы") },
@@ -594,7 +636,8 @@ fun ClientsScreen(
                             }
                             DropdownMenu(
                                 expanded = editClientGroupPicker,
-                                onDismissRequest = { editClientGroupPicker = false }
+                                onDismissRequest = { editClientGroupPicker = false },
+                                modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Без группы") },
@@ -792,7 +835,7 @@ private fun GroupHeader(
             }
         }
         Icon(
-            imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            imageVector = if (isExpanded) com.example.wassertech.ui.theme.NavigationIcons.CollapseMenuIcon else com.example.wassertech.ui.theme.NavigationIcons.ExpandMenuIcon,
             contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
             tint = contentColor
         )
@@ -876,7 +919,7 @@ private fun ClientRowWithEdit(
                     Modifier
                 }
             )
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
+            .padding(start = 8.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
             .animateContentSize(),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -949,7 +992,7 @@ private fun ClientRowWithEdit(
         // Иконка навигации справа (когда не в режиме редактирования)
         if (!isEditMode) {
             Icon(
-                imageVector = Icons.Filled.ChevronRight,
+                imageVector = com.example.wassertech.ui.theme.NavigationIcons.NavigateIcon,
                 contentDescription = "Открыть",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
@@ -993,7 +1036,11 @@ private fun ClientRowWithEdit(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                    ) {
                         DropdownMenuItem(
                             text = { Text("Переместить в: Без группы") },
                             onClick = {

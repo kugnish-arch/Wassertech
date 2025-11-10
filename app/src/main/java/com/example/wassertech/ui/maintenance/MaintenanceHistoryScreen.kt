@@ -1,10 +1,13 @@
 package com.example.wassertech.ui.maintenance
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
@@ -13,16 +16,16 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HomeWork
-import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.example.wassertech.R
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import com.example.wassertech.data.AppDatabase
@@ -72,7 +75,8 @@ fun MaintenanceHistoryScreen(
                 val clientName = client?.name ?: "Без клиента"
                 val siteName = site?.name ?: "Без объекта"
                 val instName = inst?.name ?: "Без установки"
-                val dateText = s.startedAtEpoch?.let { epoch -> sdf.format(Date(epoch)) } ?: "Неизвестно"
+                val dateText =
+                    s.startedAtEpoch?.let { epoch -> sdf.format(Date(epoch)) } ?: "Неизвестно"
                 Triple(clientName, "$siteName — $instName", dateText)
             }
             sessionDisplay = result
@@ -80,6 +84,7 @@ fun MaintenanceHistoryScreen(
     }
 
     Scaffold(
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0), // Убираем белое поле внизу
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             if (isEditing && selectedSessions.isNotEmpty()) {
@@ -107,7 +112,7 @@ fun MaintenanceHistoryScreen(
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.PictureAsPdf,
+                        painter = painterResource(R.drawable.document_pdf),
                         contentDescription = "Отчёты ТО",
                         modifier = Modifier.size(28.dp)
                     )
@@ -116,154 +121,214 @@ fun MaintenanceHistoryScreen(
         }
     ) { padding ->
         val layoutDirection = LocalLayoutDirection.current
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 0.dp) // Уменьшаем отступ от апбара
-            .padding(bottom = padding.calculateBottomPadding())
-            .padding(horizontal = padding.calculateStartPadding(layoutDirection))) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 0.dp) // Уменьшаем отступ от апбара
+                .padding(bottom = padding.calculateBottomPadding())
+                .padding(horizontal = padding.calculateStartPadding(layoutDirection))
+        ) {
             if (sessions.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Записей ТО пока нет")
                 }
             } else {
+                Spacer(Modifier.height(8.dp)) // Отступ от подзаголовка до контента
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                items(sessionDisplay.zip(sessions)) { (display, s) ->
-                    val isSelected = selectedSessions.contains(s.id)
-                    ElevatedCard(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (isEditing) {
-                                    // В режиме редактирования - переключаем выбор
-                                    selectedSessions = if (isSelected) {
-                                        selectedSessions - s.id
-                                    } else {
-                                        selectedSessions + s.id
-                                    }
-                                } else {
-                                    // Обычный режим - открываем сессию
-                                    onOpenSession(s.id)
-                                }
-                            }
-                    ) {
-                        Row(
-                            Modifier
+                    items(sessionDisplay.zip(sessions)) { (display, s) ->
+                        val isSelected = selectedSessions.contains(s.id)
+                        // Карточка с новым стилем: белый фон, тонкая граница, скругление 12dp, elevation 1dp
+                        OutlinedCard(
+                            modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Чекбокс выбора - только в режиме редактирования
-                            if (isEditing) {
-                                IconButton(
-                                    onClick = {
+                                .clickable {
+                                    if (isEditing) {
+                                        // В режиме редактирования - переключаем выбор
                                         selectedSessions = if (isSelected) {
                                             selectedSessions - s.id
                                         } else {
                                             selectedSessions + s.id
                                         }
-                                    },
-                                    modifier = Modifier.size(48.dp)
+                                    } else {
+                                        // Обычный режим - открываем сессию
+                                        onOpenSession(s.id)
+                                    }
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.outlinedCardColors(
+                                containerColor = Color.White
+                            ),
+                            border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                // Вертикальная линия-акцент слева (цвет #E53935)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .width(4.dp)
+                                        .background(Color(0xFFE53935))
+                                )
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            start = 12.dp,
+                                            end = 12.dp,
+                                            top = 12.dp,
+                                            bottom = 12.dp
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = if (isSelected) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
-                                        contentDescription = if (isSelected) "Снять выделение" else "Выбрать",
-                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Outlined.Business,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(display.first, style = MaterialTheme.typography.titleMedium)
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Outlined.HomeWork,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(display.second, style = MaterialTheme.typography.bodyMedium)
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Outlined.History,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(display.third, style = MaterialTheme.typography.bodySmall)
+                                    // Чекбокс выбора - только в режиме редактирования
+                                    if (isEditing) {
+                                        IconButton(
+                                            onClick = {
+                                                selectedSessions = if (isSelected) {
+                                                    selectedSessions - s.id
+                                                } else {
+                                                    selectedSessions + s.id
+                                                }
+                                            },
+                                            modifier = Modifier.size(48.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isSelected) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                                                contentDescription = if (isSelected) "Снять выделение" else "Выбрать",
+                                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Outlined.Business,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                display.first,
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Outlined.HomeWork,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                display.second,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Outlined.History,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                display.third,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                    // Иконка навигации - только вне режима редактирования
+                                    if (!isEditing) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = com.example.wassertech.ui.theme.NavigationIcons.NavigateIcon,
+                                            contentDescription = "Открыть детали",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                    // Конец записей
+                    item {
+                        Spacer(Modifier.height(12.dp)) // Отступ от последней карточки
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center // Выравнивание по центру
+                        ) {
+                            Text(
+                                text = "Конец записей...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
-            }
             }
         }
-    }
-    
-    // Диалог подтверждения удаления выбранных сессий
-    if (showDeleteDialog && selectedSessions.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Удалить выбранные записи?") },
-            text = { 
-                Text("Вы уверены, что хотите удалить ${selectedSessions.size} запис${if (selectedSessions.size == 1) "ь" else "ей"} ТО?") 
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            try {
-                                val count = selectedSessions.size
-                                val sessionsToDelete = selectedSessions.toList() // Копируем список перед очисткой
-                                withContext(Dispatchers.IO) {
-                                    sessionsToDelete.forEach { sessionId ->
-                                        SafeDeletionHelper.deleteSession(db, sessionId)
+
+        // Диалог подтверждения удаления выбранных сессий
+        if (showDeleteDialog && selectedSessions.isNotEmpty()) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Удалить выбранные записи?") },
+                text = {
+                    Text("Вы уверены, что хотите удалить ${selectedSessions.size} запис${if (selectedSessions.size == 1) "ь" else "ей"} ТО?")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val count = selectedSessions.size
+                                    val sessionsToDelete =
+                                        selectedSessions.toList() // Копируем список перед очисткой
+                                    withContext(Dispatchers.IO) {
+                                        sessionsToDelete.forEach { sessionId ->
+                                            SafeDeletionHelper.deleteSession(db, sessionId)
+                                        }
                                     }
+                                    selectedSessions = emptySet()
+                                    showDeleteDialog = false
+                                    snackbarHostState.showSnackbar(
+                                        message = "Удалено записей: $count",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                } catch (e: Exception) {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Ошибка при удалении: ${e.message}",
+                                        duration = SnackbarDuration.Long
+                                    )
                                 }
-                                selectedSessions = emptySet()
-                                showDeleteDialog = false
-                                snackbarHostState.showSnackbar(
-                                    message = "Удалено записей: $count",
-                                    duration = SnackbarDuration.Short
-                                )
-                            } catch (e: Exception) {
-                                snackbarHostState.showSnackbar(
-                                    message = "Ошибка при удалении: ${e.message}",
-                                    duration = SnackbarDuration.Long
-                                )
                             }
-                        }
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Удалить")
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Удалить")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Отмена")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Отмена")
-                }
-            }
-        )
+            )
+        }
     }
 }

@@ -8,7 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.ui.res.painterResource
+import com.example.wassertech.R
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.ui.graphics.Color
 import com.example.wassertech.ui.common.AppFloatingActionButton
@@ -256,7 +257,7 @@ fun MaintenanceSessionDetailScreen(
                         )
                     } else {
                         Icon(
-                            imageVector = Icons.Outlined.PictureAsPdf,
+                            painter = painterResource(R.drawable.document_pdf),
                             contentDescription = "Создать PDF",
                             modifier = Modifier.size(28.dp) // Увеличена иконка PDF
                         )
@@ -271,24 +272,25 @@ fun MaintenanceSessionDetailScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Header card (secondaryContainer)
+                    // Header card (используем стиль из темы)
                     item {
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            )
+                                containerColor = com.example.wassertech.ui.theme.HeaderCardStyle.backgroundColor
+                            ),
+                            shape = com.example.wassertech.ui.theme.HeaderCardStyle.shape
                         ) {
                             Column(
-                                Modifier.fillMaxWidth().padding(12.dp),
+                                Modifier.fillMaxWidth().padding(com.example.wassertech.ui.theme.HeaderCardStyle.padding),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     val icon =
                                         if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
-                                    Icon(icon, contentDescription = null)
+                                    Icon(icon, contentDescription = null, tint = com.example.wassertech.ui.theme.HeaderCardStyle.textColor)
                                     Spacer(Modifier.width(8.dp))
-                                    Text(clientName, style = MaterialTheme.typography.titleMedium)
+                                    Text(clientName, style = com.example.wassertech.ui.theme.HeaderCardStyle.titleTextStyle, color = com.example.wassertech.ui.theme.HeaderCardStyle.textColor)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
@@ -307,7 +309,13 @@ fun MaintenanceSessionDetailScreen(
                     }
 
                     items(groups) { g ->
-                        ElevatedCard(Modifier.fillMaxWidth()) {
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                        ) {
                             ListItem(
                                 headlineContent = { Text(g.componentName) },
                                 supportingContent = {
@@ -320,6 +328,22 @@ fun MaintenanceSessionDetailScreen(
                                         }
                                     }
                                 }
+                            )
+                        }
+                    }
+                    // Конец записей
+                    item {
+                        Spacer(Modifier.height(12.dp)) // Уменьшенный отступ от последней карточки
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center // Выравнивание по центру
+                        ) {
+                            Text(
+                                text = "Конец записей...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

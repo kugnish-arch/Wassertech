@@ -74,29 +74,30 @@ fun SiteDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ======= HEADER =======
-            // Шапка в стиле ClientDetailScreen.kt
+            // Шапка в стиле из темы
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+                    containerColor = com.example.wassertech.ui.theme.HeaderCardStyle.backgroundColor
+                ),
+                shape = com.example.wassertech.ui.theme.HeaderCardStyle.shape
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 12.dp),
+                        .padding(com.example.wassertech.ui.theme.HeaderCardStyle.padding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = AppIcons.Site,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        tint = com.example.wassertech.ui.theme.HeaderCardStyle.textColor
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         siteName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        style = com.example.wassertech.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = com.example.wassertech.ui.theme.HeaderCardStyle.textColor
                     )
                     Spacer(Modifier.weight(1f))
                     // Иконка редактирования видна только в режиме редактирования
@@ -105,7 +106,7 @@ fun SiteDetailScreen(
                             Icon(
                                 Icons.Filled.Edit,
                                 contentDescription = "Редактировать объект",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = com.example.wassertech.ui.theme.HeaderCardStyle.textColor
                             )
                         }
                     }
@@ -136,13 +137,17 @@ fun SiteDetailScreen(
                         ElevatedCard(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onOpenInstallation(inst.id) }
+                                .clickable { onOpenInstallation(inst.id) },
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
                         ) {
                             ListItem(
                                 headlineContent = { Text(inst.name) },
                                 trailingContent = {
                                     IconButton(onClick = { onOpenInstallation(inst.id) }) {
-                                        Icon(Icons.Filled.ChevronRight, contentDescription = "Открыть")
+                                        Icon(com.example.wassertech.ui.theme.NavigationIcons.NavigateIcon, contentDescription = "Открыть")
                                     }
                                 }
                             )

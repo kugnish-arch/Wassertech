@@ -1,5 +1,6 @@
 package com.example.wassertech.ui.clients
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -231,26 +232,27 @@ fun ClientDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+                    containerColor = com.example.wassertech.ui.theme.HeaderCardStyle.backgroundColor
+                ),
+                shape = com.example.wassertech.ui.theme.HeaderCardStyle.shape
             ) {
-                // Плашка имени — как у групп (secondaryContainer)
+                // Плашка имени — используем стиль из темы
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 12.dp),
+                        .padding(com.example.wassertech.ui.theme.HeaderCardStyle.padding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = if (isCorporate) AppIcons.ClientCorporate else AppIcons.ClientPrivate,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        tint = com.example.wassertech.ui.theme.HeaderCardStyle.textColor
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         clientName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        style = com.example.wassertech.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = com.example.wassertech.ui.theme.HeaderCardStyle.textColor
                     )
 
                     Spacer(Modifier.weight(1f))
@@ -265,7 +267,7 @@ fun ClientDetailScreen(
                             Icon(
                                 imageVector = Icons.Filled.Edit,
                                 contentDescription = "Редактировать клиента",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = Color(0xFF1E1E1E) // Иконка на плашке заголовка
                             )
                         }
                     }
@@ -286,7 +288,13 @@ fun ClientDetailScreen(
                         val installations = allInstallations[siteId] ?: emptyList()
                         val installationOrder = localInstallationOrders[siteId] ?: installations.map { it.id }
                         
-                        ElevatedCard(Modifier.fillMaxWidth()) {
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                        ) {
                             Column {
                                 // Рядок объекта с ручкой для drag-and-drop
                                 SiteRowWithDrag(
@@ -383,11 +391,19 @@ fun ClientDetailScreen(
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(com.example.wassertech.ui.theme.ExpandableMenuBackground) // Светло-серый фон для разворачивающихся меню
                 ) {
                     items(sitesToShow, key = { it.id }) { s ->
                         val isExpanded = expandedSites.contains(s.id)
-                        ElevatedCard(Modifier.fillMaxWidth()) {
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = com.example.wassertech.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
                             Column {
                                 ListItem(
                                     modifier = Modifier.clickable { onOpenSite(s.id) },
@@ -403,7 +419,7 @@ fun ClientDetailScreen(
                                             expandedSites = if (isExpanded) expandedSites - s.id else expandedSites + s.id
                                         }) {
                                             Icon(
-                                                imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                                imageVector = if (isExpanded) com.example.wassertech.ui.theme.NavigationIcons.CollapseMenuIcon else com.example.wassertech.ui.theme.NavigationIcons.ExpandMenuIcon,
                                                 contentDescription = null
                                             )
                                         }
@@ -422,7 +438,11 @@ fun ClientDetailScreen(
                                             installations.forEach { inst ->
                                                 ElevatedCard(
                                                     onClick = { onOpenInstallation(inst.id) },
-                                                    modifier = Modifier.fillMaxWidth()
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    colors = CardDefaults.elevatedCardColors(
+                                                        containerColor = com.example.wassertech.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
+                                                    ),
+                                                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
                                                 ) {
                                                     Row(
                                                         Modifier
@@ -438,7 +458,7 @@ fun ClientDetailScreen(
                                                         )
                                                         // Стрелочка справа (такая же как на экране "Клиенты")
                                                         Icon(
-                                                            imageVector = Icons.Filled.ChevronRight,
+                                                            imageVector = com.example.wassertech.ui.theme.NavigationIcons.NavigateIcon,
                                                             contentDescription = "Перейти к установке",
                                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                             modifier = Modifier.size(20.dp)
@@ -538,12 +558,22 @@ fun ClientDetailScreen(
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sitePickerExpanded) },
                             modifier = Modifier.menuAnchor()
                         )
-                        ExposedDropdownMenu(expanded = sitePickerExpanded, onDismissRequest = { sitePickerExpanded = false }) {
+                        ExposedDropdownMenu(
+                            expanded = sitePickerExpanded,
+                            onDismissRequest = { sitePickerExpanded = false },
+                            modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                        ) {
                             sites.forEachIndexed { index, s ->
-                                DropdownMenuItem(text = { Text(s.name) }, onClick = {
-                                    selectedSiteIndex = index
-                                    sitePickerExpanded = false
-                                })
+                                DropdownMenuItem(
+                                    text = { Text(s.name) },
+                                    onClick = {
+                                        selectedSiteIndex = index
+                                        sitePickerExpanded = false
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = MaterialTheme.colorScheme.onSurface
+                                    )
+                                )
                             }
                         }
                     }
@@ -610,7 +640,8 @@ fun ClientDetailScreen(
                         )
                         ExposedDropdownMenu(
                             expanded = groupPickerExpanded,
-                            onDismissRequest = { groupPickerExpanded = false }
+                            onDismissRequest = { groupPickerExpanded = false },
+                            modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             groupOptions.forEachIndexed { index, pair ->
                                 DropdownMenuItem(
@@ -618,7 +649,10 @@ fun ClientDetailScreen(
                                     onClick = {
                                         selectedGroupIndex = index
                                         groupPickerExpanded = false
-                                    }
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = MaterialTheme.colorScheme.onSurface
+                                    )
                                 )
                             }
                         }

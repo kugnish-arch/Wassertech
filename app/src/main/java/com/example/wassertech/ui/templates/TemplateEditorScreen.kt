@@ -127,7 +127,11 @@ fun TemplateEditorScreen(
                         ),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        Icon(Icons.Filled.Save, contentDescription = "Сохранить")
+                        Icon(
+                            Icons.Filled.Save,
+                            contentDescription = "Сохранить",
+                            tint = com.example.wassertech.ui.theme.SaveIconColor
+                        )
                     }
                 }
             }
@@ -150,7 +154,13 @@ fun TemplateEditorScreen(
                     // Переменная для позиции иконки Info (вынесена на уровень карточки)
                     var headInfoIconPosition by remember { mutableStateOf<Offset?>(null) }
                     
-                    ElevatedCard(Modifier.fillMaxWidth()) {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек полей
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                    ) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -211,7 +221,13 @@ fun TemplateEditorScreen(
                 var infoIconPosition by remember(f.id) { mutableStateOf<Offset?>(null) }
                 
                 Box {
-                    ElevatedCard(Modifier.fillMaxWidth()) {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек полей
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                    ) {
                         Column(
                             Modifier
                                 .fillMaxWidth()

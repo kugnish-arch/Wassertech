@@ -11,10 +11,12 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wassertech.data.types.FieldType
@@ -73,20 +75,21 @@ fun MaintenanceScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+                    containerColor = com.example.wassertech.ui.theme.HeaderCardStyle.backgroundColor
+                ),
+                shape = com.example.wassertech.ui.theme.HeaderCardStyle.shape
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(com.example.wassertech.ui.theme.HeaderCardStyle.padding),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                 ) {
                     // Иконка шестеренки убрана по требованию
                     Text(
                         text = "Обслуживание установки $installationName",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = com.example.wassertech.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = com.example.wassertech.ui.theme.HeaderCardStyle.textColor,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -111,7 +114,11 @@ fun MaintenanceScreen(
                         key(sec.componentId) {
                             // Заглавные компоненты используют тот же фон что и COMMON компоненты
                             ElevatedCard(
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.elevatedCardColors(
+                                    containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек компонентов
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
                             ) {
                                 Column(Modifier.fillMaxWidth()) {
                                     // заголовок секции - для заглавных компонентов такой же фон как у COMMON, но с жирным текстом и иконкой
@@ -144,7 +151,7 @@ fun MaintenanceScreen(
                                                 expandedMap[sec.componentId] = !expanded
                                             }) {
                                                 Icon(
-                                                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                                    imageVector = if (expanded) com.example.wassertech.ui.theme.NavigationIcons.CollapseMenuIcon else com.example.wassertech.ui.theme.NavigationIcons.ExpandMenuIcon,
                                                     contentDescription = if (expanded) "Свернуть" else "Развернуть"
                                                 )
                                             }
@@ -245,12 +252,21 @@ private fun FieldRow(
         FieldType.CHECKBOX -> {
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(f.label)
+                // Текст с ограничением на 2 строки и фиксированной шириной
+                Text(
+                    text = f.label,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                // Чекбокс всегда справа, не двигается
                 Checkbox(
                     checked = f.boolValue == true,
-                    onCheckedChange = onCheckbox
+                    onCheckedChange = onCheckbox,
+                    modifier = Modifier.size(48.dp) // Фиксированный размер для стабильности
                 )
             }
         }

@@ -2,9 +2,11 @@
 
 package com.example.wassertech.ui.hierarchy
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -19,6 +21,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.TextFieldValue
@@ -38,7 +41,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
-import androidx.compose.ui.graphics.Color
+
 
 @Composable
 fun ComponentsScreen(
@@ -185,10 +188,11 @@ fun ComponentsScreen(
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+                    containerColor = com.example.wassertech.ui.theme.HeaderCardStyle.backgroundColor
+                ),
+                shape = com.example.wassertech.ui.theme.HeaderCardStyle.shape
             ) {
-                Column(Modifier.padding(12.dp)) {
+                Column(Modifier.padding(com.example.wassertech.ui.theme.HeaderCardStyle.padding)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -196,8 +200,8 @@ fun ComponentsScreen(
                         // Иконка убрана по требованию
                         Text(
                             text = instName,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = com.example.wassertech.ui.theme.HeaderCardStyle.titleTextStyle,
+                            color = com.example.wassertech.ui.theme.HeaderCardStyle.textColor,
                             modifier = Modifier.weight(1f)
                         )
                         if (isEditing) {
@@ -215,7 +219,7 @@ fun ComponentsScreen(
                                 Icon(
                                     Icons.Filled.Edit,
                                     contentDescription = "Редактировать установку",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    tint = Color(0xFF1E1E1E) // Иконка на плашке заголовка
                                 )
                             }
                         }
@@ -225,39 +229,48 @@ fun ComponentsScreen(
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                            color = Color(0xFF1E1E1E).copy(alpha = 0.75f) // Текст на плашке заголовка
                         )
                     }
                 }
             }
 
-            // ===== Кнопки действий под заголовком =====
+            // ===== Кнопки действий под заголовком (SegmentedButtons) =====
             Spacer(Modifier.height(8.dp))
-            Row(
+            val firstComp = components.firstOrNull()
+            var selectedButton by remember { mutableStateOf<Int?>(null) }
+            
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 16.dp)
             ) {
-                val firstComp = components.firstOrNull()
-                OutlinedButton(
+                SegmentedButton(
+                    selected = selectedButton == 0,
                     onClick = {
+                        selectedButton = 0
                         val inst = installation
                         if (inst != null && firstComp != null) {
                             onStartMaintenanceAll(inst.siteId, inst.name ?: "")
                         }
                     },
                     enabled = installation != null && firstComp != null,
+                    shape = RoundedCornerShape(8.dp), // Скругление углов
                     modifier = Modifier.weight(1f)
-                ) { Text("Провести ТО") }
-
-
-
-
-                OutlinedButton(
-                    onClick = { onOpenMaintenanceHistoryForInstallation(installationId) },
+                ) {
+                    Text("Провести ТО")
+                }
+                SegmentedButton(
+                    selected = selectedButton == 1,
+                    onClick = {
+                        selectedButton = 1
+                        onOpenMaintenanceHistoryForInstallation(installationId)
+                    },
+                    shape = RoundedCornerShape(8.dp), // Скругление углов
                     modifier = Modifier.weight(1f)
-                ) { Text("История ТО") }
+                ) {
+                    Text("История ТО")
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -279,7 +292,13 @@ fun ComponentsScreen(
                 ) {
                     items(orderedComponents, key = { it.id }) { comp ->
                         val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
-                        ElevatedCard(Modifier.fillMaxWidth()) {
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                        ) {
                             ListItem(
                                 leadingContent = {
                                     Icon(
@@ -361,7 +380,8 @@ fun ComponentsScreen(
                         )
                         ExposedDropdownMenu(
                             expanded = editSitePickerExpanded,
-                            onDismissRequest = { editSitePickerExpanded = false }
+                            onDismissRequest = { editSitePickerExpanded = false },
+                            modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             allSites.forEachIndexed { index, s ->
                                 DropdownMenuItem(
@@ -369,7 +389,10 @@ fun ComponentsScreen(
                                     onClick = {
                                         editSelectedSiteIndex = index
                                         editSitePickerExpanded = false
-                                    }
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = MaterialTheme.colorScheme.onSurface
+                                    )
                                 )
                             }
                         }
@@ -439,12 +462,16 @@ fun ComponentsScreen(
                         )
                         ExposedDropdownMenu(
                             expanded = templateMenu,
-                            onDismissRequest = { templateMenu = false }
+                            onDismissRequest = { templateMenu = false },
+                            modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             if (allTemplates.isEmpty()) {
                                 DropdownMenuItem(
                                     text = { Text("Шаблонов нет") },
-                                    onClick = { templateMenu = false }
+                                    onClick = { templateMenu = false },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = MaterialTheme.colorScheme.onSurface
+                                    )
                                 )
                             } else {
                                 allTemplates.forEach { tmpl ->
@@ -453,7 +480,10 @@ fun ComponentsScreen(
                                         onClick = {
                                             selectedTemplate = tmpl
                                             templateMenu = false
-                                        }
+                                        },
+                                        colors = MenuDefaults.itemColors(
+                                            textColor = MaterialTheme.colorScheme.onSurface
+                                        )
                                     )
                                 }
                             }

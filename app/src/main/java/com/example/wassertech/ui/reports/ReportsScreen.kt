@@ -9,8 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.outlined.PictureAsPdf
-import androidx.compose.material.icons.outlined.Code
+import androidx.compose.ui.res.painterResource
+import com.example.wassertech.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -100,7 +100,7 @@ fun ReportsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    Icons.Outlined.PictureAsPdf,
+                    painter = painterResource(R.drawable.document_pdf),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -151,7 +151,7 @@ fun ReportsScreen(
                     val isSelected = selectedFiles.contains(file)
                     val isPdf = file.name.endsWith(".pdf", ignoreCase = true)
                     ElevatedCard(
-                        Modifier
+                        modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
                                 if (isEditing) {
@@ -169,7 +169,11 @@ fun ReportsScreen(
                                         openHtml(context, file)
                                     }
                                 }
-                            }
+                            },
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек PDF отчетов
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
                     ) {
                         Row(
                             Modifier
@@ -203,9 +207,14 @@ fun ReportsScreen(
                                     }
                                 }
                                 Icon(
-                                    if (isPdf) Icons.Outlined.PictureAsPdf else Icons.Outlined.Code,
+                                    painter = if (isPdf) {
+                                        painterResource(R.drawable.document_pdf)
+                                    } else {
+                                        // HTML файл - используем кастомную иконку html.xml
+                                        painterResource(R.drawable.html)
+                                    },
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MaterialTheme.colorScheme.onSurface, // Черный цвет для HTML иконки
                                     modifier = Modifier.size(32.dp)
                                 )
                                 Column(modifier = Modifier.weight(1f)) {

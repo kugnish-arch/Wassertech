@@ -1,7 +1,10 @@
 
 package com.example.wassertech.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
@@ -12,6 +15,8 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -60,9 +65,9 @@ fun AppTopBar(
             route.startsWith("installation/") -> "Установка"
             route.startsWith("maintenance_all") -> "Техническое обслуживание"
             route.startsWith("maintenance_edit") -> "Редактирование ТО"
-            route.startsWith("maintenance_history") -> "История ТО"
+            route.startsWith("maintenance_history") -> "История обслуживания"
             route.startsWith("maintenance_session") -> "Детали обслуживания"
-            route.startsWith("reports") -> "Отчёты ТО"
+            route.startsWith("reports") -> "Отчёты обслуживания"
             route.startsWith("settings") -> "Настройки"
             route.startsWith("about") -> "О программе"
             else -> "Wassertech CRM"
@@ -70,6 +75,15 @@ fun AppTopBar(
     }
 
     TopAppBar(
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background, // Фон совпадает с фоном приложения
+            titleContentColor = MaterialTheme.colorScheme.onBackground,
+            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+            actionIconContentColor = MaterialTheme.colorScheme.onBackground
+        ),
+        modifier = Modifier
+            .shadow(elevation = 2.dp) // Нежная тень для отделения от контента
+            .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = RoundedCornerShape(0.dp)), // Тонкая рамка
         navigationIcon = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canNavigateBack) {
@@ -84,7 +98,8 @@ fun AppTopBar(
                         // Бургер-меню привязано к иконке
                         DropdownMenu(
                             expanded = menuOpen,
-                            onDismissRequest = { menuOpen = false }
+                            onDismissRequest = { menuOpen = false },
+                            modifier = Modifier.background(com.example.wassertech.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Шаблоны") },
@@ -93,7 +108,10 @@ fun AppTopBar(
                                     navController.navigate("templates") {
                                         launchSingleTop = true
                                     }
-                                }
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = MaterialTheme.colorScheme.onSurface
+                                )
                             )
                             DropdownMenuItem(
                                 text = { Text("Настройки") },
@@ -102,7 +120,10 @@ fun AppTopBar(
                                     navController.navigate("settings") {
                                         launchSingleTop = true
                                     }
-                                }
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = MaterialTheme.colorScheme.onSurface
+                                )
                             )
                             DropdownMenuItem(
                                 text = { Text("О программе") },
@@ -111,7 +132,10 @@ fun AppTopBar(
                                     navController.navigate("about") {
                                         launchSingleTop = true
                                     }
-                                }
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = MaterialTheme.colorScheme.onSurface
+                                )
                             )
                         }
                     }
