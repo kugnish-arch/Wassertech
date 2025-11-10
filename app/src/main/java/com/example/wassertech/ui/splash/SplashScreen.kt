@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -17,6 +18,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
 import kotlinx.coroutines.delay
 import com.example.wassertech.R
 
@@ -45,21 +49,22 @@ fun SplashRouteFixed(onFinished: () -> Unit, totalMs: Int = 1500) {
     val wipeProgress = remember { Animatable(0f) } // Прогресс "вайпа": 0 (линия) -> 1 (справа)
 
     LaunchedEffect(Unit) {
-        // Этап 1: Появление логотипа (300ms)
-        alpha.animateTo(1f, tween(300, easing = LinearOutSlowInEasing))
-        scale.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+        // Замедляем анимацию в 1.5 раза
+        // Этап 1: Появление логотипа (450ms = 300 * 1.5)
+        alpha.animateTo(1f, tween(450, easing = LinearOutSlowInEasing))
+        scale.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
 
-        // Небольшая пауза перед следующим этапом (120ms)
-        delay(120)
+        // Небольшая пауза перед следующим этапом (180ms = 120 * 1.5)
+        delay(180)
         
-        // Этап 2: Падение красной линии сверху вниз (380ms)
-        lineProgress.animateTo(1f, tween(380, easing = FastOutLinearInEasing))
+        // Этап 2: Падение красной линии сверху вниз (570ms = 380 * 1.5)
+        lineProgress.animateTo(1f, tween(570, easing = FastOutLinearInEasing))
 
-        // Этап 3: "Вайп" графитового фона и появление белого текста (520ms)
-        wipeProgress.animateTo(1f, tween(520, easing = LinearOutSlowInEasing))
+        // Этап 3: "Вайп" графитового фона и появление белого текста (780ms = 520 * 1.5)
+        wipeProgress.animateTo(1f, tween(780, easing = LinearOutSlowInEasing))
 
         // Ожидание до завершения общей длительности анимации
-        val elapsedTime = 300 + 120 + 380 + 520
+        val elapsedTime = 450 + 180 + 570 + 780
         delay((totalMs - elapsedTime).coerceAtLeast(0).toLong())
         onFinished()
     }
@@ -96,107 +101,175 @@ private fun SplashLogoFixed(
     lineProgress: Float,
     wipeProgress: Float
 ) {
-    // Максимальная ширина логотипа для адаптивности на разных экранах
-    val maxLogoWidth = 280.dp
+    // Получаем плотность для конвертации пикселей в dp
+    val density = androidx.compose.ui.platform.LocalDensity.current
     
-    // Размеры логотипа в пикселях (обновляются после измерения)
+    // Размеры экрана в пикселях (для линии и фона на всю высоту)
+    var screenW by remember { mutableStateOf(0f) }
+    var screenH by remember { mutableStateOf(0f) }
+    
+    // Размеры логотипа и позиция разделения между wasser и tech
     var logoW by remember { mutableStateOf(0f) }
     var logoH by remember { mutableStateOf(0f) }
+        //var logoCenterX by remember { mutableStateOf(0f) } // X-позиция центра логотипа
+    var wasserW by remember { mutableStateOf(0f) } // Ширина wasser части
+    var wasserH by remember { mutableStateOf(0f) } // Высота wasser части
+    var wasserRightX by remember { mutableStateOf(0f) } // X-позиция правого края wasser
+    var wasserTopY by remember { mutableStateOf(0f) } // Y-позиция верха wasser
+    var xLineAbsolute by remember { mutableStateOf(0f) } // Абсолютная X-позиция линии разделения (wasser.right + 8px)
+    var techXAbsolute by remember { mutableStateOf(0f) } // Абсолютная X-позиция tech (xLineAbsolute + 4px)
 
-    // Внешний контейнер - центрирует логотип на экране
+    // Внешний контейнер - заполняет весь экран для линии и фона
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
+            .onGloballyPositioned {
+                screenW = it.size.width.toFloat()
+                screenH = it.size.height.toFloat()
+            },
         contentAlignment = Alignment.Center
     ) {
-        // Внутренний контейнер - ограничивает ширину и применяет анимации
+        // Логотип (wasser) - маленький, по центру экрана
         Box(
             modifier = Modifier
-                .widthIn(max = maxLogoWidth)  // Ограничение ширины для стабильности в портретной ориентации
+                .widthIn(max = 200.dp)  // Уменьшенная максимальная ширина логотипа
                 .wrapContentHeight()
-                .scale(scale)                 // Применяем масштабирование
-                .alpha(alpha)                 // Применяем прозрачность
-                .onGloballyPositioned {
-                    // Сохраняем размеры логотипа для расчетов координат в Canvas
-                    logoW = it.size.width.toFloat()
-                    logoH = it.size.height.toFloat()
+                .scale(scale * 0.7f)    // Уменьшаем масштаб (0.7 от текущего)
+                .alpha(alpha)            // Применяем прозрачность
+                .onGloballyPositioned { coordinates ->
+                    // Сохраняем размеры логотипа для расчетов координат
+                    logoW = coordinates.size.width.toFloat()
+                    logoH = coordinates.size.height.toFloat()
                 }
         ) {
-            // ВАЖНО: Все слои используют matchParentSize() для единой системы координат
-            // Это позволяет точно позиционировать элементы относительно друг друга
-
-            // Слой 1: WASSER (красный текст) - статичный, всегда видим слева
-            Image(
-                painter = painterResource(R.drawable.logo_wasser_red),
-                contentDescription = "wasser (red)",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.matchParentSize()
-            )
-
-            // Слой 2: TECH (чёрный текст) - базовый слой справа, всегда видим
-            // Этот слой виден везде, где нет графитового фона
+            // Row только для wasser (tech позиционируется абсолютно)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Слой 1: WASSER (красный текст) - статичный, всегда видим слева
+                // Сдвигаем wasser левее на 4px
+                Image(
+                    painter = painterResource(R.drawable.logo_wasser_red),
+                    contentDescription = "wasser (red)",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .wrapContentHeight()
+                        .offset(x = with(density) { -4.dp }) // Сдвигаем левее на 4px
+                        .onGloballyPositioned { wasserCoordinates ->
+                            wasserW = wasserCoordinates.size.width.toFloat()
+                            wasserH = wasserCoordinates.size.height.toFloat()
+                            val wasserBounds = wasserCoordinates.boundsInRoot()
+                            wasserRightX = wasserBounds.right
+                            wasserTopY = wasserBounds.top
+                            // Линия должна быть справа от wasser + 8px (расстояние до tech)
+                            val spacingPx = with(density) { 8.dp.toPx() } // 8px между wasser и tech
+                            xLineAbsolute = wasserRightX + spacingPx
+                            // tech должен быть в 4px справа от линии
+                            val techOffsetPx = with(density) { 4.dp.toPx() }
+                            techXAbsolute = xLineAbsolute + techOffsetPx
+                        }
+                )
+            }
+            
+        }
+        
+        // Слой 2: TECH (чёрный текст) - позиционируется абсолютно в 4px справа от красной линии
+        // Этот слой виден везде, где нет графитового фона
+        // Позиционируем относительно экрана, выравниваем по вертикали с wasser
+        if (techXAbsolute > 0f && wasserH > 0f && wasserTopY > 0f) {
             Image(
                 painter = painterResource(R.drawable.logo_tech_black),
                 contentDescription = "tech (black)",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.matchParentSize()
+                modifier = Modifier
+                    .offset(
+                        x = with(density) { techXAbsolute.toDp() },
+                        y = with(density) { wasserTopY.toDp() }
+                    )
+                    .height(with(density) { wasserH.toDp() }) // Фиксируем высоту равной wasser
+                    .wrapContentWidth() // Ширина подстраивается под пропорции изображения
             )
+        }
 
-            // Слой 3: Красная вертикальная линия - падает сверху вниз
-            // Позиция линии: 63% ширины логотипа (эмпирически подобранное значение)
-            Canvas(Modifier.matchParentSize()) {
-                if (logoW > 0f && logoH > 0f) {
-                    val xLine = logoW * 0.63f  // X-координата линии (разделяет "WASSER" и "TECH")
-                    val yEnd = logoH * lineProgress  // Y-координата конца линии (прогресс падения)
-                    
-                    drawLine(
-                        color = BrandRed,
-                        start = Offset(xLine, 0f),      // Начало линии вверху
-                        end = Offset(xLine, yEnd),      // Конец линии (меняется в зависимости от прогресса)
-                        strokeWidth = 6f,               // Толщина линии
-                        cap = StrokeCap.Round           // Закругленные концы
-                    )
-                }
+        // Слой 3: Красная вертикальная линия - падает сверху вниз на всю высоту экрана
+        // Линия рисуется на позиции разделения между wasser и tech
+        Canvas(Modifier.fillMaxSize()) {
+            if (screenW > 0f && screenH > 0f && xLineAbsolute > 0f) {
+                val yEnd = screenH * lineProgress  // Y-координата конца линии (прогресс падения)
+                
+                drawLine(
+                    color = BrandRed,
+                    start = Offset(xLineAbsolute, 0f),      // Начало линии вверху экрана на позиции разделения
+                    end = Offset(xLineAbsolute, yEnd),      // Конец линии (меняется в зависимости от прогресса)
+                    strokeWidth = 12f,              // Толщина линии
+                    cap = StrokeCap.Round           // Закругленные концы
+                )
             }
+        }
 
-            // Слой 4: Графитовый фон - "вайпится" справа от красной линии
-            // Начинается от линии и расширяется вправо в зависимости от wipeProgress
-            Canvas(Modifier.matchParentSize()) {
-                if (logoW > 0f && logoH > 0f) {
-                    val xLine = logoW * 0.63f  // Позиция красной линии
-                    // Правая граница графитового фона (расширяется от линии вправо)
-                    val rightNow = xLine + (logoW - xLine) * wipeProgress
-                    
-                    drawRect(
-                        color = Graphite,
-                        topLeft = Offset(xLine, 0f),  // Начинается от красной линии
-                        size = androidx.compose.ui.geometry.Size(
-                            (rightNow - xLine).coerceAtLeast(0f),  // Ширина фона (расширяется)
-                            logoH  // Высота фона (на всю высоту логотипа)
-                        )
+        // Слой 4: Графитовый фон - "вайпится" справа от красной линии на всю высоту экрана
+        Canvas(Modifier.fillMaxSize()) {
+            if (screenW > 0f && screenH > 0f && xLineAbsolute > 0f) {
+                // Правая граница графитового фона (расширяется от линии вправо до края экрана)
+                val rightNow = xLineAbsolute + (screenW - xLineAbsolute) * wipeProgress
+                
+                drawRect(
+                    color = Graphite,
+                    topLeft = Offset(xLineAbsolute, 0f),  // Начинается от красной линии, сверху экрана
+                    size = androidx.compose.ui.geometry.Size(
+                        (rightNow - xLineAbsolute).coerceAtLeast(0f),  // Ширина фона (расширяется)
+                        screenH  // Высота фона (на всю высоту экрана)
                     )
-                }
+                )
             }
-
-            // Слой 5: TECH (белый текст) - проявляется ТОЛЬКО в зоне графитового фона
-            // Используется clipRect для обрезки белого текста только в области графитового фона
-            val whiteTech = painterResource(R.drawable.logo_tech_white)
-            Canvas(Modifier.matchParentSize()) {
-                if (logoW > 0f && logoH > 0f) {
-                    val xLine = logoW * 0.63f
-                    val rightNow = xLine + (logoW - xLine) * wipeProgress
-                    
-                    // Обрезаем область рисования до зоны графитового фона
-                    clipRect(
-                        left = xLine,      // Начинается от красной линии
-                        top = 0f,          // Вверху
-                        right = rightNow,  // Заканчивается на правой границе графитового фона
-                        bottom = logoH     // Внизу
-                    ) {
-                        // Рисуем белый текст TECH только в обрезанной области
-                        with(whiteTech) { draw(size = size) }
-                    }
+        }
+        
+        // Слой 5: TECH (белый текст) - проявляется ТОЛЬКО в зоне графитового фона
+        // Позиционируем белый текст TECH в том же месте, что и черный (techXAbsolute)
+        // Обрезаем его маской, которая движется вместе с графитовым фоном
+        if (screenW > 0f && screenH > 0f && techXAbsolute > 0f && wasserH > 0f && wasserTopY > 0f && wipeProgress > 0f) {
+            // Правая граница маски (расширяется от линии вправо вместе с графитовым фоном)
+            val maskRight = xLineAbsolute + (screenW - xLineAbsolute) * wipeProgress
+            val maskLeftDp = with(density) { xLineAbsolute.toDp() }
+            val maskRightDp = with(density) { maskRight.toDp() }
+            val maskWidthDp = maskRightDp - maskLeftDp
+            val techYAbsoluteDp = with(density) { wasserTopY.toDp() }
+            
+            // Контейнер для белого текста TECH, обрезанный маской
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+            ) {
+                // Маска - обрезает белый tech до зоны графитового фона
+                // Маска начинается от xLineAbsolute и расширяется вправо
+                Box(
+                    modifier = Modifier
+                        .offset(x = maskLeftDp, y = 0.dp)
+                        .width(maskWidthDp.coerceAtLeast(0.dp))
+                        .fillMaxHeight()
+                        .clipToBounds()
+                ) {
+                    // Белый текст TECH - позиционируем относительно маски
+                    // techXAbsolute находится в 4px справа от xLineAbsolute (начала маски)
+                    // Поэтому offset = 4px от начала маски
+                    Image(
+                        painter = painterResource(R.drawable.logo_tech_white),
+                        contentDescription = "tech (white)",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .offset(
+                                x = with(density) { 4.dp }, // 4px от начала маски (xLineAbsolute)
+                                y = techYAbsoluteDp
+                            )
+                            .height(with(density) { wasserH.toDp() }) // Фиксируем высоту равной wasser
+                            .wrapContentWidth() // Ширина подстраивается под пропорции изображения
+                    )
                 }
             }
         }

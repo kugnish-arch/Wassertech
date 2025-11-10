@@ -237,7 +237,7 @@ fun ClientDetailScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 2.dp),
+                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -269,27 +269,6 @@ fun ClientDetailScreen(
                         }
                     }
                 }
-
-                if (client != null) {
-                    val groupName = groups.firstOrNull { it.id == client!!.clientGroupId }?.title
-                    if (groupName != null) {
-                        Text(
-                            text = "Группа: $groupName",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
-                            modifier = Modifier.padding(start = 48.dp, top = 2.dp, bottom = 4.dp) // Выравнивание на уровне имени клиента (иконка 24dp + отступ 8dp + еще 16dp для совпадения)
-                        )
-                    } else {
-                        Text(
-                            text = "Без группы",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(start = 48.dp, top = 2.dp, bottom = 4.dp)
-                        )
-                    }
-                }
-
-
             }
 
             // ======= Список объектов/установок =======

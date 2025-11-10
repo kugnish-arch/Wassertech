@@ -191,7 +191,8 @@ public final class WebViewPdfExporter {
                 measurementResult.contentHeightCss,
                 pageHeightCss,
                 measurementResult.componentBoundaries,
-                measurementResult.sectionHeaderBoundaries
+                measurementResult.sectionHeaderBoundaries,
+                measurementResult.signatureBoundary
         );
 
         // Получаем density для конвертации CSS пикселей в device пиксели

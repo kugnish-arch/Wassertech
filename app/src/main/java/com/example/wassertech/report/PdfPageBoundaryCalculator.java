@@ -16,18 +16,21 @@ public class PdfPageBoundaryCalculator {
      * Ensures that:
      * 1. No component is split across pages (break before component start)
      * 2. Section headers are not separated from their content (break before section header)
+     * 3. If last page contains only signature, move last components from previous page to last page
      * 
      * @param contentHeightCss Total content height in CSS pixels
      * @param pageHeightCss Height of one page in CSS pixels
      * @param componentBoundaries List of component boundaries (top, bottom in CSS pixels)
      * @param sectionHeaderBoundaries List of section header boundaries (top, bottom in CSS pixels)
+     * @param signatureBoundary Signature block boundary (top, bottom in CSS pixels), can be null
      * @return List of page boundaries (start positions in CSS pixels), including start (0) and end (contentHeightCss)
      */
     public static List<Float> calculatePageBoundaries(
             int contentHeightCss,
             float pageHeightCss,
             List<PdfBoundaryModels.ComponentBoundary> componentBoundaries,
-            List<PdfBoundaryModels.SectionHeaderBoundary> sectionHeaderBoundaries) {
+            List<PdfBoundaryModels.SectionHeaderBoundary> sectionHeaderBoundaries,
+            PdfBoundaryModels.SignatureBoundary signatureBoundary) {
         
         List<Float> boundaries = new ArrayList<>();
         boundaries.add(0f); // Start of first page
@@ -208,7 +211,87 @@ public class PdfPageBoundaryCalculator {
         }
         
         Log.d(TAG, "");
-        Log.d(TAG, "=== FINAL PAGE BOUNDARIES ===");
+        Log.d(TAG, "=== FINAL PAGE BOUNDARIES (before signature check) ===");
+        for (int i = 0; i < boundaries.size(); i++) {
+            Log.d(TAG, "  Boundary[" + i + "]: " + boundaries.get(i) + " CSS px");
+        }
+        Log.d(TAG, "");
+        
+        // Проверяем последнюю страницу: если там только подпись, переносим последние компоненты с предыдущей страницы
+        if (boundaries.size() >= 2 && signatureBoundary != null) {
+            float lastPageStart = boundaries.get(boundaries.size() - 2);
+            float lastPageEnd = boundaries.get(boundaries.size() - 1);
+            
+            // Проверяем, есть ли компоненты на последней странице
+            boolean hasComponentsOnLastPage = false;
+            for (PdfBoundaryModels.ComponentBoundary comp : componentBoundaries) {
+                // Компонент считается на последней странице, если он пересекается с ней
+                if (comp.intersects(lastPageStart, lastPageEnd)) {
+                    hasComponentsOnLastPage = true;
+                    break;
+                }
+            }
+            
+            // Если на последней странице нет компонентов, но есть подпись
+            if (!hasComponentsOnLastPage && signatureBoundary.intersects(lastPageStart, lastPageEnd)) {
+                Log.d(TAG, "=== LAST PAGE HAS ONLY SIGNATURE, CHECKING FOR COMPONENT MIGRATION ===");
+                Log.d(TAG, "Last page range: [" + lastPageStart + " - " + lastPageEnd + "] CSS px");
+                Log.d(TAG, "Signature range: [" + signatureBoundary.topCss + " - " + signatureBoundary.bottomCss + "] CSS px");
+                
+                // Находим последние компоненты на предыдущей странице
+                if (boundaries.size() >= 3) {
+                    float prevPageStart = boundaries.get(boundaries.size() - 3);
+                    float prevPageEnd = boundaries.get(boundaries.size() - 2);
+                    
+                    // Находим компоненты на предыдущей странице, которые можно перенести
+                    List<PdfBoundaryModels.ComponentBoundary> componentsToMove = new ArrayList<>();
+                    for (PdfBoundaryModels.ComponentBoundary comp : componentBoundaries) {
+                        // Компонент на предыдущей странице
+                        if (comp.intersects(prevPageStart, prevPageEnd)) {
+                            // Проверяем, поместится ли компонент на последней странице вместе с подписью
+                            float spaceOnLastPage = lastPageEnd - lastPageStart;
+                            float spaceNeeded = comp.bottomCss - comp.topCss;
+                            float spaceForSignature = signatureBoundary.bottomCss - signatureBoundary.topCss;
+                            float spaceAvailable = spaceOnLastPage - spaceForSignature;
+                            
+                            // Если компонент помещается (с учетом подписи), добавляем в список для переноса
+                            if (spaceNeeded <= spaceAvailable && comp.topCss >= prevPageStart) {
+                                componentsToMove.add(comp);
+                                Log.d(TAG, "  Component to move: " + comp.toString() + 
+                                      " (needs " + spaceNeeded + " px, available " + spaceAvailable + " px)");
+                            }
+                        }
+                    }
+                    
+                    // Если есть компоненты для переноса, перемещаем границу последней страницы вверх
+                    if (!componentsToMove.isEmpty()) {
+                        // Находим самый ранний компонент для переноса
+                        float earliestComponentTop = Float.MAX_VALUE;
+                        for (PdfBoundaryModels.ComponentBoundary comp : componentsToMove) {
+                            if (comp.topCss < earliestComponentTop) {
+                                earliestComponentTop = comp.topCss;
+                            }
+                        }
+                        
+                        // Переносим границу последней страницы вверх, чтобы включить компоненты
+                        // Новая граница должна быть перед первым компонентом для переноса
+                        float newLastPageStart = earliestComponentTop;
+                        
+                        // Проверяем, что новая граница не нарушает другие правила
+                        if (newLastPageStart > prevPageStart && newLastPageStart < prevPageEnd) {
+                            // Обновляем границы: последняя страница начинается раньше
+                            boundaries.set(boundaries.size() - 2, newLastPageStart);
+                            Log.d(TAG, "  ✓ Moved last page boundary from " + lastPageStart + 
+                                  " to " + newLastPageStart + " CSS px");
+                            Log.d(TAG, "  Components moved to last page: " + componentsToMove.size());
+                        }
+                    }
+                }
+            }
+        }
+        
+        Log.d(TAG, "");
+        Log.d(TAG, "=== FINAL PAGE BOUNDARIES (after signature check) ===");
         for (int i = 0; i < boundaries.size(); i++) {
             Log.d(TAG, "  Boundary[" + i + "]: " + boundaries.get(i) + " CSS px");
         }

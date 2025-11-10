@@ -33,6 +33,7 @@ public class PdfContentMeasurer {
         public final int contentWidthCss;
         public final List<PdfBoundaryModels.ComponentBoundary> componentBoundaries;
         public final List<PdfBoundaryModels.SectionHeaderBoundary> sectionHeaderBoundaries;
+        public final PdfBoundaryModels.SignatureBoundary signatureBoundary;
         public final boolean hasError;
         public final String errorMessage;
         public final JSONObject debugJson;
@@ -40,11 +41,13 @@ public class PdfContentMeasurer {
         private MeasurementResult(int contentHeightCss, int contentWidthCss,
                                   List<PdfBoundaryModels.ComponentBoundary> componentBoundaries,
                                   List<PdfBoundaryModels.SectionHeaderBoundary> sectionHeaderBoundaries,
+                                  PdfBoundaryModels.SignatureBoundary signatureBoundary,
                                   boolean hasError, String errorMessage, JSONObject debugJson) {
             this.contentHeightCss = contentHeightCss;
             this.contentWidthCss = contentWidthCss;
             this.componentBoundaries = componentBoundaries;
             this.sectionHeaderBoundaries = sectionHeaderBoundaries;
+            this.signatureBoundary = signatureBoundary;
             this.hasError = hasError;
             this.errorMessage = errorMessage;
             this.debugJson = debugJson;
@@ -53,14 +56,15 @@ public class PdfContentMeasurer {
         public static MeasurementResult success(int contentHeightCss, int contentWidthCss,
                                                 List<PdfBoundaryModels.ComponentBoundary> componentBoundaries,
                                                 List<PdfBoundaryModels.SectionHeaderBoundary> sectionHeaderBoundaries,
+                                                PdfBoundaryModels.SignatureBoundary signatureBoundary,
                                                 JSONObject debugJson) {
             return new MeasurementResult(contentHeightCss, contentWidthCss, componentBoundaries,
-                    sectionHeaderBoundaries, false, null, debugJson);
+                    sectionHeaderBoundaries, signatureBoundary, false, null, debugJson);
         }
 
         public static MeasurementResult error(String errorMessage, int fallbackHeight, JSONObject debugJson) {
             return new MeasurementResult(fallbackHeight, 794, new ArrayList<>(), new ArrayList<>(),
-                    true, errorMessage, debugJson);
+                    null, true, errorMessage, debugJson);
         }
     }
 
@@ -249,6 +253,17 @@ public class PdfContentMeasurer {
             "      console.warn('Error measuring components: ' + e2); " +
             "      result.debug.componentError = e2.toString(); " +
             "    } " +
+            "    try { " +
+            "      var signRow = root.querySelector('.sign-row'); " +
+            "      if (signRow) { " +
+            "        var signRect = signRow.getBoundingClientRect(); " +
+            "        var signTop = signRect.top - rootRect.top + root.scrollTop; " +
+            "        var signBottom = signTop + signRect.height; " +
+            "        result.signatureBounds = {top: Math.round(signTop), bottom: Math.round(signBottom)}; " +
+            "      } " +
+            "    } catch(e3) { " +
+            "      console.warn('Error measuring signature: ' + e3); " +
+            "    } " +
             "    console.log('JS measurement completed'); " +
             "    return JSON.stringify(result); " +
             "  } catch(e) { " +
@@ -395,9 +410,18 @@ public class PdfContentMeasurer {
                     }
                 }
 
+                // Парсим границы подписи
+                PdfBoundaryModels.SignatureBoundary signatureBoundary = null;
+                if (json.has("signatureBounds")) {
+                    JSONObject signBounds = json.getJSONObject("signatureBounds");
+                    signatureBoundary = new PdfBoundaryModels.SignatureBoundary(
+                        signBounds.getInt("top"), signBounds.getInt("bottom"));
+                    Log.d(TAG, "Parsed signature bounds: " + signatureBoundary.toString());
+                }
+
                 expired.set(true);
                 callback.onResult(MeasurementResult.success(contentHeightCss, contentWidthCss,
-                        componentBoundaries, sectionHeaderBoundaries,
+                        componentBoundaries, sectionHeaderBoundaries, signatureBoundary,
                         json.has("debug") ? json.getJSONObject("debug") : null));
             } catch (Exception e) {
                 Log.e(TAG, "Failed to parse JS result after " + elapsed + "ms", e);

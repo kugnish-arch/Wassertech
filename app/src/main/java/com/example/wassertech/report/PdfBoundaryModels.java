@@ -102,5 +102,34 @@ public class PdfBoundaryModels {
             return String.format("SectionHeader[top=%d, bottom=%d]", topCss, bottomCss);
         }
     }
+    
+    /**
+     * Stores signature block boundaries (top and bottom positions).
+     */
+    public static class SignatureBoundary {
+        public final int topCss;
+        public final int bottomCss;
+        
+        public SignatureBoundary(int topCss, int bottomCss) {
+            this.topCss = topCss;
+            this.bottomCss = bottomCss;
+        }
+        
+        public boolean contains(float yCss) {
+            return yCss >= topCss && yCss < bottomCss;
+        }
+        
+        /**
+         * Check if this signature boundary intersects with the given range.
+         */
+        public boolean intersects(float startCss, float endCss) {
+            return !(endCss <= topCss || startCss >= bottomCss);
+        }
+        
+        @Override
+        public String toString() {
+            return String.format("Signature[top=%d, bottom=%d]", topCss, bottomCss);
+        }
+    }
 }
 

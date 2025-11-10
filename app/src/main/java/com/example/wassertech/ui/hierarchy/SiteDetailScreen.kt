@@ -22,6 +22,8 @@ import com.example.wassertech.data.entities.InstallationEntity
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
 import androidx.compose.ui.graphics.Color
+import com.example.wassertech.ui.icons.AppIcons
+import androidx.compose.ui.Alignment
 
 @Composable
 fun SiteDetailScreen(
@@ -51,6 +53,7 @@ fun SiteDetailScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем отступы от топБара
         floatingActionButton = {
             AppFloatingActionButton(
                 template = FABTemplate(
@@ -62,16 +65,47 @@ fun SiteDetailScreen(
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp)) {
-                    Text(siteName, style = MaterialTheme.typography.titleLarge)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // ======= HEADER =======
+            // Шапка в стиле ClientDetailScreen.kt
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Site,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        siteName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { showEdit = true }) { Icon(Icons.Filled.Edit, contentDescription = null) }
+                    IconButton(onClick = { showEdit = true }) {
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = "Редактировать объект",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
             }
-
-            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = "Установки",

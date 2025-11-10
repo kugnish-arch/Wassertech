@@ -724,14 +724,16 @@ private fun GroupHeader(
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                // Уменьшаем порог для лучшей работы на физических устройствах
+                                val threshold = 10f
+                                if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                     onMoveUp()
-                                    lastMoveThreshold = -60f
-                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                    lastMoveThreshold = -threshold
+                                } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                     onMoveDown()
-                                    lastMoveThreshold = 60f
+                                    lastMoveThreshold = threshold
                                 }
-                                if (dragAmount.y in -60f..60f) {
+                                if (dragAmount.y in -threshold..threshold) {
                                     lastMoveThreshold = dragAmount.y
                                 }
                             },
@@ -864,7 +866,14 @@ private fun ClientRowWithEdit(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .then(
+                // В режиме редактирования не используем clickable, чтобы не мешать drag-n-drop
+                if (!isEditMode) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            )
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
             .animateContentSize(),
         verticalAlignment = Alignment.CenterVertically
@@ -885,17 +894,16 @@ private fun ClientRowWithEdit(
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                // dragAmount.y - накопленное смещение с начала жеста
-                                // Перемещаем при достижении порога 60dp и сбрасываем счетчик
-                                if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
+                                // Уменьшаем порог для лучшей работы на физических устройствах
+                                val threshold = 10f
+                                if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                     onMoveUp()
-                                    lastMoveThreshold = -60f
-                                } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
+                                    lastMoveThreshold = -threshold
+                                } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                     onMoveDown()
-                                    lastMoveThreshold = 60f
+                                    lastMoveThreshold = threshold
                                 }
-                                // Сбрасываем порог при возврате в зону
-                                if (dragAmount.y in -60f..60f) {
+                                if (dragAmount.y in -threshold..threshold) {
                                     lastMoveThreshold = dragAmount.y
                                 }
                             },
@@ -906,6 +914,8 @@ private fun ClientRowWithEdit(
                     }
             )
             Spacer(Modifier.width(8.dp))
+        } else if (!isEditMode) {
+            // В не-редактирующем режиме можно кликать по всей строке
         }
         val icon =
             if (client.isCorporate == true) Icons.Filled.Business else Icons.Filled.Person

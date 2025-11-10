@@ -143,13 +143,13 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun addInstallationToMain(clientId: String, name: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentSites = hierarchyDao.observeSites(clientId).first()
-            val main = currentSites.firstOrNull { it.name.equals("Главный", ignoreCase = true) }
+            val main = currentSites.firstOrNull { it.name.equals("Основной", ignoreCase = true) }
                 ?: run {
                     val newId = UUID.randomUUID().toString()
                     val site = SiteEntity(
                         id = newId,
                         clientId = clientId,
-                        name = "Главный",
+                        name = "Основной",
                         address = null,
                         orderIndex = 0
                     )

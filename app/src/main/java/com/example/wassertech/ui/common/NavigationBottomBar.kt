@@ -17,7 +17,7 @@ fun NavigationBottomBar(
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
-        modifier = modifier.height(80.dp) // Фиксированная высота 80dp
+        modifier = modifier.height(93.dp) // Фиксированная высота 93dp (увеличено на 5px с 88dp)
     ) {
         NavigationBarItem(
             icon = { Icon(Icons.Filled.Person, contentDescription = "Клиенты") },

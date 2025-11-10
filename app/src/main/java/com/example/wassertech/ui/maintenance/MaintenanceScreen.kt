@@ -124,10 +124,10 @@ fun MaintenanceScreen(
                 } else {
                     sections.forEach { sec ->
                         key(sec.componentId) {
-                            // Выделяем заглавные компоненты цветом
+                            // Выделяем заглавные компоненты цветом карточки, текст черный
                             val cardColors = if (sec.isHeadComponent) {
                                 CardDefaults.elevatedCardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                 )
                             } else {
                                 CardDefaults.elevatedCardColors()
@@ -143,11 +143,8 @@ fun MaintenanceScreen(
                                         headlineContent = { 
                                             Text(
                                                 sec.componentName,
-                                                color = if (sec.isHeadComponent) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurface
-                                                }
+                                                // Текст всегда черный для заглавных компонентов
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         },
                                         trailingContent = {

@@ -151,10 +151,18 @@ fun MaintenanceSessionDetailScreen(
                     )
                 }
                 
-                // Сохраняем HTML рядом с PDF
-                val htmlFile = File(reportsDir, fileName.replace(".pdf", ".html"))
-                htmlFile.writeText(html, Charsets.UTF_8)
-                Log.d("PDF", "HTML saved to: ${htmlFile.absolutePath}")
+                // Проверяем настройку сохранения HTML
+                val shouldSaveHtml = withContext(Dispatchers.IO) {
+                    val setting = AppDatabase.getInstance(context).settingsDao().getValueSync("save_html")
+                    setting?.toBoolean() ?: false
+                }
+                
+                // Сохраняем HTML рядом с PDF, если настройка включена
+                if (shouldSaveHtml) {
+                    val htmlFile = File(reportsDir, fileName.replace(".pdf", ".html"))
+                    htmlFile.writeText(html, Charsets.UTF_8)
+                    Log.d("PDF", "HTML saved to: ${htmlFile.absolutePath}")
+                }
                 
                 // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
                 PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)

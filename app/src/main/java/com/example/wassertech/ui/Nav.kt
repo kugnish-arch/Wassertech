@@ -159,7 +159,9 @@ private fun AppScaffold(navController: NavHostController) {
         route.startsWith("templates") ||
         route.startsWith("client/") ||
         route.startsWith("site/") ||
-        route.startsWith("installation/")
+        route.startsWith("installation/") ||
+        route.startsWith("reports") ||
+        route.startsWith("maintenance_history")
     } ?: false
     
     // Состояние редактирования для разных экранов
@@ -167,6 +169,8 @@ private fun AppScaffold(navController: NavHostController) {
     var clientDetailEditing by remember { mutableStateOf(false) }
     var installationEditing by remember { mutableStateOf(false) }
     var templatesEditing by remember { mutableStateOf(false) }
+    var reportsEditing by remember { mutableStateOf(false) }
+    var maintenanceHistoryEditing by remember { mutableStateOf(false) }
     
     // Определяем текущее состояние редактирования и функцию переключения
     val (currentEditing, toggleEditing) = remember(currentRoute) {
@@ -175,6 +179,8 @@ private fun AppScaffold(navController: NavHostController) {
             currentRoute?.startsWith("client/") == true -> clientDetailEditing to { clientDetailEditing = !clientDetailEditing }
             currentRoute?.startsWith("installation/") == true -> installationEditing to { installationEditing = !installationEditing }
             currentRoute?.startsWith("templates") == true -> templatesEditing to { templatesEditing = !templatesEditing }
+            currentRoute?.startsWith("reports") == true -> reportsEditing to { reportsEditing = !reportsEditing }
+            currentRoute?.startsWith("maintenance_history") == true -> maintenanceHistoryEditing to { maintenanceHistoryEditing = !maintenanceHistoryEditing }
             else -> false to { }
         }
     }
@@ -347,6 +353,8 @@ private fun AppScaffold(navController: NavHostController) {
             composable("maintenance_history") {
                 MaintenanceHistoryScreen(
                     installationId = null,
+                    isEditing = maintenanceHistoryEditing,
+                    onToggleEdit = { maintenanceHistoryEditing = !maintenanceHistoryEditing },
                     onBack = { navController.navigateUp() },
                     onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
                     onOpenReports = { navController.navigate("reports") }
@@ -361,6 +369,8 @@ private fun AppScaffold(navController: NavHostController) {
                 val installationId = bse.arguments?.getString("installationId")
                 MaintenanceHistoryScreen(
                     installationId = installationId,
+                    isEditing = maintenanceHistoryEditing,
+                    onToggleEdit = { maintenanceHistoryEditing = !maintenanceHistoryEditing },
                     onBack = { navController.navigateUp() },
                     onOpenSession = { sid -> navController.navigate("maintenance_session/$sid") },
                     onOpenReports = { navController.navigate("reports") }
@@ -369,7 +379,10 @@ private fun AppScaffold(navController: NavHostController) {
             
             // Экран отчётов ТО
             composable("reports") {
-                ReportsScreen()
+                ReportsScreen(
+                    isEditing = reportsEditing,
+                    onToggleEdit = { reportsEditing = !reportsEditing }
+                )
             }
 
             // Экран деталей ТО

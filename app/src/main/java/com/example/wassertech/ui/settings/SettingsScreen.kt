@@ -29,6 +29,11 @@ fun SettingsScreen() {
     var syncing by remember { mutableStateOf(false) }
     var syncMessage by remember { mutableStateOf<String?>(null) }
     
+    // Настройка сохранения HTML
+    val saveHtmlFlow = db.settingsDao().getValue("save_html")
+    val saveHtml by saveHtmlFlow.collectAsState(initial = null)
+    val saveHtmlValue = saveHtml?.toBoolean() ?: false
+    
     // Переключатель метода рендеринга PDF отключен - всегда используется bitmap метод
     
     Scaffold(
@@ -44,6 +49,47 @@ fun SettingsScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(Modifier.height(8.dp))
+            
+            // Настройка сохранения HTML
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Сохранять HTML",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "При генерации PDF отчёта также сохранять HTML файл",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = saveHtmlValue,
+                        onCheckedChange = { newValue ->
+                            scope.launch(Dispatchers.IO) {
+                                db.settingsDao().setValue(
+                                    com.example.wassertech.data.entities.SettingsEntity(
+                                        key = "save_html",
+                                        value = newValue.toString()
+                                    )
+                                )
+                            }
+                        }
+                    )
+                }
+            }
             
             Text(
                 text = "Синхронизация с удалённой БД",

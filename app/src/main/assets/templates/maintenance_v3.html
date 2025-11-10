@@ -42,31 +42,35 @@
         }
 
         /* Шапка - информация о компании с логотипом справа */
-        .header { 
-          margin-bottom: 8mm; 
-          padding-top: 10mm;
-          padding-left: 10mm;
-          padding-right: 10mm;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
+
+        .header {
+            width: 100%;
+            padding: 10px 20px;
+            border-bottom: 1px solid #ccc;
         }
+
         .header-content {
-          flex: 1;
+          display: flex;
+          justify-content: space-between; /* реквизиты слева, логотип справа */
+          align-items: center;            /* выравнивание по вертикали */
         }
-        .requisites { 
-          font-size: 10pt; 
+
+        .requisites {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
         }
-        .requisites b { font-weight: 600; }
-        .requisites .muted { color: var(--muted); }
-        .requisites .contacts { margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+        .contacts span {
+          margin-right: 8px;
+        }
+
         .header-logo {
-          width: 120px;
-          height: 120px;
+          height: 30px;       /* или авто/макс-высота по желанию */
           object-fit: contain;
-          flex-shrink: 0;
-          margin-left: 16px;
         }
+
+
 
         /* Заголовок документа */
         .doc-title { text-align: center; margin: 0 0 6mm; }
@@ -279,20 +283,22 @@
 <body>
 <div id="print-root">
 
-<!-- ШАПКА -->
-<header class="header">
-    <div class="header-content">
-        <div class="requisites">
-            <div><b>{{company.legal_name}}</b>, ИНН {{company.inn}}</div>
-            <div class="contacts">
-                <span>+7 {{company.phone1}}</span>
-                <span class="muted">{{company.email}}</span>
-                <span class="muted">{{company.website}}</span>
+    <!-- ШАПКА -->
+    <header class="header">
+        <div class="header-content">
+            <div class="requisites">
+                <div><b>{{company.legal_name}}</b>, ИНН {{company.inn}}</div>
+                <div class="contacts">
+                    <span>+7 {{company.phone1}}</span>
+                    <span class="muted">{{company.email}}</span>
+                    <span class="muted">{{company.website}}</span>
+                </div>
             </div>
+
+            <img class="header-logo" src="{{company.logo_data_uri}}" alt="Логотип" />
         </div>
-    </div>
-    <img class="header-logo" src="{{company.logo_data_uri}}" alt="Логотип" />
-</header>
+    </header>
+
 
 <!-- ЗАГОЛОВОК -->
 <section class="doc-title">

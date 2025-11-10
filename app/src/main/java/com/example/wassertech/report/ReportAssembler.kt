@@ -80,8 +80,12 @@ object ReportAssembler {
         val maintenanceValues = db.sessionsDao().getValuesForSession(sessionId)
         val valuesByComponent = maintenanceValues.groupBy { it.componentId }
         
+        // Создаем множество ID компонентов, которые уже обработаны через valuesByComponent
+        val processedComponentIds = mutableSetOf<String>()
+        
         val componentsWithFields = mutableListOf<ComponentWithFieldsDTO>()
         for ((componentId, values) in valuesByComponent) {
+            processedComponentIds.add(componentId)
             val component = db.hierarchyDao().getComponent(componentId)
             val componentName = component?.name ?: componentId
             
@@ -155,14 +159,45 @@ object ReportAssembler {
                 }
             }.sortedBy { it.label.lowercase(Locale.getDefault()) }
             
-            if (fields.isNotEmpty()) {
+            // ВАЖНО: Добавляем компонент даже если fields пуст, если это HEAD компонент
+            // Это нужно для отображения заглавных компонентов в начале и конце отчёта
+            val isHeadComponent = componentType == "HEAD"
+            if (fields.isNotEmpty() || isHeadComponent) {
                 componentsWithFields.add(
                     ComponentWithFieldsDTO(
                         componentName = componentName,
                         componentType = componentType,
-                        fields = fields
+                        fields = fields  // Может быть пустым для HEAD компонентов
                     )
                 )
+            }
+        }
+        
+        // ВАЖНО: Обрабатываем HEAD компоненты, которые не имеют maintenance_values
+        // Эти компоненты должны быть добавлены в отчёт даже без полей
+        for (component in components) {
+            if (component.id !in processedComponentIds) {
+                // Получаем componentType из шаблона
+                var componentType: String? = "COMMON"
+                component.templateId?.let { templateId ->
+                    try {
+                        val template = db.templatesDao().getTemplateById(templateId)
+                        componentType = template?.componentType?.name ?: "COMMON"
+                    } catch (e: Exception) {
+                        componentType = "COMMON"
+                    }
+                }
+                
+                // Добавляем HEAD компоненты даже без полей
+                if (componentType == "HEAD") {
+                    componentsWithFields.add(
+                        ComponentWithFieldsDTO(
+                            componentName = component.name,
+                            componentType = componentType,
+                            fields = emptyList()  // Пустой список полей для HEAD компонентов без значений
+                        )
+                    )
+                }
             }
         }
         
