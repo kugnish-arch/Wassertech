@@ -65,7 +65,11 @@ fun SitesScreen(
                     ElevatedCard(onClick = { onOpenSite(s.id) }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(s.name, style = MaterialTheme.typography.titleMedium)
-                            if (!s.address.isNullOrBlank()) Text(s.address!!, style = MaterialTheme.typography.bodyMedium)
+                            s.address?.let { address ->
+                                if (address.isNotBlank()) {
+                                    Text(address, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
                         }
                     }
                 }

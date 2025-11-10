@@ -1,6 +1,7 @@
 package com.example.wassertech.ui.about
 
 import android.content.pm.PackageManager
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,9 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.wassertech.R
 
 @Composable
 fun AboutScreen() {
@@ -43,43 +47,68 @@ fun AboutScreen() {
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = "Wassertech CRM",
-            style = MaterialTheme.typography.headlineLarge,
-            textAlign = TextAlign.Center
-        )
-        
-        Spacer(Modifier.height(32.dp))
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(
+            // Логотип над надписью
+            Image(
+                painter = painterResource(R.drawable.logo_wassertech),
+                contentDescription = "Wassertech Logo",
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .size(120.dp)
+                    .padding(bottom = 24.dp),
+                contentScale = ContentScale.Fit
+            )
+            
+            Text(
+                text = "Wassertech CRM",
+                style = MaterialTheme.typography.headlineLarge,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(Modifier.height(32.dp))
+            
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
-                Text(
-                    text = "Версия приложения",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Text(
-                    text = versionName,
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Center
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Версия приложения",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        text = versionName,
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
+        
+        // Автор внизу страницы
+        Text(
+            text = "Автор: Дмитрий Шульски / Wassertech Digital",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
     }
 }
 

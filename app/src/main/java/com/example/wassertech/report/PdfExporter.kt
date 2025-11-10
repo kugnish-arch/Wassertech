@@ -36,25 +36,10 @@ object PdfExporter {
         html: String, 
         outFile: File, 
         reportNumber: String? = null,
-        method: String? = null // "bitmap" or "direct", null = read from settings
+        method: String? = null // Игнорируется, всегда используется bitmap метод
     ) {
-        val renderMethod = method ?: getPdfRenderMethod(context)
-        
-        if (renderMethod == "direct") {
-            exportHtmlToPdfDirect(context, html, outFile, reportNumber)
-        } else {
-            exportHtmlToPdfBitmap(context, html, outFile, reportNumber)
-        }
-    }
-    
-    private suspend fun getPdfRenderMethod(context: Context): String {
-        return try {
-            val db = com.example.wassertech.data.AppDatabase.getInstance(context)
-            db.settingsDao().getValueSync(PDF_RENDER_METHOD_KEY) ?: "bitmap"
-        } catch (e: Exception) {
-            Log.w("PDF", "Failed to get PDF render method from settings, using bitmap", e)
-            "bitmap"
-        }
+        // Всегда используем bitmap метод (переключатель отключен)
+        exportHtmlToPdfBitmap(context, html, outFile, reportNumber)
     }
     
     /**

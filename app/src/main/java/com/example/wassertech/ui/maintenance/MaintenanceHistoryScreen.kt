@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.History
@@ -11,9 +12,11 @@ import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.wassertech.data.AppDatabase
@@ -27,14 +30,14 @@ import java.util.*
 @Composable
 fun MaintenanceHistoryScreen(
     installationId: String?,
-    onBack: () -> Unit,
+    onBack: () -> Unit = {}, // Не используется, но оставлен для совместимости API
     onOpenSession: (String) -> Unit,
     onOpenReports: () -> Unit = {},
-    onClearFilter: (() -> Unit)? = null
+    onClearFilter: (() -> Unit)? = null // Не используется, но оставлен для совместимости API
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
-    val sdf = remember { SimpleDateFormat("d MMMM yyyy (HH:mm)", Locale("ru")) }
+    val sdf = remember { SimpleDateFormat("d MMMM yyyy (HH:mm)", Locale.forLanguageTag("ru")) }
 
     val sessionsFlow: Flow<List<MaintenanceSessionEntity>> = remember(installationId) {
         if (installationId == null) db.sessionsDao().observeAllSessions()
@@ -54,45 +57,43 @@ fun MaintenanceHistoryScreen(
                 val clientName = client?.name ?: "Без клиента"
                 val siteName = site?.name ?: "Без объекта"
                 val instName = inst?.name ?: "Без установки"
-                val dateText = s.startedAtEpoch?.let { sdf.format(Date(it)) } ?: "Неизвестно"
+                val dateText = s.startedAtEpoch?.let { epoch -> sdf.format(Date(epoch)) } ?: "Неизвестно"
                 Triple(clientName, "$siteName — $instName", dateText)
             }
             sessionDisplay = result
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Кнопка "Отчёты ТО"
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
                 onClick = onOpenReports,
-                modifier = Modifier.padding(vertical = 4.dp)
+                containerColor = Color(0xFF1E1E1E), // Черный цвет
+                contentColor = Color.White,
+                shape = CircleShape, // Явно указываем круглую форму
+                modifier = Modifier.size(56.dp) // Размер для круглой формы
             ) {
                 Icon(
-                    Icons.Outlined.PictureAsPdf,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    imageVector = Icons.Filled.PictureAsPdf,
+                    contentDescription = "Отчёты ТО",
+                    modifier = Modifier.size(28.dp) // Крупная иконка PDF
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("Отчёты ТО")
             }
         }
-
-        if (sessions.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Записей ТО пока нет")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+    ) { padding ->
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)) {
+            if (sessions.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Записей ТО пока нет")
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 items(sessionDisplay.zip(sessions)) { (display, s) ->
                     ElevatedCard(
                         Modifier
@@ -133,6 +134,7 @@ fun MaintenanceHistoryScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

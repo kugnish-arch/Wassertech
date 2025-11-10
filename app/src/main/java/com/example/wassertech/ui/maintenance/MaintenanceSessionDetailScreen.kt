@@ -3,6 +3,7 @@ package com.example.wassertech.ui.maintenance
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Business
@@ -49,7 +50,7 @@ fun MaintenanceSessionDetailScreen(
     var dateTimeText by remember { mutableStateOf<String>("") }
 
     val dateFormatter = remember {
-        SimpleDateFormat("d MMMM yyyy (HH:mm)", Locale("ru"))
+        SimpleDateFormat("d MMMM yyyy (HH:mm)", Locale.forLanguageTag("ru"))
             .apply { timeZone = TimeZone.getDefault() }
     }
 
@@ -94,20 +95,20 @@ fun MaintenanceSessionDetailScreen(
                 val labels: Map<String, String> = comp?.templateId?.let { tid ->
                     try {
                         db.templatesDao().getMaintenanceFieldsForTemplate(tid)
-                            .associate { it.key to (it.label ?: it.key) }
+                            .associate { it.key to it.label } // label не nullable, elvis не нужен
                     } catch (e: Exception) {
                         emptyMap()
                     }
                 } ?: emptyMap()
 
                 val rows = vals.map { v ->
-                    val rawKey = v.fieldKey ?: ""
+                    val rawKey = v.fieldKey // fieldKey не nullable, elvis не нужен
                     val label = labels[rawKey] ?: rawKey.substringBefore('_', rawKey)
                     val valueText = when {
                         v.valueText != null -> v.valueText
                         v.valueBool != null -> if (v.valueBool == true) "Да" else "Нет"
                         else -> ""
-                    } ?: ""
+                    }
                     DetailFieldRow(fieldLabel = label, value = valueText)
                 }.sortedBy { it.fieldLabel.lowercase(Locale.getDefault()) }
                 list.add(DetailComponentGroup(componentName = compName, rows = rows))
@@ -223,18 +224,21 @@ fun MaintenanceSessionDetailScreen(
                         }
                     },
                     containerColor = Color(0xFFD32F2F), // Красный цвет
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    shape = CircleShape, // Явно указываем круглую форму
+                    modifier = Modifier.size(56.dp) // Размер для круглой формы
                 ) {
                     if (exporting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(28.dp), // Увеличена иконка
+                            strokeWidth = 3.dp,
                             color = Color.White
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Outlined.PictureAsPdf,
-                            contentDescription = "Создать PDF"
+                            contentDescription = "Создать PDF",
+                            modifier = Modifier.size(28.dp) // Увеличена иконка PDF
                         )
                     }
                 }

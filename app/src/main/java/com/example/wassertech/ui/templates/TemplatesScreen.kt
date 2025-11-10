@@ -24,7 +24,6 @@ import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
 import com.example.wassertech.sync.SafeDeletionHelper
-import com.example.wassertech.ui.common.EditDoneBottomBar
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -34,6 +33,8 @@ import com.example.wassertech.ui.common.FABTemplate
 
 @Composable
 fun TemplatesScreen(
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
     onOpenTemplate: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -49,9 +50,37 @@ fun TemplatesScreen(
     var showCreate by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
 
-    // Режим редактирования + локальный порядок для live-перестановки
-    var isEditing by remember { mutableStateOf(false) }
-    var localOrder by remember(templates) { mutableStateOf(templates.map { it.id }) }
+    // Локальный порядок для live-перестановки
+    var localOrder by remember(templates, isEditing) { 
+        mutableStateOf(templates.map { it.id }) 
+    }
+    
+    // Синхронизируем локальный порядок при изменении состояния редактирования
+    LaunchedEffect(isEditing, templates) {
+        if (!isEditing) {
+            localOrder = templates.map { it.id }
+        } else {
+            // При входе в режим редактирования фиксируем текущий порядок
+            val allTemplatesOrdered = templates.sortedWith(
+                compareBy<ChecklistTemplateEntity> { it.sortOrder ?: Int.MAX_VALUE }
+                    .thenBy { it.title.lowercase() }
+            )
+            localOrder = allTemplatesOrdered.map { it.id }
+        }
+    }
+    
+    // Сохранение порядка при выходе из режима редактирования
+    LaunchedEffect(isEditing) {
+        if (!isEditing && localOrder.isNotEmpty()) {
+            // сохранить локальный порядок в БД
+            scope.launch {
+                val now = System.currentTimeMillis()
+                localOrder.forEachIndexed { index, id ->
+                    dao.updateTemplateOrder(id, index, now)
+                }
+            }
+        }
+    }
 
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
@@ -93,31 +122,8 @@ fun TemplatesScreen(
                     }
                 )
             )
-        },
-        bottomBar = {
-            EditDoneBottomBar(
-                isEditing = isEditing,
-                onEdit = {
-                    isEditing = true
-                    // зафиксировать актуальный порядок из БД в локальный (включая архивные)
-                    val allTemplatesOrdered = templates.sortedWith(
-                        compareBy<ChecklistTemplateEntity> { it.sortOrder ?: Int.MAX_VALUE }
-                            .thenBy { it.title.lowercase() }
-                    )
-                    localOrder = allTemplatesOrdered.map { it.id }
-                },
-                onDone = {
-                    // сохранить локальный порядок в БД
-                    scope.launch {
-                        val now = System.currentTimeMillis()
-                        localOrder.forEachIndexed { index, id ->
-                            dao.updateTemplateOrder(id, index, now)
-                        }
-                    }
-                    isEditing = false
-                }
-            )
         }
+        // Ботомбар убран - используется переключатель в топбаре
     ) { padding ->
         val layoutDir = LocalLayoutDirection.current
 
@@ -290,7 +296,8 @@ private fun TemplateRowWithDrag(
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                val threshold = 40f
+                                // Еще больше уменьшаем порог для физических устройств
+                                val threshold = 10f
                                 if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                     onMoveUp()
                                     lastMoveThreshold = -threshold

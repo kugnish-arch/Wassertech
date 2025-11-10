@@ -221,29 +221,46 @@ public final class WebViewPdfExporter {
                   ": CSS range [" + pageStartCss + "-" + pageEndCss + "], " +
                   "Device range [" + pageStartDevicePx + "-" + (pageStartDevicePx + pageHeightDevicePxActual) + "]");
 
-            // Создаём страницу PDF
-            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(pageWidthDevicePx, pageHeightDevicePxActual, pageIndex + 1).create();
+            // ВАЖНО: Используем фиксированную высоту A4 для всех страниц, чтобы футер всегда был внизу
+            // Создаём страницу PDF с фиксированной высотой A4
+            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(pageWidthDevicePx, pageHeightDevicePx, pageIndex + 1).create();
             PdfDocument.Page page = pdfDocument.startPage(pageInfo);
             
             // Получаем Canvas для рисования
             android.graphics.Canvas canvas = page.getCanvas();
             
-            // Создаём Bitmap для рендеринга части WebView
+            // ВАЖНО: Страница PDF всегда A4 (pageHeightDevicePx), но битмап создаем с фактической высотой контента
+            // Это исходная рабочая логика, которая правильно срезала контент для каждой страницы
+            // Создаём Bitmap для рендеринга контента на этой странице
             android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(
                     pageWidthDevicePx, 
-                    pageHeightDevicePxActual, 
+                    pageHeightDevicePxActual, // Фактическая высота контента на странице
                     android.graphics.Bitmap.Config.ARGB_8888
             );
             android.graphics.Canvas bitmapCanvas = new android.graphics.Canvas(bitmap);
             
-            // Смещаем Canvas вверх, чтобы показать нужную часть WebView
+            // Заливаем фон белым цветом
+            bitmapCanvas.drawColor(android.graphics.Color.WHITE);
+            
+            // Смещаем Canvas вверх на -pageStartDevicePx
+            // Это означает: контент WebView, который находится на позиции pageStartDevicePx,
+            // будет нарисован на позиции 0 в битмапе (вверху битмапа)
             bitmapCanvas.translate(0, -pageStartDevicePx);
             
             // Рисуем WebView на Bitmap Canvas
+            // Благодаря translate и размеру битмапа, нарисуется только нужная часть контента 
+            // (от pageStartDevicePx до pageStartDevicePx + pageHeightDevicePxActual)
             webView.draw(bitmapCanvas);
             
-            // Рисуем Bitmap на PDF Canvas
+            // Рисуем Bitmap на PDF Canvas (начинаем с позиции 0,0 - верх страницы A4)
             canvas.drawBitmap(bitmap, 0, 0, null);
+            
+            // Если контент не заполняет всю страницу A4, заливаем оставшуюся часть белым
+            if (pageHeightDevicePxActual < pageHeightDevicePx) {
+                android.graphics.Paint whitePaint = new android.graphics.Paint();
+                whitePaint.setColor(android.graphics.Color.WHITE);
+                canvas.drawRect(0, pageHeightDevicePxActual, pageWidthDevicePx, pageHeightDevicePx, whitePaint);
+            }
             
             // Освобождаем память
             bitmap.recycle();
@@ -252,6 +269,7 @@ public final class WebViewPdfExporter {
             // PdfDebugDrawer.drawDebugLines(...) - закомментировано
             
             // Добавляем колонтитул с номером акта и страницы в правом нижнем углу
+            // Футер рисуется в самом низу страницы A4, независимо от высоты контента
             int totalPages = pageBoundaries.size() - 1;
             android.graphics.Paint footerPaint = new android.graphics.Paint();
             footerPaint.setColor(0xFF6B7280); // Серый цвет (--muted)
@@ -261,19 +279,16 @@ public final class WebViewPdfExporter {
             footerPaint.setAntiAlias(true);
             footerPaint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.NORMAL));
             
-            // Без отступов - впритык к краю
-            // В Canvas drawText координата Y - это baseline текста, поэтому нужно учесть высоту текста
-            // Чтобы текст был виден, ставим Y на высоту текста от низа (минимальный отступ для видимости)
+            // Футер в самом низу страницы A4 (всегда используем pageHeightDevicePx для позиционирования)
             String footerText = "Акт №" + reportNumber + " - Страница " + (pageIndex + 1) + " из " + totalPages;
             android.graphics.Paint.FontMetrics fontMetrics = footerPaint.getFontMetrics();
-            float textHeight = fontMetrics.descent - fontMetrics.ascent; // Высота текста
-            float footerY = pageHeightDevicePxActual - fontMetrics.descent; // Baseline текста впритык к низу (с учетом descent)
+            float footerY = pageHeightDevicePx - fontMetrics.descent; // Baseline текста в самом низу страницы A4
             float footerX = pageWidthDevicePx; // Впритык к правому краю
             float footerBaselineY = footerY; // Сохраняем для использования в надписи "Продолжение"
             
             canvas.drawText(footerText, footerX, footerY, footerPaint);
             Log.d(TAG, "Added footer on page " + (pageIndex + 1) + ": " + footerText + 
-                  " at Y=" + footerY + " (page height=" + pageHeightDevicePxActual + ", text height=" + textHeight + ")");
+                  " at Y=" + footerY + " (page height A4=" + pageHeightDevicePx + ", actual content height=" + pageHeightDevicePxActual + ")");
             
             // Добавляем надпись "Продолжение отчёта смотри на странице Nx..." 
             // если есть большое пустое пространство внизу страницы (не на последней странице)

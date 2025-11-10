@@ -228,9 +228,13 @@ private fun AppScaffold(navController: NavHostController) {
             }
 
             composable("templates") {
-                TemplatesScreen(onOpenTemplate = { id ->
-                    navController.navigate("template_editor/$id")
-                })
+                TemplatesScreen(
+                    isEditing = templatesEditing,
+                    onToggleEdit = { templatesEditing = !templatesEditing },
+                    onOpenTemplate = { id ->
+                        navController.navigate("template_editor/$id")
+                    }
+                )
             }
 
             composable(

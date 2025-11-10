@@ -8,7 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.navigation.compose.rememberNavController
 import com.example.wassertech.ui.AppNavHost
-import com.example.wassertech.ui.splash.SplashRouteV2
+import com.example.wassertech.ui.splash.SplashRouteFixed
 import com.example.wassertech.ui.theme.WassertechTheme
 
 class MainActivity : ComponentActivity() {
@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
                     var showSplash by remember { mutableStateOf(true) }
                     
                     if (showSplash) {
-                        SplashRouteV2(
+                        SplashRouteFixed(
                             onFinished = { showSplash = false },
                             totalMs = 1500
                         )

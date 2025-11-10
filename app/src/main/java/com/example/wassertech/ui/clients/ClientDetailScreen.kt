@@ -62,7 +62,6 @@ fun ClientDetailScreen(
     val groups by clientsVm.groups.collectAsState(initial = emptyList())
 
     val scope = rememberCoroutineScope()
-    val accent = Color(0xFF26A69A)
 
     // Данные
     val sites by vm.sites(clientId).collectAsState(initial = emptyList())
@@ -71,8 +70,6 @@ fun ClientDetailScreen(
     val client by vm.client(clientId).collectAsState(initial = null)
     val clientName = client?.name ?: "-Клиент-"
     val isCorporate = client?.isCorporate ?: false
-    // В начало экрана (рядом с другими collectAsState):
-    val all by vm.clients(includeArchived = true).collectAsState(initial = emptyList())
 
     // Режим редактирования - используем переданное состояние из топбара
     var includeArchived by remember { mutableStateOf(false) }
@@ -449,18 +446,22 @@ fun ClientDetailScreen(
                                                 ) {
                                                     Row(
                                                         Modifier
+                                                            .fillMaxWidth()
                                                             .padding(12.dp),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        // Иконка установки — Material3 Manufacturing
-                                                        Icon(
-                                                            imageVector = Icons.Outlined.SettingsApplications,
-                                                            contentDescription = null
-                                                        )
-                                                        Spacer(Modifier.width(8.dp))
+                                                        // Иконка установки убрана по требованию
                                                         Text(
                                                             inst.name,
-                                                            style = MaterialTheme.typography.titleMedium
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            modifier = Modifier.weight(1f)
+                                                        )
+                                                        // Стрелочка справа
+                                                        Icon(
+                                                            imageVector = Icons.Filled.ArrowForward,
+                                                            contentDescription = "Перейти к установке",
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                            modifier = Modifier.size(20.dp)
                                                         )
                                                     }
                                                 }
@@ -555,7 +556,7 @@ fun ClientDetailScreen(
                             readOnly = true,
                             label = { Text("Объект") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sitePickerExpanded) },
-                            modifier = androidx.compose.ui.Modifier.menuAnchor()
+                            modifier = Modifier.menuAnchor()
                         )
                         ExposedDropdownMenu(expanded = sitePickerExpanded, onDismissRequest = { sitePickerExpanded = false }) {
                             sites.forEachIndexed { index, s ->
@@ -587,13 +588,13 @@ fun ClientDetailScreen(
     }
 
     if (showEditClient) {
-        val groups by clientsVm.groups.collectAsState(initial = emptyList())
+        val clientGroups by clientsVm.groups.collectAsState(initial = emptyList())
 
         // Опции групп: [0] — "Без группы", дальше реальные группы
-        val groupOptions = remember(groups) {
+        val groupOptions = remember(clientGroups) {
             buildList<Pair<String?, String>> {
                 add(null to "Без группы")
-                addAll(groups.map { it.id to it.title })
+                addAll(clientGroups.map { it.id to it.title })
             }
         }
         AlertDialog(
@@ -623,7 +624,9 @@ fun ClientDetailScreen(
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupPickerExpanded)
                             },
-                            modifier = Modifier.menuAnchor()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
                         )
                         ExposedDropdownMenu(
                             expanded = groupPickerExpanded,
@@ -690,7 +693,7 @@ private fun SiteRowWithDrag(
             .fillMaxWidth()
             .then(
                 if (!isArchived) {
-                    Modifier
+                        Modifier
                         .pointerInput(site.id, index) {
                             detectDragGestures(
                                 onDragStart = { 
@@ -698,8 +701,8 @@ private fun SiteRowWithDrag(
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    // Уменьшаем порог для лучшей чувствительности на реальных устройствах
-                                    val threshold = 30f
+                                    // Еще больше уменьшаем порог для физических устройств
+                                    val threshold = 10f
                                     if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                         onMoveUp()
                                         lastMoveThreshold = -threshold
@@ -802,8 +805,8 @@ private fun InstallationRowWithDrag(
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        // Уменьшаем порог для лучшей чувствительности на реальных устройствах
-                                        val threshold = 30f
+                                        // Еще больше уменьшаем порог для физических устройств
+                                        val threshold = 15f // Еще более чувствительный порог
                                         if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                             onMoveUp()
                                             lastMoveThreshold = -threshold

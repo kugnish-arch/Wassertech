@@ -414,6 +414,34 @@ object MySqlSyncService {
         }
     }
     
+    /**
+     * Мигрирует удалённую MySQL БД, создавая таблицы, если они не существуют.
+     */
+    suspend fun migrateRemoteDatabase(): String {
+        var connection: Connection? = null
+        try {
+            Log.d(TAG, "Начало миграции удалённой БД")
+            Class.forName("com.mysql.jdbc.Driver")
+            connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)
+            connection.autoCommit = true // Миграции выполняются по одной
+            
+            createTablesIfNotExist(connection)
+            
+            Log.d(TAG, "Удалённая БД успешно мигрирована.")
+            return "Удалённая БД успешно мигрирована."
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при миграции удалённой БД", e)
+            throw RuntimeException("Ошибка миграции удалённой БД: ${e.message}", e)
+        } finally {
+            try {
+                connection?.close()
+                Log.d(TAG, "Соединение с MySQL закрыто после миграции")
+            } catch (closeEx: Exception) {
+                Log.e(TAG, "Ошибка при закрытии соединения после миграции", closeEx)
+            }
+        }
+    }
+    
     private fun createTablesIfNotExist(conn: Connection) {
         val statements = listOf(
             """

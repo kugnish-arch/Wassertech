@@ -33,7 +33,9 @@ import com.example.wassertech.ui.common.EditDoneBottomBar
 import com.example.wassertech.viewmodel.ClientsViewModel
 import com.example.wassertech.viewmodel.ClientsViewModelFactory
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
 import androidx.compose.ui.graphics.Color
@@ -66,10 +68,14 @@ fun ComponentsScreen(
     val components by vm.components(installationId).collectAsState(initial = emptyList())
 
     // Подтянем сайт (нужен clientId). Если у тебя другой метод — поправь здесь.
-    val siteFlow = remember(installation?.siteId) {
-        installation?.siteId?.let { vm.site(it) } ?: flowOf(null)
-    }
-    val site by siteFlow.collectAsState(initial = null)
+    val siteId = installation?.siteId
+    val site by remember(siteId) {
+        if (siteId != null) {
+            vm.site(siteId)
+        } else {
+            flowOf<com.example.wassertech.data.entities.SiteEntity?>(null)
+        }
+    }.collectAsState(initial = null)
 
     // Имя клиента берём из clientsVm.clients
     val clientName: String? = remember(site, allClients) {
@@ -107,14 +113,27 @@ fun ComponentsScreen(
     var editSelectedSiteIndex by remember { mutableStateOf(0) }
     
     // Получаем список всех объектов клиента для выбора в диалоге редактирования
-    val allSites by remember(installation, allClients) {
+    var allSites by remember { mutableStateOf<List<com.example.wassertech.data.entities.SiteEntity>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+    
+    // Обновляем список объектов при изменении installation или site
+    LaunchedEffect(installation, site, allClients) {
         val clientId = site?.clientId
         if (clientId != null) {
-            vm.sites(clientId, includeArchived = false)
+            val sitesList = vm.sites(clientId, includeArchived = false).first()
+            allSites = sitesList
+            // Обновляем выбранный индекс при изменении списка объектов
+            val currentSiteId = installation?.siteId
+            if (currentSiteId != null) {
+                val index = sitesList.indexOfFirst { it.id == currentSiteId }
+                if (index >= 0) {
+                    editSelectedSiteIndex = index
+                }
+            }
         } else {
-            flowOf(emptyList())
+            allSites = emptyList()
         }
-    }.collectAsState(initial = emptyList())
+    }
 
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
