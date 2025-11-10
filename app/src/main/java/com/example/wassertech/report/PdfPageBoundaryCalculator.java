@@ -12,11 +12,22 @@ public class PdfPageBoundaryCalculator {
     private static final String TAG = "PdfPageBoundaryCalculator";
     
     /**
+     * Нижнее поле страницы в CSS пикселях.
+     * Нижний край компонента не должен заходить за это поле.
+     * То есть, если bottomCss компонента > (currentPageStart + pageHeightCss - BOTTOM_MARGIN_CSS),
+     * то компонент должен переноситься на следующую страницу.
+     * 
+     * Вы можете изменить это значение для настройки нижнего поля.
+     */
+    private static final float BOTTOM_MARGIN_CSS = 15f; // По умолчанию 15px
+    
+    /**
      * Calculate page boundaries respecting component and section header boundaries.
      * Ensures that:
      * 1. No component is split across pages (break before component start)
      * 2. Section headers are not separated from their content (break before section header)
      * 3. If last page contains only signature, move last components from previous page to last page
+     * 4. Components respect bottom margin (BOTTOM_MARGIN_CSS) - bottom edge should not enter the margin zone
      * 
      * @param contentHeightCss Total content height in CSS pixels
      * @param pageHeightCss Height of one page in CSS pixels
@@ -39,10 +50,14 @@ public class PdfPageBoundaryCalculator {
         int iteration = 0;
         final int MAX_ITERATIONS = 1000; // Safety limit
         
+        // Эффективная высота страницы с учетом нижнего поля
+        float effectivePageHeight = pageHeightCss - BOTTOM_MARGIN_CSS;
+        
         while (currentPageStart < contentHeightCss && iteration < MAX_ITERATIONS) {
             iteration++;
             
-            float idealPageEnd = currentPageStart + pageHeightCss;
+            // Идеальный конец страницы с учетом нижнего поля
+            float idealPageEnd = currentPageStart + effectivePageHeight;
             
             // If this would be the last page, just add the end
             if (idealPageEnd >= contentHeightCss - 0.1f) { // Small epsilon for floating point
@@ -125,28 +140,34 @@ public class PdfPageBoundaryCalculator {
                 Log.d(TAG, "  Section header would be split: " + splitSectionHeader.toString());
             }
             
-            Log.d(TAG, "  Checking " + componentBoundaries.size() + " components:");
+            Log.d(TAG, "  Checking " + componentBoundaries.size() + " components (effective page height: " + effectivePageHeight + ", bottom margin: " + BOTTOM_MARGIN_CSS + "):");
             for (int idx = 0; idx < componentBoundaries.size(); idx++) {
                 PdfBoundaryModels.ComponentBoundary comp = componentBoundaries.get(idx);
                 // Check if idealPageEnd falls inside the component
                 boolean wouldBreak = comp.wouldBreakInside(idealPageEnd);
                 // Also check if idealPageEnd is very close to component top (within 5px) - we should break before it
                 boolean isCloseToTop = idealPageEnd > comp.topCss - 5 && idealPageEnd <= comp.topCss + 5;
+                // ВАЖНО: Проверяем, не заходит ли нижний край компонента в зону нижнего поля
+                // Если bottomCss компонента > idealPageEnd, то компонент должен переноситься
+                boolean bottomEntersMargin = comp.bottomCss > idealPageEnd;
                 
                 Log.d(TAG, "  Component[" + idx + "] " + comp.toString() + 
                       " - wouldBreak=" + wouldBreak + 
                       ", isCloseToTop=" + isCloseToTop +
-                      " (idealPageEnd=" + idealPageEnd + " is " + 
+                      ", bottomEntersMargin=" + bottomEntersMargin +
+                      " (idealPageEnd=" + idealPageEnd + ", bottomCss=" + comp.bottomCss + " is " + 
                       (idealPageEnd < comp.topCss ? "before" : 
                        idealPageEnd > comp.bottomCss ? "after" : "inside") + " component)");
                 
-                if (wouldBreak || isCloseToTop) {
-                    // This component would be split or break is too close to component start
+                if (wouldBreak || isCloseToTop || bottomEntersMargin) {
+                    // This component would be split, break is too close to component start, or bottom enters margin zone
                     // We want to break BEFORE the component starts
                     if (comp.topCss >= currentPageStart && comp.topCss < closestComponentTop) {
                         splitComponent = comp;
                         closestComponentTop = comp.topCss;
-                        Log.d(TAG, "    -> SELECTED as splitComponent (closest top: " + comp.topCss + ", wouldBreak=" + wouldBreak + ", isCloseToTop=" + isCloseToTop + ")");
+                        Log.d(TAG, "    -> SELECTED as splitComponent (closest top: " + comp.topCss + 
+                              ", wouldBreak=" + wouldBreak + ", isCloseToTop=" + isCloseToTop + 
+                              ", bottomEntersMargin=" + bottomEntersMargin + ")");
                     }
                 }
             }
@@ -244,28 +265,41 @@ public class PdfPageBoundaryCalculator {
                     float prevPageEnd = boundaries.get(boundaries.size() - 2);
                     
                     // Находим компоненты на предыдущей странице, которые можно перенести
+                    // Ищем компоненты с конца предыдущей страницы, которые поместятся на последней странице
                     List<PdfBoundaryModels.ComponentBoundary> componentsToMove = new ArrayList<>();
+                    
+                    // Сортируем компоненты по их позиции (снизу вверх на предыдущей странице)
+                    List<PdfBoundaryModels.ComponentBoundary> componentsOnPrevPage = new ArrayList<>();
                     for (PdfBoundaryModels.ComponentBoundary comp : componentBoundaries) {
-                        // Компонент на предыдущей странице
                         if (comp.intersects(prevPageStart, prevPageEnd)) {
-                            // Проверяем, поместится ли компонент на последней странице вместе с подписью
-                            float spaceOnLastPage = lastPageEnd - lastPageStart;
-                            float spaceNeeded = comp.bottomCss - comp.topCss;
-                            float spaceForSignature = signatureBoundary.bottomCss - signatureBoundary.topCss;
-                            float spaceAvailable = spaceOnLastPage - spaceForSignature;
-                            
-                            // Если компонент помещается (с учетом подписи), добавляем в список для переноса
-                            if (spaceNeeded <= spaceAvailable && comp.topCss >= prevPageStart) {
-                                componentsToMove.add(comp);
-                                Log.d(TAG, "  Component to move: " + comp.toString() + 
-                                      " (needs " + spaceNeeded + " px, available " + spaceAvailable + " px)");
-                            }
+                            componentsOnPrevPage.add(comp);
+                        }
+                    }
+                    // Сортируем по bottomCss (снизу вверх)
+                    componentsOnPrevPage.sort((a, b) -> Float.compare(b.bottomCss, a.bottomCss));
+                    
+                    // Вычисляем доступное пространство на последней странице
+                    float spaceOnLastPage = lastPageEnd - lastPageStart;
+                    float spaceForSignature = signatureBoundary.bottomCss - signatureBoundary.topCss;
+                    float spaceAvailable = spaceOnLastPage - spaceForSignature;
+                    
+                    // Пробуем добавить компоненты с конца предыдущей страницы, пока есть место
+                    float totalSpaceUsed = 0f;
+                    for (PdfBoundaryModels.ComponentBoundary comp : componentsOnPrevPage) {
+                        float spaceNeeded = comp.bottomCss - comp.topCss;
+                        if (totalSpaceUsed + spaceNeeded <= spaceAvailable) {
+                            componentsToMove.add(comp);
+                            totalSpaceUsed += spaceNeeded;
+                            Log.d(TAG, "  Component to move: " + comp.toString() + 
+                                  " (needs " + spaceNeeded + " px, total used " + totalSpaceUsed + " / " + spaceAvailable + " px)");
+                        } else {
+                            break; // Больше не помещается
                         }
                     }
                     
                     // Если есть компоненты для переноса, перемещаем границу последней страницы вверх
                     if (!componentsToMove.isEmpty()) {
-                        // Находим самый ранний компонент для переноса
+                        // Находим самый ранний (верхний) компонент для переноса
                         float earliestComponentTop = Float.MAX_VALUE;
                         for (PdfBoundaryModels.ComponentBoundary comp : componentsToMove) {
                             if (comp.topCss < earliestComponentTop) {
@@ -283,8 +317,14 @@ public class PdfPageBoundaryCalculator {
                             boundaries.set(boundaries.size() - 2, newLastPageStart);
                             Log.d(TAG, "  ✓ Moved last page boundary from " + lastPageStart + 
                                   " to " + newLastPageStart + " CSS px");
-                            Log.d(TAG, "  Components moved to last page: " + componentsToMove.size());
+                            Log.d(TAG, "  Components moved to last page: " + componentsToMove.size() + 
+                                  " (total space: " + totalSpaceUsed + " px)");
+                        } else {
+                            Log.w(TAG, "  ✗ Cannot move boundary: newStart=" + newLastPageStart + 
+                                  " not in range [" + prevPageStart + ", " + prevPageEnd + "]");
                         }
+                    } else {
+                        Log.d(TAG, "  No components to move (available space: " + spaceAvailable + " px)");
                     }
                 }
             }

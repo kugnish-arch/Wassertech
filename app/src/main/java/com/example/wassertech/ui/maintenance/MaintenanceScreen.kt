@@ -6,10 +6,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.SettingsApplications
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,21 +67,7 @@ fun MaintenanceScreen(
                 .fillMaxSize()
                 .verticalScroll(scroll)
         ) {
-            // узкая полоска под AppBar
-            Surface(tonalElevation = 1.dp) {
-                Text(
-                    text = "Проведение обслуживания",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
-            Spacer(Modifier.height(4.dp))
-
-            // плашка заголовка
+            // плашка заголовка (подтянута к апбару, без подзаголовка)
             ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -92,14 +82,9 @@ fun MaintenanceScreen(
                         .padding(12.dp),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.SettingsApplications,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(Modifier.width(8.dp))
+                    // Иконка шестеренки убрана по требованию
                     Text(
-                        text = "ТО установки $installationName",
+                        text = "Обслуживание установки $installationName",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.weight(1f)
@@ -124,35 +109,44 @@ fun MaintenanceScreen(
                 } else {
                     sections.forEach { sec ->
                         key(sec.componentId) {
-                            // Выделяем заглавные компоненты цветом карточки, текст черный
-                            val cardColors = if (sec.isHeadComponent) {
-                                CardDefaults.elevatedCardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                )
-                            } else {
-                                CardDefaults.elevatedCardColors()
-                            }
-                            
+                            // Заглавные компоненты используют тот же фон что и COMMON компоненты
                             ElevatedCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = cardColors
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(Modifier.fillMaxWidth()) {
-                                    // заголовок секции
+                                    // заголовок секции - для заглавных компонентов такой же фон как у COMMON, но с жирным текстом и иконкой
+                                    val expanded = expandedMap[sec.componentId] == true
                                     ListItem(
+                                        leadingContent = if (sec.isHeadComponent) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Category,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        } else null,
                                         headlineContent = { 
                                             Text(
                                                 sec.componentName,
-                                                // Текст всегда черный для заглавных компонентов
-                                                color = MaterialTheme.colorScheme.onSurface
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                style = if (sec.isHeadComponent) {
+                                                    MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                } else {
+                                                    MaterialTheme.typography.titleMedium
+                                                }
                                             )
                                         },
                                         trailingContent = {
-                                            val expanded = expandedMap[sec.componentId] == true
-                                            TextButton(onClick = {
+                                            IconButton(onClick = {
                                                 expandedMap[sec.componentId] = !expanded
                                             }) {
-                                                Text(if (expanded) "Свернуть" else "Развернуть")
+                                                Icon(
+                                                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                                    contentDescription = if (expanded) "Свернуть" else "Развернуть"
+                                                )
                                             }
                                         }
                                     )
@@ -261,28 +255,38 @@ private fun FieldRow(
             }
         }
         FieldType.NUMBER -> {
-            OutlinedTextField(
-                value = f.numberValue,
-                onValueChange = onNumberChange,
-                label = { Text(labelWithUnit(f)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                supportingText = {
-                    val warn = validateNumber(f.numberValue, f.min, f.max)
-                    if (warn != null) Text(warn)
-                },
+            Surface(
+                color = MaterialTheme.colorScheme.surface, // Белый фон для полей
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = f.numberValue,
+                    onValueChange = onNumberChange,
+                    label = { Text(labelWithUnit(f)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    supportingText = {
+                        val warn = validateNumber(f.numberValue, f.min, f.max)
+                        if (warn != null) Text(warn)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
         FieldType.TEXT -> {
-            OutlinedTextField(
-                value = f.textValue,
-                onValueChange = onTextChange,
-                label = { Text(f.label) },
-                singleLine = false,
-                minLines = 2,
+            Surface(
+                color = MaterialTheme.colorScheme.surface, // Белый фон для полей
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = f.textValue,
+                    onValueChange = onTextChange,
+                    label = { Text(f.label) },
+                    singleLine = false,
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }

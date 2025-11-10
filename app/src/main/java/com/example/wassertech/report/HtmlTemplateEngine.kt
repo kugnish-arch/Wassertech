@@ -131,6 +131,13 @@ object HtmlTemplateEngine {
         
         if (dto.componentsWithFields.isNotEmpty()) {
             Log.d("HtmlTemplate", "Processing ${dto.componentsWithFields.size} components")
+            // Логируем типы компонентов для отладки
+            val headCount = dto.componentsWithFields.count { it.componentType == "HEAD" }
+            val commonCount = dto.componentsWithFields.count { it.componentType == "COMMON" }
+            Log.d("HtmlTemplate", "HEAD components: $headCount, COMMON components: $commonCount")
+            dto.componentsWithFields.forEachIndexed { index, comp ->
+                Log.d("HtmlTemplate", "  Component[$index]: ${comp.componentName}, type=${comp.componentType}, fields=${comp.fields.size}")
+            }
             val componentsBlockMatch = componentsBlockRegex.find(html)
             if (componentsBlockMatch != null) {
                 val componentsBlockContent = componentsBlockMatch.groupValues[1]
@@ -198,11 +205,13 @@ object HtmlTemplateEngine {
                     }
                     
                     // Разделяем компоненты на группы:
-                    // 1. HEAD компоненты в начале
+                    // 1. HEAD компоненты в начале (непрерывная последовательность)
                     // 2. COMMON компоненты в середине
-                    // 3. HEAD компоненты в конце
+                    // 3. HEAD компоненты в конце (непрерывная последовательность)
+                    // ВАЖНО: HEAD компоненты в середине списка (между COMMON) также обрабатываются как COMMON
+                    // для упрощения логики, но они должны отрисовываться во всю ширину
                     
-                    // Находим HEAD компоненты в начале
+                    // Находим HEAD компоненты в начале (непрерывная последовательность)
                     val headAtStart = mutableListOf<com.example.wassertech.report.model.ComponentWithFieldsDTO>()
                     var startIndex = 0
                     for (component in dto.componentsWithFields) {
@@ -214,7 +223,7 @@ object HtmlTemplateEngine {
                         }
                     }
                     
-                    // Находим HEAD компоненты в конце
+                    // Находим HEAD компоненты в конце (непрерывная последовательность)
                     val headAtEnd = mutableListOf<com.example.wassertech.report.model.ComponentWithFieldsDTO>()
                     var endIndex = dto.componentsWithFields.size - 1
                     for (i in dto.componentsWithFields.size - 1 downTo 0) {
@@ -238,11 +247,13 @@ object HtmlTemplateEngine {
                     }
                     
                     // COMMON компоненты - это все компоненты между HEAD в начале и конце
+                    // ВАЖНО: HEAD компоненты в середине списка также включаются в commonOnly,
+                    // но они будут обработаны с флагом isHead=true в generateComponentHtml
                     val commonOnly = if (!allHead && startIndex <= endIndex) {
                         dto.componentsWithFields.filterIndexed { index, component ->
                             // Пропускаем HEAD компоненты в начале и конце
-                            // Оставляем только COMMON компоненты между ними
-                            index >= startIndex && index <= endIndex && component.componentType != "HEAD"
+                            // Включаем все компоненты между ними (и COMMON, и HEAD в середине)
+                            index >= startIndex && index <= endIndex
                         }
                     } else {
                         emptyList()
@@ -270,16 +281,18 @@ object HtmlTemplateEngine {
                         sectionsHtml.append("</section>\n\n")
                     }
                     
-                    // 2. Раздел COMMON компонентов
+                    // 2. Раздел COMMON компонентов (и HEAD компонентов в середине)
                     if (commonOnly.isNotEmpty()) {
-                        sectionsHtml.append("<!-- COMMON компоненты -->\n")
+                        sectionsHtml.append("<!-- COMMON компоненты и HEAD в середине -->\n")
                         sectionsHtml.append("<section class=\"section\">\n")
                         sectionsHtml.append("    <h2 class=\"section-header-red\">Результаты проверки компонентов</h2>\n")
                         sectionsHtml.append("    <div class=\"components-grid\">\n")
                         
                         commonOnly.forEach { component ->
+                            // HEAD компоненты в середине обрабатываются с isHead=true для отрисовки во всю ширину
+                            val isHead = component.componentType == "HEAD"
                             sectionsHtml.append("        ")
-                            sectionsHtml.append(generateComponentHtml(component, false))
+                            sectionsHtml.append(generateComponentHtml(component, isHead))
                             sectionsHtml.append("\n")
                         }
                         
@@ -316,6 +329,12 @@ object HtmlTemplateEngine {
                     
                     Log.d("HtmlTemplate", "Generated sections HTML length: ${finalContent.length}")
                     Log.d("HtmlTemplate", "Head at start: ${headAtStart.size}, Common: ${commonOnly.size}, Head at end: ${headAtEnd.size}")
+                    headAtStart.forEachIndexed { idx, comp ->
+                        Log.d("HtmlTemplate", "  Head at start[$idx]: ${comp.componentName}, fields=${comp.fields.size}")
+                    }
+                    headAtEnd.forEachIndexed { idx, comp ->
+                        Log.d("HtmlTemplate", "  Head at end[$idx]: ${comp.componentName}, fields=${comp.fields.size}")
+                    }
                     
                     // Заменяем весь блок componentsWithFields
                     html = componentsBlockRegex.replace(html, finalContent)

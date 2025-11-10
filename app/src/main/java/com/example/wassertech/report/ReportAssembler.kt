@@ -190,19 +190,38 @@ object ReportAssembler {
                 
                 // Добавляем HEAD компоненты даже без полей
                 if (componentType == "HEAD") {
-                    componentsWithFields.add(
-                        ComponentWithFieldsDTO(
-                            componentName = component.name,
-                            componentType = componentType,
-                            fields = emptyList()  // Пустой список полей для HEAD компонентов без значений
-                        )
+                    val headComponent = ComponentWithFieldsDTO(
+                        componentName = component.name,
+                        componentType = componentType,
+                        fields = emptyList()  // Пустой список полей для HEAD компонентов без значений
                     )
+                    componentsWithFields.add(headComponent)
+                    android.util.Log.d("ReportAssembler", "Added HEAD component without fields: ${component.name}")
                 }
             }
         }
         
-        // Сортируем компоненты по имени
-        componentsWithFields.sortBy { it.componentName.lowercase(Locale.getDefault()) }
+        // Логируем перед сортировкой
+        val headBeforeSort = componentsWithFields.count { it.componentType == "HEAD" }
+        android.util.Log.d("ReportAssembler", "Before sort: ${componentsWithFields.size} components, $headBeforeSort HEAD")
+        
+        // Создаем мапу componentId -> orderIndex для сортировки
+        val componentOrderMap = components.associate { it.name to it.orderIndex }
+        
+        // Сортируем компоненты по orderIndex, затем по имени
+        componentsWithFields.sortWith(compareBy(
+            { componentOrderMap[it.componentName] ?: Int.MAX_VALUE },
+            { it.componentName.lowercase(Locale.getDefault()) }
+        ))
+        
+        // Логируем после сортировки
+        val headAfterSort = componentsWithFields.count { it.componentType == "HEAD" }
+        android.util.Log.d("ReportAssembler", "After sort: ${componentsWithFields.size} components, $headAfterSort HEAD")
+        componentsWithFields.forEachIndexed { idx, comp ->
+            if (comp.componentType == "HEAD") {
+                android.util.Log.d("ReportAssembler", "  HEAD[$idx]: ${comp.componentName}")
+            }
+        }
 
         ReportDTO(
             reportNumber = reportNumber,  // Используем новый формат номера

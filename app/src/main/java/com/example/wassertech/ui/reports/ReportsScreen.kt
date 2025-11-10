@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import android.content.Intent
@@ -118,6 +119,7 @@ fun ReportsScreen(
         }
     } else {
         Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
             floatingActionButton = {
                 if (isEditing && selectedFiles.isNotEmpty()) {
                     FloatingActionButton(
@@ -139,7 +141,9 @@ fun ReportsScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .padding(top = 0.dp) // Уменьшаем отступ от апбара
+                    .padding(bottom = padding.calculateBottomPadding())
+                    .padding(horizontal = padding.calculateStartPadding(LocalLayoutDirection.current)),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {

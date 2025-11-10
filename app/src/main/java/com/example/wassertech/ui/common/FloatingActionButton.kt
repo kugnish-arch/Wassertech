@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Конфигурация для Floating Action Button
@@ -45,7 +47,7 @@ data class FABOption(
 @Composable
 fun AppFloatingActionButton(
     template: FABTemplate,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier.padding(bottom = 16.dp) // Отступ снизу для позиционирования внизу экрана
 ) {
     var expanded by remember { mutableStateOf(false) }
     
@@ -66,45 +68,64 @@ fun AppFloatingActionButton(
     } else {
         // FAB с выпрыгивающими кнопками
         Box(modifier = modifier) {
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                // Выпрыгивающие кнопки (сверху вниз)
-                template.options.reversed().forEachIndexed { index, option ->
-                    // Увеличенный интервал между кнопками: 80dp для лучшего визуального разделения
-                    val buttonHeightWithSpacing = 80f
-                    val offsetY = remember(expanded) {
-                        Animatable(if (expanded) 0f else buttonHeightWithSpacing * (index + 1))
-                    }
-                    val alpha = remember(expanded) {
-                        Animatable(if (expanded) 1f else 0f)
-                    }
-                    val scale = remember(expanded) {
-                        Animatable(if (expanded) 1f else 0f)
-                    }
+            // Выпрыгивающие кнопки (сверху вниз) - позиционируются выше красного FABа
+            template.options.reversed().forEachIndexed { index, option ->
+                // Интервал между кнопками: 10dp
+                val buttonSpacing = 10.dp
+                val fabSize = 56.dp
+                
+                // Анимационные значения для каждой кнопки
+                // Используем Float для offsetY и конвертируем в dp при использовании
+                val offsetYFloat = remember { Animatable(0f) }
+                val alpha = remember { Animatable(0f) }
+                val scale = remember { Animatable(0.3f) }
 
-                    LaunchedEffect(expanded) {
-                        if (expanded) {
-                            // Анимация появления с задержкой для каждой кнопки
-                            delay(index * 50L)
-                            offsetY.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
-                            alpha.animateTo(1f, tween(300))
-                            scale.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
-                        } else {
-                            // Анимация исчезновения
-                            alpha.animateTo(0f, tween(200))
-                            scale.animateTo(0f, tween(200))
-                            offsetY.animateTo(buttonHeightWithSpacing * (index + 1), tween(200))
+                LaunchedEffect(expanded) {
+                    if (expanded) {
+                        // Анимация появления с задержкой для каждой кнопки
+                        delay(index * 50L)
+                        // Запускаем все анимации параллельно
+                        coroutineScope {
+                            val targetOffset = -(fabSize.value + buttonSpacing.value) * (index + 1)
+                            launch {
+                                offsetYFloat.animateTo(
+                                    targetValue = targetOffset,
+                                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                                )
+                            }
+                            launch {
+                                alpha.animateTo(1f, tween(300))
+                            }
+                            launch {
+                                scale.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+                            }
+                        }
+                    } else {
+                        // Анимация исчезновения
+                        coroutineScope {
+                            launch {
+                                alpha.animateTo(0f, tween(200))
+                            }
+                            launch {
+                                scale.animateTo(0.3f, tween(200))
+                            }
+                            launch {
+                                offsetYFloat.animateTo(0f, tween(200))
+                            }
                         }
                     }
+                }
 
-                    // Кнопка с подписью слева (черным текстом) и круглой кнопкой справа
+                // Кнопка с подписью слева (черным текстом) и круглой кнопкой справа
+                // Позиционируем абсолютно относительно основного FAB
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(y = offsetYFloat.value.dp)
+                        .alpha(alpha.value)
+                        .scale(scale.value)
+                ) {
                     Row(
-                        modifier = Modifier
-                            .offset(y = (-offsetY.value).dp)
-                            .alpha(alpha.value)
-                            .scale(scale.value)
-                            .padding(end = 8.dp), // Небольшой отступ от края
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -116,7 +137,7 @@ fun AppFloatingActionButton(
                             modifier = Modifier.padding(end = 4.dp)
                         )
                         
-                        // Круглая кнопка справа
+                        // Круглая кнопка справа (выровнена по горизонтали с красным FABом)
                         FloatingActionButton(
                             onClick = {
                                 expanded = false
@@ -136,19 +157,20 @@ fun AppFloatingActionButton(
                         }
                     }
                 }
+            }
 
-                // Основная FAB (всегда "+")
-                FloatingActionButton(
-                    onClick = { expanded = !expanded },
-                    containerColor = template.containerColor,
-                    contentColor = template.contentColor,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = if (expanded) "Закрыть" else "Открыть меню"
-                    )
-                }
+            // Основная FAB (всегда "+") - позиционируется внизу
+            FloatingActionButton(
+                onClick = { expanded = !expanded },
+                containerColor = template.containerColor,
+                contentColor = template.contentColor,
+                shape = CircleShape,
+                modifier = Modifier.align(Alignment.BottomEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = if (expanded) "Закрыть" else "Открыть меню"
+                )
             }
         }
     }

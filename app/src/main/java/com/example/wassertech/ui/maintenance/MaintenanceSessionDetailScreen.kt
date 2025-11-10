@@ -86,6 +86,16 @@ fun MaintenanceSessionDetailScreen(
             // Values grouped by component, with field label resolution
             val values = db.sessionsDao().getValuesForSession(sessionId)
             val byComponent = values.groupBy { it.componentId }
+            
+            // Получаем все компоненты установки для сортировки по orderIndex
+            val installationId = s?.installationId
+            val allComponents = if (installationId != null) {
+                db.hierarchyDao().getComponentsNow(installationId)
+            } else {
+                emptyList()
+            }
+            val componentOrderMap = allComponents.associate { it.id to it.orderIndex }
+            
             val list = mutableListOf<DetailComponentGroup>()
             for ((componentId, vals) in byComponent) {
                 val comp = db.hierarchyDao().getComponent(componentId)
@@ -111,9 +121,11 @@ fun MaintenanceSessionDetailScreen(
                     }
                     DetailFieldRow(fieldLabel = label, value = valueText)
                 }.sortedBy { it.fieldLabel.lowercase(Locale.getDefault()) }
-                list.add(DetailComponentGroup(componentName = compName, rows = rows))
+                val orderIndex = componentOrderMap[componentId] ?: Int.MAX_VALUE
+                list.add(DetailComponentGroup(componentName = compName, rows = rows, orderIndex = orderIndex))
             }
-            groups = list.sortedBy { it.componentName.lowercase(Locale.getDefault()) }
+            // Сортируем по orderIndex, затем по имени
+            groups = list.sortedWith(compareBy({ it.orderIndex }, { it.componentName.lowercase(Locale.getDefault()) }))
         }
     }
 
@@ -318,6 +330,7 @@ fun MaintenanceSessionDetailScreen(
 
     // Renamed to avoid clash with MaintenanceAllScreen.kt
 private data class DetailComponentGroup(
+    val orderIndex: Int = Int.MAX_VALUE,
     val componentName: String,
     val rows: List<DetailFieldRow>
 )

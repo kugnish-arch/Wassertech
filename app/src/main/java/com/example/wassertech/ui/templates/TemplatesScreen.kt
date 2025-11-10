@@ -110,6 +110,7 @@ fun TemplatesScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
         floatingActionButton = {
             AppFloatingActionButton(
                 template = FABTemplate(

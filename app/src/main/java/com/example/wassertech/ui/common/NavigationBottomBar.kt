@@ -1,10 +1,11 @@
 package com.example.wassertech.ui.common
 
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -17,22 +18,52 @@ fun NavigationBottomBar(
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
-        modifier = modifier.height(93.dp) // Фиксированная высота 93dp (увеличено на 5px с 88dp)
+        modifier = modifier.height(90.dp) // Фиксированная высота 90dp
     ) {
         NavigationBarItem(
-            icon = { Icon(Icons.Filled.Person, contentDescription = "Клиенты") },
+            icon = { 
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Person, contentDescription = "Клиенты")
+                }
+            },
             label = {},
             selected = currentRoute?.startsWith("clients") == true,
             onClick = onNavigateToClients
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Filled.Schedule, contentDescription = "Обслуживание") },
+            icon = { 
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Schedule, contentDescription = "Обслуживание")
+                }
+            },
             label = {},
             selected = currentRoute?.startsWith("maintenance_history") == true,
             onClick = onNavigateToMaintenanceHistory
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Filled.Description, contentDescription = "Отчёты") },
+            icon = { 
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Description, contentDescription = "Отчёты")
+                }
+            },
             label = {},
             selected = currentRoute?.startsWith("reports") == true,
             onClick = onNavigateToReports

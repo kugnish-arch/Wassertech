@@ -143,6 +143,7 @@ fun ComponentsScreen(
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
         floatingActionButton = {
             AppFloatingActionButton(
                 template = FABTemplate(

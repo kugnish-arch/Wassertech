@@ -8,8 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 @Composable
 fun SiteDetailScreen(
     siteId: String,
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
     onOpenInstallation: (String) -> Unit,
     vm: HierarchyViewModel = viewModel()
 ) {
@@ -97,12 +99,15 @@ fun SiteDetailScreen(
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { showEdit = true }) {
-                        Icon(
-                            Icons.Filled.Edit,
-                            contentDescription = "Редактировать объект",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                    // Иконка редактирования видна только в режиме редактирования
+                    if (isEditing) {
+                        IconButton(onClick = { showEdit = true }) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "Редактировать объект",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
             }
@@ -137,7 +142,7 @@ fun SiteDetailScreen(
                                 headlineContent = { Text(inst.name) },
                                 trailingContent = {
                                     IconButton(onClick = { onOpenInstallation(inst.id) }) {
-                                        Icon(Icons.Default.OpenInNew, contentDescription = "Открыть")
+                                        Icon(Icons.Filled.ChevronRight, contentDescription = "Открыть")
                                     }
                                 }
                             )

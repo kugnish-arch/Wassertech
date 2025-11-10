@@ -7,6 +7,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -59,7 +61,7 @@ fun AppTopBar(
             route.startsWith("maintenance_all") -> "Техническое обслуживание"
             route.startsWith("maintenance_edit") -> "Редактирование ТО"
             route.startsWith("maintenance_history") -> "История ТО"
-            route.startsWith("maintenance_session") -> "Детали ТО"
+            route.startsWith("maintenance_session") -> "Детали обслуживания"
             route.startsWith("reports") -> "Отчёты ТО"
             route.startsWith("settings") -> "Настройки"
             route.startsWith("about") -> "О программе"
@@ -126,10 +128,20 @@ fun AppTopBar(
             // Переключатель режима редактирования (если доступен)
             if (onToggleEdit != null) {
                 IconButton(onClick = onToggleEdit) {
-                    Icon(
-                        imageVector = if (isEditing) Icons.Filled.Edit else Icons.Filled.Visibility,
-                        contentDescription = if (isEditing) "Редактирование" else "Просмотр"
-                    )
+                    if (isEditing) {
+                        // Зеленый кружок с галочкой для подтверждения сохранения
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Сохранить",
+                            tint = androidx.compose.ui.graphics.Color(0xFF4CAF50) // Зеленый цвет
+                        )
+                    } else {
+                        // Иконка EditNote для редактирования
+                        Icon(
+                            imageVector = Icons.Filled.EditNote,
+                            contentDescription = "Редактировать"
+                        )
+                    }
                 }
             }
         }
@@ -167,16 +179,28 @@ private fun AppScaffold(navController: NavHostController) {
     // Состояние редактирования для разных экранов
     var clientsEditing by remember { mutableStateOf(false) }
     var clientDetailEditing by remember { mutableStateOf(false) }
+    var siteEditing by remember { mutableStateOf(false) }
     var installationEditing by remember { mutableStateOf(false) }
     var templatesEditing by remember { mutableStateOf(false) }
     var reportsEditing by remember { mutableStateOf(false) }
     var maintenanceHistoryEditing by remember { mutableStateOf(false) }
     
     // Определяем текущее состояние редактирования и функцию переключения
-    val (currentEditing, toggleEditing) = remember(currentRoute) {
+    // Добавляем зависимости на все состояния редактирования для реактивного обновления
+    val (currentEditing, toggleEditing) = remember(
+        currentRoute,
+        clientsEditing,
+        clientDetailEditing,
+        siteEditing,
+        installationEditing,
+        templatesEditing,
+        reportsEditing,
+        maintenanceHistoryEditing
+    ) {
         when {
             currentRoute == "clients" -> clientsEditing to { clientsEditing = !clientsEditing }
             currentRoute?.startsWith("client/") == true -> clientDetailEditing to { clientDetailEditing = !clientDetailEditing }
+            currentRoute?.startsWith("site/") == true -> siteEditing to { siteEditing = !siteEditing }
             currentRoute?.startsWith("installation/") == true -> installationEditing to { installationEditing = !installationEditing }
             currentRoute?.startsWith("templates") == true -> templatesEditing to { templatesEditing = !templatesEditing }
             currentRoute?.startsWith("reports") == true -> reportsEditing to { reportsEditing = !reportsEditing }
@@ -275,6 +299,8 @@ private fun AppScaffold(navController: NavHostController) {
                 val siteId = bse.arguments?.getString("siteId") ?: return@composable
                 SiteDetailScreen(
                     siteId = siteId,
+                    isEditing = siteEditing,
+                    onToggleEdit = { siteEditing = !siteEditing },
                     onOpenInstallation = { installationId -> navController.navigate("installation/$installationId") }
                 )
             }

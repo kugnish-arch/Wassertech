@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -435,9 +436,9 @@ fun ClientDetailScreen(
                                                             style = MaterialTheme.typography.titleMedium,
                                                             modifier = Modifier.weight(1f)
                                                         )
-                                                        // Стрелочка справа
+                                                        // Стрелочка справа (такая же как на экране "Клиенты")
                                                         Icon(
-                                                            imageVector = Icons.Filled.ArrowForward,
+                                                            imageVector = Icons.Filled.ChevronRight,
                                                             contentDescription = "Перейти к установке",
                                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                             modifier = Modifier.size(20.dp)
