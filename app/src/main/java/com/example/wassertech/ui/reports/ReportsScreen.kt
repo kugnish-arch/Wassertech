@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.res.painterResource
 import com.example.wassertech.R
 import androidx.compose.material3.*
@@ -130,7 +129,7 @@ fun ReportsScreen(
                         modifier = Modifier.size(56.dp)
                     ) {
                         Icon(
-                            Icons.Filled.Delete,
+                            imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                             contentDescription = "Удалить выбранные",
                             modifier = Modifier.size(28.dp)
                         )
@@ -244,7 +243,7 @@ fun ReportsScreen(
                                     modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        Icons.Filled.Delete,
+                                        imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                                         contentDescription = "Удалить",
                                         tint = MaterialTheme.colorScheme.error
                                     )

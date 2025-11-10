@@ -438,7 +438,7 @@ fun TemplateEditorScreen(
                                 }
                                 // Корзина справа от сегментированных кнопок
                                 IconButton(onClick = { vm.remove(f.id) }) {
-                                    Icon(Icons.Outlined.Delete, contentDescription = "Удалить")
+                                    Icon(imageVector = com.example.wassertech.ui.theme.DeleteIcon, contentDescription = "Удалить")
                                 }
                             }
 

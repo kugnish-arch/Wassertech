@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import com.example.wassertech.data.entities.InstallationEntity
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
+import com.example.wassertech.ui.common.CommonAddDialog
 import androidx.compose.ui.graphics.Color
 import com.example.wassertech.ui.icons.AppIcons
 import androidx.compose.ui.Alignment
@@ -159,35 +160,33 @@ fun SiteDetailScreen(
     }
 
     if (showEdit) {
-        AlertDialog(
-            onDismissRequest = { showEdit = false },
-            title = { Text("Редактировать объект") },
+        CommonAddDialog(
+            title = "Редактировать объект",
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = editName, onValueChange = { editName = it }, label = { Text("Название") })
                     OutlinedTextField(value = editAddr, onValueChange = { editAddr = it }, label = { Text("Адрес (опц.)") })
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    scope.launch {
-                        val s = vm.getSite(siteId)
-                        if (s != null) {
-                            vm.editSite(s.copy(name = editName.text.trim(), address = editAddr.text.trim().ifEmpty { null }))
-                            siteName = editName.text.trim()
-                        }
-                        showEdit = false
+            onDismissRequest = { showEdit = false },
+            confirmText = "Сохранить",
+            onConfirm = {
+                scope.launch {
+                    val s = vm.getSite(siteId)
+                    if (s != null) {
+                        vm.editSite(s.copy(name = editName.text.trim(), address = editAddr.text.trim().ifEmpty { null }))
+                        siteName = editName.text.trim()
                     }
-                }) { Text("Сохранить") }
+                    showEdit = false
+                }
             },
-            dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Отмена") } }
+            confirmEnabled = editName.text.trim().isNotEmpty()
         )
     }
 
     if (showAddInst) {
-        AlertDialog(
-            onDismissRequest = { showAddInst = false },
-            title = { Text("Новая установка") },
+        CommonAddDialog(
+            title = "Новая установка",
             text = {
                 OutlinedTextField(
                     value = newInstName,
@@ -196,14 +195,13 @@ fun SiteDetailScreen(
                     singleLine = true
                 )
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val name = newInstName.text.trim().ifBlank { "Новая установка" }
-                    vm.addInstallation(siteId, name)
-                    showAddInst = false
-                }) { Text("Добавить") }
+            onDismissRequest = { showAddInst = false },
+            onConfirm = {
+                val name = newInstName.text.trim().ifBlank { "Новая установка" }
+                vm.addInstallation(siteId, name)
+                showAddInst = false
             },
-            dismissButton = { TextButton(onClick = { showAddInst = false }) { Text("Отмена") } }
+            confirmEnabled = newInstName.text.trim().isNotEmpty()
         )
     }
 }

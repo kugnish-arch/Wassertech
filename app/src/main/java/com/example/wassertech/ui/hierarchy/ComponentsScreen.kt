@@ -33,6 +33,7 @@ import com.example.wassertech.data.entities.ChecklistTemplateEntity
 import com.example.wassertech.data.types.ComponentType
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.ui.common.EditDoneBottomBar
+import com.example.wassertech.ui.common.CommonAddDialog
 import com.example.wassertech.viewmodel.ClientsViewModel
 import com.example.wassertech.viewmodel.ClientsViewModelFactory
 import kotlinx.coroutines.flow.Flow
@@ -229,7 +230,7 @@ fun ComponentsScreen(
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF1E1E1E).copy(alpha = 0.75f) // Текст на плашке заголовка
+                            color = MaterialTheme.colorScheme.onSurfaceVariant // Серый цвет для подзаголовка (адрес/объект)
                         )
                     }
                 }
@@ -336,7 +337,7 @@ fun ComponentsScreen(
                                             Spacer(Modifier.width(4.dp))
                                             IconButton(onClick = { pendingDeleteId = comp.id }) {
                                                 Icon(
-                                                    imageVector = Icons.Outlined.Delete,
+                                                    imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                                                     contentDescription = "Удалить компонент"
                                                 )
                                             }
@@ -353,9 +354,8 @@ fun ComponentsScreen(
 
     // ===== Диалог переименования установки =====
     if (showEdit && installation != null) {
-        AlertDialog(
-            onDismissRequest = { showEdit = false },
-            title = { Text("Редактировать установку") },
+        CommonAddDialog(
+            title = "Редактировать установку",
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -399,42 +399,24 @@ fun ComponentsScreen(
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newTitle = editName.text.trim()
-                    val newSiteId = allSites.getOrNull(editSelectedSiteIndex)?.id
-                    if (newTitle.isNotEmpty() && newSiteId != null) {
-                        vm.updateInstallation(installationId, newTitle, newSiteId)
-                    }
-                    showEdit = false
-                }) { Text("Сохранить") }
+            onDismissRequest = { showEdit = false },
+            confirmText = "Сохранить",
+            onConfirm = {
+                val newTitle = editName.text.trim()
+                val newSiteId = allSites.getOrNull(editSelectedSiteIndex)?.id
+                if (newTitle.isNotEmpty() && newSiteId != null) {
+                    vm.updateInstallation(installationId, newTitle, newSiteId)
+                }
+                showEdit = false
             },
-            dismissButton = {
-                TextButton(onClick = { showEdit = false }) { Text("Отмена") }
-            }
+            confirmEnabled = editName.text.trim().isNotEmpty() && allSites.getOrNull(editSelectedSiteIndex)?.id != null
         )
     }
 
     // ===== Диалог добавления компонента =====
     if (showAdd) {
-        AlertDialog(
-            onDismissRequest = { showAdd = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val tmpl = selectedTemplate
-                    val compName = if (newName.text.isNotBlank()) newName.text.trim()
-                    else tmpl?.title ?: "Компонент"
-                    vm.addComponentFromTemplate(
-                        installationId = installationId,
-                        name = compName,
-                        type = ComponentType.COMMON, // дефолтный тип
-                        templateId = tmpl?.id
-                    )
-                    showAdd = false
-                }) { Text("Добавить") }
-            },
-            dismissButton = { TextButton(onClick = { showAdd = false }) { Text("Отмена") } },
-            title = { Text("Новый компонент") },
+        CommonAddDialog(
+            title = "Новый компонент",
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -490,7 +472,21 @@ fun ComponentsScreen(
                         }
                     }
                 }
-            }
+            },
+            onDismissRequest = { showAdd = false },
+            onConfirm = {
+                val tmpl = selectedTemplate
+                val compName = if (newName.text.isNotBlank()) newName.text.trim()
+                else tmpl?.title ?: "Компонент"
+                vm.addComponentFromTemplate(
+                    installationId = installationId,
+                    name = compName,
+                    type = ComponentType.COMMON, // дефолтный тип
+                    templateId = tmpl?.id
+                )
+                showAdd = false
+            },
+            confirmEnabled = selectedTemplate != null || allTemplates.isNotEmpty()
         )
     }
 

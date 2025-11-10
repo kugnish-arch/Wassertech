@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Description
@@ -29,6 +28,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
+import com.example.wassertech.ui.common.CommonAddDialog
 
 
 @Composable
@@ -188,9 +188,8 @@ fun TemplatesScreen(
 
     // Диалог создания шаблона
     if (showCreate) {
-        AlertDialog(
-            onDismissRequest = { showCreate = false },
-            title = { Text("Новый шаблон") },
+        CommonAddDialog(
+            title = "Новый шаблон",
             text = {
                 OutlinedTextField(
                     value = newTitle,
@@ -199,38 +198,34 @@ fun TemplatesScreen(
                     label = { Text("Название шаблона") }
                 )
             },
-            confirmButton = {
-                val canSave = newTitle.trim().isNotEmpty()
-                TextButton(
-                    onClick = {
-                        val title = newTitle.trim()
-                        if (title.isNotEmpty()) {
-                            scope.launch {
-                                val id = UUID.randomUUID().toString()
-                                val now = System.currentTimeMillis()
-                                val nextOrder =
-                                    (templates.maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
-                                val entity = ChecklistTemplateEntity(
-                                    id = id,
-                                    title = title,
-                                    componentType = ComponentType.COMMON, // дефолт
-                                    sortOrder = nextOrder,
-                                    isArchived = false,
-                                    archivedAtEpoch = null,
-                                    updatedAtEpoch = now
-                                )
-                                dao.upsertTemplate(entity)
-                                onOpenTemplate(id)
-                            }
-                            showCreate = false
-                        }
-                    },
-                    enabled = canSave
-                ) { Text("Создать") }
+            onDismissRequest = { showCreate = false },
+            confirmText = "Создать",
+            dismissText = "Отмена",
+            confirmEnabled = newTitle.trim().isNotEmpty(),
+            onConfirm = {
+                val title = newTitle.trim()
+                if (title.isNotEmpty()) {
+                    scope.launch {
+                        val id = UUID.randomUUID().toString()
+                        val now = System.currentTimeMillis()
+                        val nextOrder =
+                            (templates.maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
+                        val entity = ChecklistTemplateEntity(
+                            id = id,
+                            title = title,
+                            componentType = ComponentType.COMMON, // дефолт
+                            sortOrder = nextOrder,
+                            isArchived = false,
+                            archivedAtEpoch = null,
+                            updatedAtEpoch = now
+                        )
+                        dao.upsertTemplate(entity)
+                        onOpenTemplate(id)
+                    }
+                    showCreate = false
+                }
             },
-            dismissButton = {
-                TextButton(onClick = { showCreate = false }) { Text("Отмена") }
-            }
+            onDismiss = { showCreate = false }
         )
     }
 
@@ -362,7 +357,7 @@ private fun TemplateRowWithDrag(
                                 onClick = onDelete
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.Delete,
+                                    imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                                     contentDescription = "Удалить",
                                     tint = MaterialTheme.colorScheme.error
                                 )

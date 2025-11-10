@@ -45,8 +45,8 @@
 
         .header {
             width: 100%;
-            padding: 10px 20px;
-            border-bottom: 1px solid #ccc;
+            padding: 30px 20px;
+            border-bottom: 0px solid #ccc;
         }
 
         .header-content {
@@ -73,7 +73,7 @@
 
 
         /* Заголовок документа */
-        .doc-title { text-align: center; margin: 0 0 6mm; }
+        .doc-title { text-align: center; margin: 20px 0 6mm; }
         .doc-title h1 {
           font-size: 16.5pt; margin: 0 0 4mm; font-weight: 300;
         }
@@ -189,7 +189,7 @@
         .sign-row { 
           display: flex; 
           justify-content: flex-end; 
-          margin-top: 8mm; 
+          margin-top: 2mm; /* Минимальный отступ от последнего компонента */
           position: relative;
           page-break-inside: avoid;
         }
@@ -232,7 +232,9 @@
         }
         .stamp-image {
           position: absolute;
-          bottom: -5mm;
+          /* Приподнимаем печать на половину диаметра (21mm) относительно подписи */
+          /* Подпись на bottom: 11mm, поднимаем печать на 21mm выше: 11mm + 21mm = 32mm */
+          bottom: 32mm; /* Поднято на половину диаметра печати (21mm) относительно подписи (11mm) */
           right: 5mm;
           width: 42mm;
           height: 42mm;

@@ -1,6 +1,10 @@
 package com.example.wassertech.ui.clients
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +31,7 @@ import com.example.wassertech.ui.common.EditDoneBottomBar
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
 import com.example.wassertech.ui.common.FABOption
+import com.example.wassertech.ui.common.CommonAddDialog
 
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
 
@@ -271,66 +276,86 @@ fun ClientsScreen(
                         onMoveDown = {},
                     )
                 }
-                if (expandedSectionId == GENERAL_SECTION_ID) {
-                    //val generalById = remember(clients) { generalClients.associateBy { it.id } }
-                    if (localOrderGeneral.isEmpty()) {
-                        item(key = "general_empty") { EmptyGroupStub(indent = 16.dp) }
-                    } else {
-                        items(
-                            items = localOrderGeneral,
-                            key = { it }
-                        ) { clientId ->
-                            val client = generalById[clientId] ?: return@items
-                            // Карточка с новым стилем: белый фон, тонкая граница, скругление 12dp, elevation 1dp
-                            OutlinedCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.outlinedCardColors(
-                                    containerColor = Color.White
-                                ),
-                                border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                            ) {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    // Вертикальная линия-акцент слева (цвет зависит от типа клиента)
-                                    val accentColor = if (client.isCorporate == true) Color(0xFFE53935) else Color(0xFF9E9E9E)
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .width(4.dp)
-                                            .background(accentColor)
-                                    )
-                                    ClientRowWithEdit(
-                                        client = client,
-                                        groupId = null,
-                                        groups = groups,
-                                        isEditMode = isEditMode,
-                                        onClick = { onClientClick(client.id) },
-                                        onArchive = { onArchiveClient(client.id) },
-                                        onRestore = { onRestoreClient(client.id) },
-                                        onMoveUp = { moveIdWithin(null, client.id, up = true) },
-                                        onMoveDown = { moveIdWithin(null, client.id, up = false) },
-                                        onMoveToGroup = { targetGroupId: String? ->
-                                            moveIdToGroup(
-                                                client.id,
-                                                null,
-                                                targetGroupId
+                // Анимированное содержимое "Общей" секции
+                item(key = "general_content") {
+                    AnimatedVisibility(
+                        visible = expandedSectionId == GENERAL_SECTION_ID,
+                        enter = expandVertically(animationSpec = tween(300)),
+                        exit = shrinkVertically(animationSpec = tween(300))
+                    ) {
+                        Column(modifier = Modifier.animateContentSize()) {
+                            if (localOrderGeneral.isEmpty()) {
+                                EmptyGroupStub(indent = 16.dp)
+                            } else {
+                                localOrderGeneral.forEach { clientId ->
+                                    val client = generalById[clientId] ?: return@forEach
+                                    // Карточка с новым стилем: белый фон, тонкая граница, скругление 12dp, elevation 1dp
+                                    OutlinedCard(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.outlinedCardColors(
+                                            containerColor = Color.White
+                                        ),
+                                        border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxWidth()) {
+                                            // Вертикальная линия-акцент слева (цвет зависит от типа клиента)
+                                            val accentColor =
+                                                if (client.isCorporate == true) Color(0xFFE53935) else Color(
+                                                    0xFF9E9E9E
+                                                )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .width(4.dp)
+                                                    .background(accentColor)
                                             )
-                                        },
-                                        onEditName = {
-                                            editClientId = client.id
-                                            editClientName = client.name
-                                            editClientGroupId = client.clientGroupId
-                                        },
-                                        onDelete = {
-                                            deleteDialogState = DeleteDialogState(
-                                                isClient = true,
-                                                id = client.id,
-                                                name = client.name
+                                            ClientRowWithEdit(
+                                                client = client,
+                                                groupId = null,
+                                                groups = groups,
+                                                isEditMode = isEditMode,
+                                                onClick = { onClientClick(client.id) },
+                                                onArchive = { onArchiveClient(client.id) },
+                                                onRestore = { onRestoreClient(client.id) },
+                                                onMoveUp = {
+                                                    moveIdWithin(
+                                                        null,
+                                                        client.id,
+                                                        up = true
+                                                    )
+                                                },
+                                                onMoveDown = {
+                                                    moveIdWithin(
+                                                        null,
+                                                        client.id,
+                                                        up = false
+                                                    )
+                                                },
+                                                onMoveToGroup = { targetGroupId: String? ->
+                                                    moveIdToGroup(
+                                                        client.id,
+                                                        null,
+                                                        targetGroupId
+                                                    )
+                                                },
+                                                onEditName = {
+                                                    editClientId = client.id
+                                                    editClientName = client.name
+                                                    editClientGroupId = client.clientGroupId
+                                                },
+                                                onDelete = {
+                                                    deleteDialogState = DeleteDialogState(
+                                                        isClient = true,
+                                                        id = client.id,
+                                                        name = client.name
+                                                    )
+                                                },
+                                                modifier = Modifier.animateContentSize()
                                             )
-                                        },
-                                        modifier = Modifier.animateContentSize()
-                                    )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -370,17 +395,20 @@ fun ClientsScreen(
                         },
                         modifier = Modifier.animateContentSize()
                     )
-
-                    if (expandedSectionId == groupId) {
-                        val listIds = localOrderByGroup[groupId] ?: emptyList()
-                        if (listIds.isEmpty()) {
-                            Column {
+                    
+                    // Анимированное содержимое группы
+                    AnimatedVisibility(
+                        visible = expandedSectionId == groupId,
+                        enter = expandVertically(animationSpec = tween(300)),
+                        exit = shrinkVertically(animationSpec = tween(300))
+                    ) {
+                        Column(modifier = Modifier.animateContentSize()) {
+                            val listIds = localOrderByGroup[groupId] ?: emptyList()
+                            if (listIds.isEmpty()) {
                                 EmptyGroupStub(indent = 16.dp)
                                 HorizontalDivider()
-                            }
-                        } else {
-                            val byId = byGroupIdMap[groupId] ?: emptyMap()
-                            Column {
+                            } else {
+                                val byId = byGroupIdMap[groupId] ?: emptyMap()
                                 listIds.forEach { cid ->
                                     val client = byId[cid] ?: return@forEach
                                     // Карточка с новым стилем: белый фон, тонкая граница, скругление 12dp, elevation 1dp
@@ -443,8 +471,8 @@ fun ClientsScreen(
                                     }
                                 }
                             }
-                }
-            }
+                        }
+                    }
                 }
             }
         }
@@ -453,9 +481,8 @@ fun ClientsScreen(
 
         // Создание группы
         if (createGroupDialog) {
-            AlertDialog(
-                onDismissRequest = { createGroupDialog = false },
-                title = { Text("Новая группа") },
+            CommonAddDialog(
+                title = "Новая группа",
                 text = {
                     OutlinedTextField(
                         value = newGroupTitle,
@@ -465,21 +492,17 @@ fun ClientsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val title = newGroupTitle.trim()
-                            if (title.isNotEmpty()) {
-                                onCreateGroup(title)
-                                newGroupTitle = ""
-                                createGroupDialog = false
-                            }
-                        }
-                    ) { Text("Создать") }
+                onDismissRequest = { createGroupDialog = false },
+                confirmText = "Создать",
+                onConfirm = {
+                    val title = newGroupTitle.trim()
+                    if (title.isNotEmpty()) {
+                        onCreateGroup(title)
+                        newGroupTitle = ""
+                        createGroupDialog = false
+                    }
                 },
-                dismissButton = {
-                    TextButton(onClick = { createGroupDialog = false }) { Text("Отмена") }
-                }
+                confirmEnabled = newGroupTitle.trim().isNotEmpty()
             )
         }
 
@@ -575,9 +598,8 @@ fun ClientsScreen(
 
         // Переименование группы
         if (editGroupId != null) {
-            AlertDialog(
-                onDismissRequest = { editGroupId = null },
-                title = { Text("Переименовать группу") },
+            CommonAddDialog(
+                title = "Переименовать группу",
                 text = {
                     OutlinedTextField(
                         value = editGroupTitle,
@@ -587,29 +609,23 @@ fun ClientsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 },
-                confirmButton = {
+                onDismissRequest = { editGroupId = null },
+                confirmText = "Сохранить",
+                onConfirm = {
                     val canSave = editGroupTitle.trim().isNotEmpty()
-                    TextButton(
-                        onClick = {
-                            if (canSave) {
-                                onRenameGroup(editGroupId!!, editGroupTitle.trim())
-                                editGroupId = null
-                            }
-                        },
-                        enabled = canSave
-                    ) { Text("Сохранить") }
+                    if (canSave) {
+                        onRenameGroup(editGroupId!!, editGroupTitle.trim())
+                        editGroupId = null
+                    }
                 },
-                dismissButton = {
-                    TextButton(onClick = { editGroupId = null }) { Text("Отмена") }
-                }
+                confirmEnabled = editGroupTitle.trim().isNotEmpty()
             )
         }
 
         // Редактирование клиента
         if (editClientId != null) {
-            AlertDialog(
-                onDismissRequest = { editClientId = null },
-                title = { Text("Редактировать клиента") },
+            CommonAddDialog(
+                title = "Редактировать клиента",
                 text = {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -660,22 +676,17 @@ fun ClientsScreen(
                         }
                     }
                 },
-                confirmButton = {
+                onDismissRequest = { editClientId = null },
+                confirmText = "Сохранить",
+                onConfirm = {
                     val canSave = editClientName.trim().isNotEmpty()
-                    TextButton(
-                        onClick = {
-                            if (canSave) {
-                                onRenameClientName(editClientId!!, editClientName.trim())
-                                onAssignClientGroup(editClientId!!, editClientGroupId)
-                                editClientId = null
-                            }
-                        },
-                        enabled = canSave
-                    ) { Text("Сохранить") }
+                    if (canSave) {
+                        onRenameClientName(editClientId!!, editClientName.trim())
+                        onAssignClientGroup(editClientId!!, editClientGroupId)
+                        editClientId = null
+                    }
                 },
-                dismissButton = {
-                    TextButton(onClick = { editClientId = null }) { Text("Отмена") }
-                }
+                confirmEnabled = editClientName.trim().isNotEmpty()
             )
         }
 
@@ -826,7 +837,7 @@ private fun GroupHeader(
                     }
                     IconButton(onClick = onDelete) {
                         Icon(
-                            Icons.Filled.Delete,
+                            imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                             contentDescription = "Удалить группу",
                             tint = MaterialTheme.colorScheme.error
                         )
@@ -1013,7 +1024,7 @@ private fun ClientRowWithEdit(
                     }
                     IconButton(onClick = onDelete) {
                         Icon(
-                            Icons.Filled.Delete,
+                            imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                             contentDescription = "Удалить клиента",
                             tint = MaterialTheme.colorScheme.error
                         )

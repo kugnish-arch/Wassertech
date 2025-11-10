@@ -97,7 +97,7 @@ fun MaintenanceHistoryScreen(
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        Icons.Filled.Delete,
+                        imageVector = com.example.wassertech.ui.theme.DeleteIcon,
                         contentDescription = "Удалить выбранные",
                         modifier = Modifier.size(28.dp)
                     )

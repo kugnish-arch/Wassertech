@@ -1,6 +1,11 @@
 package com.example.wassertech.ui.clients
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -35,6 +40,7 @@ import com.example.wassertech.data.entities.InstallationEntity
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
 import com.example.wassertech.ui.common.FABOption
+import com.example.wassertech.ui.common.CommonAddDialog
 import androidx.compose.material.icons.filled.Add
 
 private data class SiteDeleteDialogState(
@@ -425,11 +431,18 @@ fun ClientDetailScreen(
                                         }
                                     }
                                 )
-                                if (isExpanded) {
+                                // Анимированное содержимое установок
+                                AnimatedVisibility(
+                                    visible = isExpanded,
+                                    enter = expandVertically(animationSpec = tween(300)),
+                                    exit = shrinkVertically(animationSpec = tween(300))
+                                ) {
                                     val installationsFlow = vm.installations(s.id, includeArchived = false)
                                     val installations by installationsFlow.collectAsState(initial = emptyList())
                                     Column(
-                                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                                            .animateContentSize(),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         if (installations.isEmpty()) {
@@ -518,34 +531,31 @@ fun ClientDetailScreen(
 
     // ---- Dialogs ----
     if (showAddSite) {
-        AlertDialog(
-            onDismissRequest = { showAddSite = false },
-            title = { Text("Добавить объект") },
+        CommonAddDialog(
+            title = "Добавить объект",
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = addSiteName, onValueChange = { addSiteName = it }, label = { Text("Название объекта") })
                     OutlinedTextField(value = addSiteAddr, onValueChange = { addSiteAddr = it }, label = { Text("Адрес (опц.)") })
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val n = addSiteName.text.trim()
-                    if (n.isNotEmpty()) {
-                        vm.addSite(clientId, n, addSiteAddr.text.trim().ifEmpty { null })
-                        addSiteName = TextFieldValue("")
-                        addSiteAddr = TextFieldValue("")
-                        showAddSite = false
-                    }
-                }) { Text("Добавить") }
+            onDismissRequest = { showAddSite = false },
+            onConfirm = {
+                val n = addSiteName.text.trim()
+                if (n.isNotEmpty()) {
+                    vm.addSite(clientId, n, addSiteAddr.text.trim().ifEmpty { null })
+                    addSiteName = TextFieldValue("")
+                    addSiteAddr = TextFieldValue("")
+                    showAddSite = false
+                }
             },
-            dismissButton = { TextButton(onClick = { showAddSite = false }) { Text("Отмена") } }
+            confirmEnabled = addSiteName.text.trim().isNotEmpty()
         )
     }
 
     if (showAddInstallation) {
-        AlertDialog(
-            onDismissRequest = { showAddInstallation = false },
-            title = { Text("Добавить установку") },
+        CommonAddDialog(
+            title = "Добавить установку",
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = addInstallationName, onValueChange = { addInstallationName = it }, label = { Text("Название установки") })
@@ -579,21 +589,18 @@ fun ClientDetailScreen(
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val n = addInstallationName.text.trim()
-                    if (n.isNotEmpty()) {
-                        val selectedSiteId = sites.getOrNull(selectedSiteIndex)?.id
-                        if (selectedSiteId != null) vm.addInstallationToSite(selectedSiteId, n)
-                        else vm.addInstallationToMain(clientId, n)
-                        addInstallationName = TextFieldValue("")
-                        showAddInstallation = false
-                    }
-                }) { Text("Добавить") }
+            onDismissRequest = { showAddInstallation = false },
+            onConfirm = {
+                val n = addInstallationName.text.trim()
+                if (n.isNotEmpty()) {
+                    val selectedSiteId = sites.getOrNull(selectedSiteIndex)?.id
+                    if (selectedSiteId != null) vm.addInstallationToSite(selectedSiteId, n)
+                    else vm.addInstallationToMain(clientId, n)
+                    addInstallationName = TextFieldValue("")
+                    showAddInstallation = false
+                }
             },
-            dismissButton = { TextButton(onClick = { showAddInstallation = false }) { Text("Отмена") } }
-
-
+            confirmEnabled = addInstallationName.text.trim().isNotEmpty()
         )
     }
 
@@ -772,7 +779,7 @@ private fun SiteRowWithDrag(
                     Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить объект", tint = MaterialTheme.colorScheme.onSurface)
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Удалить объект", tint = MaterialTheme.colorScheme.error)
+                    Icon(imageVector = com.example.wassertech.ui.theme.DeleteIcon, contentDescription = "Удалить объект", tint = MaterialTheme.colorScheme.error)
                 }
             }
         } else {
@@ -876,7 +883,7 @@ private fun InstallationRowWithDrag(
                         Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить установку", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Удалить установку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Icon(imageVector = com.example.wassertech.ui.theme.DeleteIcon, contentDescription = "Удалить установку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                     }
                 }
             } else {
