@@ -90,24 +90,65 @@ fun ComponentsScreen(
     // --- Локальные UI-состояния ---
     // Используем переданное состояние редактирования из топбара
     // локальный порядок (живой) — отрисовываем список по нему
-    var localOrder by remember(components, isEditing) { 
-        mutableStateOf(components.map { it.id }) 
-    }
+    var localOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     
-    // Синхронизируем локальный порядок при изменении состояния редактирования
-    LaunchedEffect(isEditing, components) {
-        if (!isEditing) {
-            localOrder = components.map { it.id }
-        } else {
-            // При входе в режим редактирования фиксируем текущий порядок
+    // Инициализируем localOrder при первой загрузке компонентов
+    LaunchedEffect(components) {
+        if (localOrder.isEmpty() && components.isNotEmpty()) {
             localOrder = components.map { it.id }
         }
     }
     
-    // Сохранение порядка при выходе из режима редактирования
-    LaunchedEffect(isEditing) {
-        if (!isEditing && localOrder.isNotEmpty()) {
-            vm.reorderComponents(installationId, localOrder)
+    // Отслеживаем переход из режима редактирования для сохранения
+    var previousIsEditing by remember { mutableStateOf(isEditing) }
+    
+    // Обрабатываем изменение isEditing и синхронизацию с компонентами
+    LaunchedEffect(isEditing, components.map { it.id }.toSet()) {
+        val componentIds = components.map { it.id }
+        val componentIdsSet = componentIds.toSet()
+        val currentIds = localOrder.toSet()
+        
+        when {
+            // Выходим из режима редактирования - сохраняем порядок
+            previousIsEditing && !isEditing -> {
+                val orderToSave = localOrder.toList()
+                if (orderToSave.isNotEmpty() && components.isNotEmpty()) {
+                    // Сохраняем порядок в БД
+                    vm.reorderComponents(installationId, orderToSave)
+                }
+                // Обновляем previousIsEditing после сохранения
+                previousIsEditing = isEditing
+            }
+            // Входим в режим редактирования - фиксируем текущий порядок из БД
+            !previousIsEditing && isEditing -> {
+                if (components.isNotEmpty()) {
+                    localOrder = componentIds
+                }
+                previousIsEditing = isEditing
+            }
+            // Не в режиме редактирования - синхронизируем только если набор ID изменился
+            // Важно: этот блок выполняется только если предыдущие блоки не сработали
+            !isEditing && components.isNotEmpty() && previousIsEditing == false -> {
+                when {
+                    // Набор ID изменился - обновляем localOrder (добавляем новые, удаляем старые)
+                    currentIds != componentIdsSet -> {
+                        val existingOrder = localOrder.filter { it in componentIdsSet }
+                        val newIds = componentIdsSet - currentIds
+                        localOrder = existingOrder + newIds.toList()
+                    }
+                    // localOrder пуст - инициализируем из БД
+                    localOrder.isEmpty() -> {
+                        localOrder = componentIds
+                    }
+                    // Набор ID не изменился - НЕ обновляем порядок, чтобы не перезаписать сохраненные изменения
+                }
+            }
+            // Обновляем previousIsEditing для следующего цикла
+            else -> {
+                if (previousIsEditing != isEditing) {
+                    previousIsEditing = isEditing
+                }
+            }
         }
     }
 

@@ -87,7 +87,8 @@ fun ClientsScreen(
     
     // Режим редактирования
     isEditing: Boolean = false,
-    @Suppress("UNUSED_PARAMETER") onToggleEdit: (() -> Unit)? = null
+    @Suppress("UNUSED_PARAMETER") onToggleEdit: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null
 ) {
     var createGroupDialog by remember { mutableStateOf(false) }
     var newGroupTitle by remember { mutableStateOf("") }
@@ -136,6 +137,11 @@ fun ClientsScreen(
         )
     }
 
+    // Сохраняем исходные значения для отмены
+    var savedOrderGeneral by remember { mutableStateOf<List<String>>(emptyList()) }
+    var savedOrderByGroup by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    var savedCrossGroupMoves by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
+
     // Перемещения МЕЖДУ группами копим локально (clientId -> targetGroupId)
     var crossGroupMoves by remember { mutableStateOf(mutableMapOf<String, String?>()) }
 
@@ -183,30 +189,61 @@ fun ClientsScreen(
     var editClientGroupId by remember { mutableStateOf<String?>(null) }
     var editClientGroupPicker by remember { mutableStateOf(false) }
 
+    // Флаг для различения сохранения и отмены
+    var shouldSave by remember { mutableStateOf(true) }
+    var previousIsEditing by remember { mutableStateOf(isEditMode) }
+    
+    // Создаем обертку для onCancel, которая устанавливает shouldSave = false перед вызовом
+    val wrappedCancel = remember(onCancel) {
+        onCancel?.let { originalCancel ->
+            {
+                shouldSave = false
+                originalCancel()
+            }
+        }
+    }
+    
     // Обработка изменений режима редактирования
     LaunchedEffect(isEditMode) {
         if (isEditMode) {
+            // При входе в режим редактирования сохраняем текущее состояние
             includeArchivedBeforeEdit = includeArchived
             if (!includeArchived) onToggleIncludeArchived()
+            savedOrderGeneral = localOrderGeneral.toList()
+            savedOrderByGroup = localOrderByGroup.mapValues { it.value.toList() }
+            savedCrossGroupMoves = crossGroupMoves.toMap()
             crossGroupMoves.clear()
-        } else {
-            // 1) Сначала применяем переносы между группами
-            if (crossGroupMoves.isNotEmpty()) {
-                crossGroupMoves.forEach { (clientId, targetGroupId) ->
-                    onAssignClientGroup(clientId, targetGroupId)
+            shouldSave = true // Сбрасываем флаг
+            previousIsEditing = true
+        } else if (previousIsEditing) {
+            // Выход из режима редактирования
+            if (shouldSave) {
+                // Сохранение: применяем изменения
+                // 1) Сначала применяем переносы между группами
+                if (crossGroupMoves.isNotEmpty()) {
+                    crossGroupMoves.forEach { (clientId, targetGroupId) ->
+                        onAssignClientGroup(clientId, targetGroupId)
+                    }
+                    crossGroupMoves.clear()
                 }
-                crossGroupMoves.clear()
-            }
-            // 2) Затем сохраняем порядок в каждой группе (включая «Общую»)
-            onReorderGroupClients(null, localOrderGeneral)
-            groups.forEach { g ->
-                onReorderGroupClients(g.id, localOrderByGroup[g.id] ?: emptyList())
+                // 2) Затем сохраняем порядок в каждой группе (включая «Общую»)
+                onReorderGroupClients(null, localOrderGeneral)
+                groups.forEach { g ->
+                    onReorderGroupClients(g.id, localOrderByGroup[g.id] ?: emptyList())
+                }
+            } else {
+                // Отмена: восстанавливаем исходное состояние
+                localOrderGeneral = savedOrderGeneral.toMutableList()
+                localOrderByGroup = savedOrderByGroup.mapValues { it.value.toMutableList() }.toMutableMap()
+                crossGroupMoves = savedCrossGroupMoves.toMutableMap()
             }
 
             if (includeArchivedBeforeEdit == false && includeArchived) {
                 onToggleIncludeArchived()
             }
             includeArchivedBeforeEdit = null
+            shouldSave = true // Сбрасываем флаг
+            previousIsEditing = false
         }
     }
 

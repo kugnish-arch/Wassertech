@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EditNote
+import com.example.wassertech.ui.theme.EditButtonStyle
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -79,12 +80,22 @@ private fun slideOutToRight() = slideOutHorizontally(
 private fun fadeInTransition() = fadeIn(animationSpec = tween(500))
 private fun fadeOutTransition() = fadeOut(animationSpec = tween(500))
 
+// Data class для состояния редактирования
+private data class EditingState(
+    val isEditing: Boolean,
+    val onToggle: () -> Unit,
+    val onSave: () -> Unit,
+    val onCancel: () -> Unit
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
     navController: NavHostController,
     isEditing: Boolean = false,
     onToggleEdit: (() -> Unit)? = null,
+    onSave: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null,
     onLogout: (() -> Unit)? = null,
     onOfflineIconClick: ((Offset) -> Unit)? = null
 ) {
@@ -239,21 +250,38 @@ fun AppTopBar(
                 }
                 
                 // Переключатель режима редактирования (если доступен)
-                if (onToggleEdit != null) {
-                    IconButton(onClick = onToggleEdit) {
-                        if (isEditing) {
-                            // Зеленый кружок с галочкой для подтверждения сохранения
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = "Сохранить",
-                                tint = androidx.compose.ui.graphics.Color(0xFF4CAF50) // Зеленый цвет
-                            )
-                        } else {
-                            // Иконка EditNote для редактирования
-                            Icon(
-                                imageVector = Icons.Filled.EditNote,
-                                contentDescription = "Редактировать"
-                            )
+                if (onToggleEdit != null || onSave != null || onCancel != null) {
+                    if (isEditing) {
+                        // В режиме редактирования показываем две кнопки: Отмена и Сохранить
+                        // Кнопка "Отмена" (красный кружок с крестом)
+                        if (onCancel != null) {
+                            IconButton(onClick = onCancel) {
+                                Icon(
+                                    imageVector = EditButtonStyle.CancelIcon,
+                                    contentDescription = "Отмена",
+                                    tint = EditButtonStyle.CancelIconColor
+                                )
+                            }
+                        }
+                        // Кнопка "Сохранить" (зеленый кружок с галочкой)
+                        if (onSave != null) {
+                            IconButton(onClick = onSave) {
+                                Icon(
+                                    imageVector = EditButtonStyle.SaveIcon,
+                                    contentDescription = "Сохранить",
+                                    tint = EditButtonStyle.SaveIconColor
+                                )
+                            }
+                        }
+                    } else {
+                        // Вне режима редактирования показываем кнопку "Редактировать"
+                        if (onToggleEdit != null) {
+                            IconButton(onClick = onToggleEdit) {
+                                Icon(
+                                    imageVector = EditButtonStyle.EditIcon,
+                                    contentDescription = "Редактировать"
+                                )
+                            }
                         }
                     }
                 }
@@ -405,9 +433,9 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
     var reportsEditing by remember { mutableStateOf(false) }
     var maintenanceHistoryEditing by remember { mutableStateOf(false) }
     
-    // Определяем текущее состояние редактирования и функцию переключения
+    // Определяем текущее состояние редактирования и функции управления
     // Добавляем зависимости на все состояния редактирования для реактивного обновления
-    val (currentEditing, toggleEditing) = remember(
+    val editingState = remember(
         currentRoute,
         clientsEditing,
         clientDetailEditing,
@@ -418,16 +446,61 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
         maintenanceHistoryEditing
     ) {
         when {
-            currentRoute == "clients" -> clientsEditing to { clientsEditing = !clientsEditing }
-            currentRoute?.startsWith("client/") == true -> clientDetailEditing to { clientDetailEditing = !clientDetailEditing }
-            currentRoute?.startsWith("site/") == true -> siteEditing to { siteEditing = !siteEditing }
-            currentRoute?.startsWith("installation/") == true -> installationEditing to { installationEditing = !installationEditing }
-            currentRoute?.startsWith("templates") == true -> templatesEditing to { templatesEditing = !templatesEditing }
-            currentRoute?.startsWith("reports") == true -> reportsEditing to { reportsEditing = !reportsEditing }
-            currentRoute?.startsWith("maintenance_history") == true -> maintenanceHistoryEditing to { maintenanceHistoryEditing = !maintenanceHistoryEditing }
-            else -> false to { }
+            currentRoute == "clients" -> EditingState(
+                isEditing = clientsEditing,
+                onToggle = { clientsEditing = !clientsEditing },
+                onSave = { clientsEditing = false },
+                onCancel = { clientsEditing = false }
+            )
+            currentRoute?.startsWith("client/") == true -> EditingState(
+                isEditing = clientDetailEditing,
+                onToggle = { clientDetailEditing = !clientDetailEditing },
+                onSave = { clientDetailEditing = false },
+                onCancel = { clientDetailEditing = false }
+            )
+            currentRoute?.startsWith("site/") == true -> EditingState(
+                isEditing = siteEditing,
+                onToggle = { siteEditing = !siteEditing },
+                onSave = { siteEditing = false },
+                onCancel = { siteEditing = false }
+            )
+            currentRoute?.startsWith("installation/") == true -> EditingState(
+                isEditing = installationEditing,
+                onToggle = { installationEditing = !installationEditing },
+                onSave = { installationEditing = false },
+                onCancel = { installationEditing = false }
+            )
+            currentRoute?.startsWith("templates") == true -> EditingState(
+                isEditing = templatesEditing,
+                onToggle = { templatesEditing = !templatesEditing },
+                onSave = { templatesEditing = false },
+                onCancel = { templatesEditing = false }
+            )
+            currentRoute?.startsWith("reports") == true -> EditingState(
+                isEditing = reportsEditing,
+                onToggle = { reportsEditing = !reportsEditing },
+                onSave = { reportsEditing = false },
+                onCancel = { reportsEditing = false }
+            )
+            currentRoute?.startsWith("maintenance_history") == true -> EditingState(
+                isEditing = maintenanceHistoryEditing,
+                onToggle = { maintenanceHistoryEditing = !maintenanceHistoryEditing },
+                onSave = { maintenanceHistoryEditing = false },
+                onCancel = { maintenanceHistoryEditing = false }
+            )
+            else -> EditingState(
+                isEditing = false,
+                onToggle = { },
+                onSave = { },
+                onCancel = { }
+            )
         }
     }
+    
+    val currentEditing = editingState.isEditing
+    val toggleEditing = editingState.onToggle
+    val saveEditing = editingState.onSave
+    val cancelEditing = editingState.onCancel
     
     // Состояние для тултипа оффлайн режима
     var showOfflineTooltip by remember { mutableStateOf(false) }
@@ -439,6 +512,8 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                 navController = navController,
                 isEditing = currentEditing,
                 onToggleEdit = if (showEditToggle) toggleEditing else null,
+                onSave = if (showEditToggle && currentEditing) saveEditing else null,
+                onCancel = if (showEditToggle && currentEditing) cancelEditing else null,
                 onLogout = onLogout,
                 onOfflineIconClick = { position ->
                     offlineIconPosition = position
@@ -484,6 +559,7 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                 ClientsRoute(
                     isEditing = clientsEditing,
                     onToggleEdit = { clientsEditing = !clientsEditing },
+                    onCancel = { clientsEditing = false },
                     onClientClick = { clientId ->
                         navController.navigate("client/$clientId") {
                             launchSingleTop = true

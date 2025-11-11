@@ -23,6 +23,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.view.WindowCompat
 import android.app.Activity
@@ -304,6 +307,22 @@ val DeleteIcon = Icons.Filled.Delete // Иконка корзины для уд�
 // Scrim (подложка) для FAB группы - легкая тень/фон для визуального отделения выпрыгивающих кнопок от списка
 val FABScrimColor = Color.Black.copy(alpha = 0.08f) // Полупрозрачная черная подложка для FAB группы
 val FABScrimElevation = 8.dp // Тень для scrim FAB группы
+
+/* ================== СТИЛЬ КНОПОК РЕДАКТИРОВАНИЯ В АПБАРЕ ================== */
+// Стиль для кнопок редактирования в верхней панели приложения
+// Используется на всех экранах, где доступно редактирование
+object EditButtonStyle {
+    // Иконка для входа в режим редактирования
+    val EditIcon: ImageVector = Icons.Filled.EditNote
+    
+    // Иконка для сохранения изменений (зеленый кружок с галочкой)
+    val SaveIcon: ImageVector = Icons.Filled.CheckCircle
+    val SaveIconColor = Color(0xFF4CAF50) // Зеленый цвет для иконки сохранения
+    
+    // Иконка для отмены изменений (красный кружок с крестом)
+    val CancelIcon: ImageVector = Icons.Filled.Close
+    val CancelIconColor = Color(0xFFE53935) // Красный цвет для иконки отмены (совпадает с BrandRed)
+}
 
 /* ================== ЦВЕТА ДЛЯ ЭКРАНА КЛИЕНТЫ ================== */
 // Цвета для групп клиентов на экране ClientsScreen
