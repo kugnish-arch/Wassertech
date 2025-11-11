@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,6 +30,15 @@ import androidx.navigation.navArgument
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.clickable
+import com.example.wassertech.R
+import com.example.wassertech.auth.UserAuthService
 import com.example.wassertech.ui.clients.ClientDetailScreen
 import com.example.wassertech.ui.clients.ClientsRoute
 import com.example.wassertech.ui.hierarchy.ComponentsScreen
@@ -46,44 +57,49 @@ import com.example.wassertech.ui.common.NavigationBottomBar
 // Вспомогательные функции для анимаций переходов
 private fun slideInFromRight() = slideInHorizontally(
     initialOffsetX = { fullWidth -> fullWidth },
-    animationSpec = tween(300)
-) + fadeIn(animationSpec = tween(300))
+    animationSpec = tween(500)
+) + fadeIn(animationSpec = tween(500))
 
 private fun slideOutToLeft() = slideOutHorizontally(
     targetOffsetX = { fullWidth -> -fullWidth },
-    animationSpec = tween(300)
-) + fadeOut(animationSpec = tween(300))
+    animationSpec = tween(500)
+) + fadeOut(animationSpec = tween(500))
 
 private fun slideInFromLeft() = slideInHorizontally(
     initialOffsetX = { fullWidth -> -fullWidth },
-    animationSpec = tween(300)
-) + fadeIn(animationSpec = tween(300))
+    animationSpec = tween(500)
+) + fadeIn(animationSpec = tween(500))
 
 private fun slideOutToRight() = slideOutHorizontally(
     targetOffsetX = { fullWidth -> fullWidth },
-    animationSpec = tween(300)
-) + fadeOut(animationSpec = tween(300))
+    animationSpec = tween(500)
+) + fadeOut(animationSpec = tween(500))
 
 // Легкий fade transition для некоторых экранов
-private fun fadeInTransition() = fadeIn(animationSpec = tween(300))
-private fun fadeOutTransition() = fadeOut(animationSpec = tween(300))
+private fun fadeInTransition() = fadeIn(animationSpec = tween(500))
+private fun fadeOutTransition() = fadeOut(animationSpec = tween(500))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
     navController: NavHostController,
     isEditing: Boolean = false,
-    onToggleEdit: (() -> Unit)? = null
+    onToggleEdit: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null,
+    onOfflineIconClick: ((Offset) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val backEntry by navController.currentBackStackEntryAsState()
     val route = backEntry?.destination?.route ?: "clients"
     val canNavigateBack = route != "clients" || navController.previousBackStackEntry != null
+    val isOfflineMode = UserAuthService.isOfflineMode(context)
 
     var menuOpen by remember { mutableStateOf(false) }
 
     // Получаем название страницы из route
     val pageTitle = remember(route) {
         when {
+            route == "login" -> "Вход"
             route.startsWith("clients") -> "Клиенты"
             route.startsWith("templates") -> "Шаблоны компонентов"
             route.startsWith("template_editor") -> "Редактор шаблона"
@@ -164,6 +180,24 @@ fun AppTopBar(
                                     textColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
+                            if (onLogout != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Выйти") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Filled.ExitToApp,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        menuOpen = false
+                                        onLogout()
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = MaterialTheme.colorScheme.onSurface
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -176,22 +210,51 @@ fun AppTopBar(
             )
         },
         actions = {
-            // Переключатель режима редактирования (если доступен)
-            if (onToggleEdit != null) {
-                IconButton(onClick = onToggleEdit) {
-                    if (isEditing) {
-                        // Зеленый кружок с галочкой для подтверждения сохранения
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Иконка оффлайн режима (если включен)
+                if (isOfflineMode) {
+                    var iconPosition by remember { mutableStateOf<Offset?>(null) }
+                    
+                    IconButton(
+                        onClick = {
+                            iconPosition?.let { position ->
+                                onOfflineIconClick?.invoke(position)
+                            }
+                        },
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            val position = coordinates.localToWindow(Offset.Zero)
+                            iconPosition = position
+                        }
+                    ) {
                         Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = "Сохранить",
-                            tint = androidx.compose.ui.graphics.Color(0xFF4CAF50) // Зеленый цвет
+                            painter = painterResource(id = R.drawable.cloud_offline_outline),
+                            contentDescription = "Оффлайн режим",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(24.dp)
                         )
-                    } else {
-                        // Иконка EditNote для редактирования
-                        Icon(
-                            imageVector = Icons.Filled.EditNote,
-                            contentDescription = "Редактировать"
-                        )
+                    }
+                }
+                
+                // Переключатель режима редактирования (если доступен)
+                if (onToggleEdit != null) {
+                    IconButton(onClick = onToggleEdit) {
+                        if (isEditing) {
+                            // Зеленый кружок с галочкой для подтверждения сохранения
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Сохранить",
+                                tint = androidx.compose.ui.graphics.Color(0xFF4CAF50) // Зеленый цвет
+                            )
+                        } else {
+                            // Иконка EditNote для редактирования
+                            Icon(
+                                imageVector = Icons.Filled.EditNote,
+                                contentDescription = "Редактировать"
+                            )
+                        }
                     }
                 }
             }
@@ -199,20 +262,126 @@ fun AppTopBar(
     )
 }
 
+/**
+ * Компонент тултипа оффлайн режима с жёлтым фоном, иконкой и крестиком для закрытия
+ * Позиционируется относительно anchorPosition (координаты иконки)
+ */
 @Composable
-fun AppNavHost(navController: NavHostController) {
-    AppScaffold(navController)
+private fun OfflineModeTooltip(
+    anchorPosition: Offset?,
+    onDismiss: () -> Unit
+) {
+    val density = LocalDensity.current
+    var containerPosition by remember { mutableStateOf<Offset?>(null) }
+    
+    // Используем Box с fillMaxSize для верхнего слоя
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable { onDismiss() }
+            .zIndex(1000f) // Верхний слой
+            .onGloballyPositioned { coordinates ->
+                // Получаем позицию контейнера в window координатах
+                containerPosition = coordinates.localToWindow(Offset.Zero)
+            },
+        contentAlignment = Alignment.TopStart
+    ) {
+        // Полупрозрачный фон
+        Surface(
+            color = Color.Black.copy(alpha = 0.3f),
+            modifier = Modifier.fillMaxSize()
+        ) {}
+
+        // Карточка с подсказкой - позиционируется относительно иконки
+        if (anchorPosition != null && containerPosition != null) {
+            // Вычисляем относительное смещение от контейнера до иконки
+            val relativeX = with(density) { 
+                (anchorPosition.x - containerPosition!!.x).toDp()
+            }
+            val relativeY = with(density) { 
+                (anchorPosition.y - containerPosition!!.y).toDp()
+            }
+            
+            Card(
+                modifier = Modifier
+                    .offset(
+                        x = relativeX + 24.dp - 265.dp, // Сдвигаем еще левее (дополнительно -40dp от предыдущего значения)
+                        y = relativeY + 72.dp // Опускаем на 40dp ниже (было 32dp, стало 72dp)
+                    )
+                    .widthIn(max = 300.dp)
+                    .clickable(enabled = false) {},
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFFEB3B).copy(alpha = 0.85f) // Жёлтый фон с прозрачностью 85%
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Заголовок с иконкой оффлайн режима и крестиком
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.cloud_offline_outline),
+                                contentDescription = null,
+                                tint = Color(0xFF1A1A1A), // Тёмный цвет для иконки
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "Оффлайн режим",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color(0xFF1A1A1A) // Тёмный текст на жёлтом фоне
+                            )
+                        }
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Закрыть",
+                                tint = Color(0xFF1A1A1A),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Текст подсказки
+                    Text(
+                        text = "Вы используете оффлайн режим приложения. Функционал работы с удалённым сервером будет недоступен до повторного входа в приложение.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF1A1A1A)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(navController: NavHostController, onLogout: (() -> Unit)? = null) {
+    AppScaffold(navController, onLogout)
+}
+
+@Composable
+fun AppNavHost(onLogout: (() -> Unit)? = null) {
     val navController = rememberNavController()
-    AppScaffold(navController)
+    AppScaffold(navController, onLogout)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppScaffold(navController: NavHostController) {
+private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)? = null) {
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
     
@@ -260,12 +429,21 @@ private fun AppScaffold(navController: NavHostController) {
         }
     }
     
+    // Состояние для тултипа оффлайн режима
+    var showOfflineTooltip by remember { mutableStateOf(false) }
+    var offlineIconPosition by remember { mutableStateOf<Offset?>(null) }
+    
     Scaffold(
         topBar = { 
             AppTopBar(
                 navController = navController,
                 isEditing = currentEditing,
-                onToggleEdit = if (showEditToggle) toggleEditing else null
+                onToggleEdit = if (showEditToggle) toggleEditing else null,
+                onLogout = onLogout,
+                onOfflineIconClick = { position ->
+                    offlineIconPosition = position
+                    showOfflineTooltip = true
+                }
             )
         },
         bottomBar = {
@@ -290,11 +468,12 @@ private fun AppScaffold(navController: NavHostController) {
             )
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = "clients",
-            modifier = Modifier.padding(innerPadding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = "clients", // По умолчанию все пользователи начинают с "clients" (см. UserPermissions.startScreen)
+                modifier = Modifier.padding(innerPadding)
+            ) {
             composable(
                 route = "clients",
                 enterTransition = { fadeInTransition() },
@@ -554,6 +733,15 @@ private fun AppScaffold(navController: NavHostController) {
                 popExitTransition = { fadeOutTransition() }
             ) {
                 AboutScreen()
+            }
+            }
+            
+            // Тултип оффлайн режима (отображается поверх всего контента)
+            if (showOfflineTooltip && offlineIconPosition != null) {
+                OfflineModeTooltip(
+                    anchorPosition = offlineIconPosition,
+                    onDismiss = { showOfflineTooltip = false }
+                )
             }
         }
     }

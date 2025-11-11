@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -42,6 +41,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import com.example.wassertech.ui.common.AppFloatingActionButton
 import com.example.wassertech.ui.common.FABTemplate
+import com.example.wassertech.ui.theme.SegmentedButtonStyle
 
 
 @Composable
@@ -256,7 +256,7 @@ fun ComponentsScreen(
                         }
                     },
                     enabled = installation != null && firstComp != null,
-                    shape = RoundedCornerShape(8.dp), // Скругление углов
+                    shape = SegmentedButtonStyle.getShape(index = 0, count = 2),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Провести ТО")
@@ -267,7 +267,7 @@ fun ComponentsScreen(
                         selectedButton = 1
                         onOpenMaintenanceHistoryForInstallation(installationId)
                     },
-                    shape = RoundedCornerShape(8.dp), // Скругление углов
+                    shape = SegmentedButtonStyle.getShape(index = 1, count = 2),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("История ТО")

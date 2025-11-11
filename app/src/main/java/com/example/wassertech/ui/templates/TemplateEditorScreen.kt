@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -32,12 +33,12 @@ import com.example.wassertech.data.types.FieldType
 import com.example.wassertech.util.Translit
 import com.example.wassertech.viewmodel.TemplatesViewModel
 import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.wassertech.ui.theme.SegmentedButtonStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,61 +85,44 @@ fun TemplateEditorScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        // Шапка с названием шаблона и кнопками
-        Surface(tonalElevation = 1.dp, color = MaterialTheme.colorScheme.secondaryContainer) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(templateTitle, style = MaterialTheme.typography.titleMedium)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = { vm.addField() }) { Text("+ Поле") }
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                vm.saveAll(localFieldOrder)
-                                // Сохраняем componentType шаблона
-                                withContext(Dispatchers.IO) {
-                                    try {
-                                        val template = db.templatesDao().getTemplateById(templateId)
-                                        if (template != null) {
-                                            val updatedTemplate = template.copy(
-                                                componentType = if (isHeadTemplate) ComponentType.HEAD else ComponentType.COMMON
-                                            )
-                                            db.templatesDao().upsertTemplate(updatedTemplate)
-                                        }
-                                    } catch (_: Throwable) {
-                                    }
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    scope.launch {
+                        vm.saveAll(localFieldOrder)
+                        // Сохраняем componentType шаблона
+                        withContext(Dispatchers.IO) {
+                            try {
+                                val template = db.templatesDao().getTemplateById(templateId)
+                                if (template != null) {
+                                    val updatedTemplate = template.copy(
+                                        componentType = if (isHeadTemplate) ComponentType.HEAD else ComponentType.COMMON
+                                    )
+                                    db.templatesDao().upsertTemplate(updatedTemplate)
                                 }
-                                Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
-                                onSaved()
+                            } catch (_: Throwable) {
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF26A69A),
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.Save,
-                            contentDescription = "Сохранить",
-                            tint = com.example.wassertech.ui.theme.SaveIconColor
-                        )
+                        }
+                        Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
+                        onSaved()
                     }
-                }
+                },
+                containerColor = Color(0xFF4CAF50), // Чисто зеленый цвет
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Filled.Save,
+                    contentDescription = "Сохранить",
+                    tint = Color.White
+                )
             }
         }
-
+    ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             contentPadding = PaddingValues(
                 start = 12.dp,
                 end = 12.dp,
@@ -380,10 +364,7 @@ fun TemplateEditorScreen(
                                             FieldType.TEXT
                                         )
                                         },
-                                        shape = SegmentedButtonDefaults.itemShape(
-                                            index = 0,
-                                            count = 3
-                                        ),
+                                        shape = SegmentedButtonStyle.getShape(index = 0, count = 3),
                                         label = {
                                             Text(
                                                 "TXT",
@@ -401,10 +382,7 @@ fun TemplateEditorScreen(
                                             FieldType.CHECKBOX
                                         )
                                         },
-                                        shape = SegmentedButtonDefaults.itemShape(
-                                            index = 1,
-                                            count = 3
-                                        ),
+                                        shape = SegmentedButtonStyle.getShape(index = 1, count = 3),
                                         label = {
                                             Text(
                                                 "CHK",
@@ -422,10 +400,7 @@ fun TemplateEditorScreen(
                                             FieldType.NUMBER
                                         )
                                         },
-                                        shape = SegmentedButtonDefaults.itemShape(
-                                            index = 2,
-                                            count = 3
-                                        ),
+                                        shape = SegmentedButtonStyle.getShape(index = 2, count = 3),
                                         label = {
                                             Text(
                                                 "NUM",
@@ -482,9 +457,29 @@ fun TemplateEditorScreen(
                     }
                 }
             }
+            
+            // Кнопка "Добавить поле" внизу списка
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Button(
+                        onClick = { vm.addField() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFE53935), // Красный цвет
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Добавить поле")
+                    }
+                }
+            }
         }
     }
-
 }
 
 /**

@@ -1,8 +1,8 @@
 package com.example.wassertech.ui.common
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -11,19 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.wassertech.ui.theme.DialogStyle
 import com.example.wassertech.ui.theme.SaveIconColor
-
-/**
- * Стили для диалогов добавления/редактирования элементов
- * Используются во всех диалогах добавления (Клиент, Группа, Объект, Установка, Компонент и т.д.)
- */
-object DialogStyles {
-    val shape = RoundedCornerShape(12.dp) // Радиус скругления 12dp (было 16dp) - более инженерный стиль
-    val elevation = 6.dp // Elevation 6 - легкая тень для визуального отделения от фона
-}
 
 /**
  * Общий компонент для диалогов добавления/редактирования элементов
@@ -57,15 +50,15 @@ fun CommonAddDialog(
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = DialogStyles.shape,
+            shape = DialogStyle.shape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = DialogStyles.elevation)
+            elevation = CardDefaults.cardElevation(defaultElevation = DialogStyle.elevation)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(DialogStyle.padding),
+                verticalArrangement = Arrangement.spacedBy(DialogStyle.contentSpacing)
             ) {
                 // Заголовок
                 Text(
@@ -131,6 +124,92 @@ fun CommonAddDialog(
                                 )
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Диалог с иконкой и текстом
+ * 
+ * @param title Заголовок диалога
+ * @param message Текст сообщения
+ * @param iconResId ID ресурса иконки (drawable)
+ * @param onDismissRequest Обработчик закрытия диалога
+ * @param confirmText Текст кнопки подтверждения
+ * @param onConfirm Обработчик подтверждения
+ * @param showDismissButton Показывать ли кнопку отмены (по умолчанию false)
+ */
+@Composable
+fun IconDialog(
+    title: String,
+    message: String,
+    iconResId: Int,
+    onDismissRequest: () -> Unit,
+    confirmText: String = "ОК",
+    onConfirm: () -> Unit,
+    showDismissButton: Boolean = false
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = DialogStyle.shape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = DialogStyle.elevation)
+        ) {
+            Column(
+                modifier = Modifier.padding(DialogStyle.padding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(DialogStyle.contentSpacing)
+            ) {
+                // Иконка
+                Image(
+                    painter = painterResource(id = iconResId),
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp)
+                )
+                
+                // Заголовок
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                
+                // Сообщение
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // Кнопки
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (showDismissButton) Arrangement.SpaceBetween else Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (showDismissButton) {
+                        TextButton(onClick = onDismissRequest) {
+                            Text("Отмена")
+                        }
+                    }
+                    
+                    Button(
+                        onClick = onConfirm
+                    ) {
+                        Text(confirmText)
                     }
                 }
             }

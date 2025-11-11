@@ -6,7 +6,10 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -14,12 +17,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.core.view.WindowCompat
+import android.app.Activity
+import android.os.Build
 
 /* ================== БАЗОВЫЕ ЦВЕТА ================== */
 // Графитово-серо-белая палитра с красным акцентом
@@ -306,13 +313,111 @@ val ClientsGroupExpandedText = Color(0xFFFFFFFF) // Белый текст для
 val ClientsGroupBorder = Color(0xFFDADADA) // Тонкий бордер снизу для групп
 val ClientsRowDivider = Color(0xFFDADADA) // Разделительная линия между клиентами в списке
 
+/* ================== СТИЛЬ СЕГМЕНТИРОВАННЫХ КНОПОК ================== */
+// Стиль для сегментированных кнопок (SegmentedButton) - скругленные углы
+object SegmentedButtonStyle {
+    // Размер скругления углов для сегментированных кнопок
+    val cornerRadius = 8.dp
+    
+    /**
+     * Возвращает форму для сегментированной кнопки в зависимости от её позиции
+     * @param index Индекс кнопки (0 - первая, последняя - count - 1)
+     * @param count Общее количество кнопок в ряду
+     * @return RoundedCornerShape с соответствующими скруглениями
+     */
+    fun getShape(index: Int, count: Int): RoundedCornerShape {
+        return when {
+            count == 1 -> RoundedCornerShape(cornerRadius) // Одна кнопка - все углы скруглены
+            index == 0 -> RoundedCornerShape( // Первая кнопка - скругление слева
+                topStart = cornerRadius,
+                bottomStart = cornerRadius,
+                topEnd = 0.dp,
+                bottomEnd = 0.dp
+            )
+            index == count - 1 -> RoundedCornerShape( // Последняя кнопка - скругление справа
+                topStart = 0.dp,
+                bottomStart = 0.dp,
+                topEnd = cornerRadius,
+                bottomEnd = cornerRadius
+            )
+            else -> RoundedCornerShape(0.dp) // Средние кнопки - без скругления
+        }
+    }
+}
+
+/* ================== СТИЛЬ ДИАЛОГОВ ================== */
+// Стили для диалогов добавления/редактирования элементов
+// Используются во всех диалогах добавления (Клиент, Группа, Объект, Установка, Компонент и т.д.)
+object DialogStyle {
+    val shape = RoundedCornerShape(12.dp) // Радиус скругления 12dp - более инженерный стиль
+    val elevation = 6.dp // Elevation 6 - легкая тень для визуального отделения от фона
+    val padding = androidx.compose.foundation.layout.PaddingValues(24.dp) // Отступы внутри диалога
+    val contentSpacing = 16.dp // Расстояние между элементами содержимого
+}
+
+/* ================== НАСТРОЙКИ СИСТЕМНЫХ БАРОВ ================== */
+// Конфигурация для системных кнопок навигации Android
+// Всегда темные иконки системных кнопок (видно на любом фоне)
+object SystemBarsStyle {
+    /**
+     * Определяет, должны ли системные кнопки навигации быть темными (light navigation bars)
+     * @param isDarkTheme true для темной темы, false для светлой (параметр игнорируется, всегда темные)
+     * @return false = темные иконки (всегда)
+     */
+    fun isLightNavigationBars(isDarkTheme: Boolean): Boolean {
+        return false // Всегда темные иконки системных кнопок
+    }
+    
+    /**
+     * Определяет, должен ли статус-бар быть светлым (light status bar)
+     * @param isDarkTheme true для темной темы, false для светлой
+     * @return false = темные иконки статус-бара (для светлой темы), true = светлые иконки (для темной темы)
+     */
+    fun isLightStatusBar(isDarkTheme: Boolean): Boolean {
+        return isDarkTheme // Для темной темы - светлые иконки, для светлой - темные
+    }
+}
+
 @Composable
 fun WassertechTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
+    val colorScheme = if (darkTheme) DarkColors else LightColors
+    
+    // Настройка системных баров (статус-бар и навигационные кнопки)
+    // Всегда темные иконки на белом фоне для видимости
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val windowInsetsController = WindowCompat.getInsetsController(window, view)
+                
+                // Всегда темные иконки для системных кнопок навигации (false = темные иконки)
+                windowInsetsController.isAppearanceLightNavigationBars = false
+                
+                // Всегда темные иконки для статус-бара (false = темные иконки)
+                windowInsetsController.isAppearanceLightStatusBars = false
+                
+                // Установка белого цвета для системных баров (чтобы темные иконки были видны)
+                val whiteColor = Color(0xFFFFFFFF).toArgb()
+                
+                // Установка белого цвета статус-бара
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    window.statusBarColor = whiteColor
+                }
+                
+                // Установка белого цвета навигационной панели
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    window.navigationBarColor = whiteColor
+                }
+            }
+        }
+    }
+    
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = AppTypography,
         content = content
     )

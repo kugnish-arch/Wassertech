@@ -423,15 +423,79 @@ object MySqlSyncService {
             Log.d(TAG, "Начало миграции удалённой БД")
             Class.forName("com.mysql.jdbc.Driver")
             connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)
-            connection.autoCommit = true // Миграции выполняются по одной
+            connection.autoCommit = false
             
+            // Создаём таблицы, если их нет (включая новые поля в users)
             createTablesIfNotExist(connection)
             
+            // Миграция таблицы users: добавляем новые поля, если их нет
+            try {
+                // Проверяем наличие колонки role
+                val checkRoleSql = "SHOW COLUMNS FROM users LIKE 'role'"
+                val checkRoleRs = connection.createStatement().executeQuery(checkRoleSql)
+                if (!checkRoleRs.next()) {
+                    // Колонки нет, добавляем
+                    val alterRoleSql = "ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'USER'"
+                    connection.createStatement().executeUpdate(alterRoleSql)
+                    Log.d(TAG, "Добавлена колонка 'role' в таблицу users")
+                }
+                checkRoleRs.close()
+                
+                // Проверяем наличие колонки permissions
+                val checkPermissionsSql = "SHOW COLUMNS FROM users LIKE 'permissions'"
+                val checkPermissionsRs = connection.createStatement().executeQuery(checkPermissionsSql)
+                if (!checkPermissionsRs.next()) {
+                    // Колонки нет, добавляем
+                    val alterPermissionsSql = "ALTER TABLE users ADD COLUMN permissions TEXT"
+                    connection.createStatement().executeUpdate(alterPermissionsSql)
+                    Log.d(TAG, "Добавлена колонка 'permissions' в таблицу users")
+                }
+                checkPermissionsRs.close()
+                
+                // Проверяем наличие колонки lastLoginAtEpoch
+                val checkLastLoginSql = "SHOW COLUMNS FROM users LIKE 'lastLoginAtEpoch'"
+                val checkLastLoginRs = connection.createStatement().executeQuery(checkLastLoginSql)
+                if (!checkLastLoginRs.next()) {
+                    // Колонки нет, добавляем
+                    val alterLastLoginSql = "ALTER TABLE users ADD COLUMN lastLoginAtEpoch BIGINT"
+                    connection.createStatement().executeUpdate(alterLastLoginSql)
+                    Log.d(TAG, "Добавлена колонка 'lastLoginAtEpoch' в таблицу users")
+                }
+                checkLastLoginRs.close()
+                
+                // Обновляем существующих пользователей: устанавливаем значения по умолчанию для новых полей
+                val defaultPermissions = com.example.wassertech.auth.UserPermissions()
+                val permissionsJson = com.example.wassertech.auth.UserPermissions.toJson(defaultPermissions)
+                val updateUsersSql = """
+                    UPDATE users 
+                    SET role = COALESCE(role, 'USER'),
+                        permissions = COALESCE(NULLIF(permissions, ''), ?)
+                    WHERE role IS NULL OR permissions IS NULL OR permissions = ''
+                """.trimIndent()
+                val updatePs = connection.prepareStatement(updateUsersSql)
+                updatePs.setString(1, permissionsJson)
+                val updatedRows = updatePs.executeUpdate()
+                updatePs.close()
+                if (updatedRows > 0) {
+                    Log.d(TAG, "Обновлено пользователей: $updatedRows")
+                }
+                
+            } catch (e: SQLException) {
+                Log.e(TAG, "Ошибка при миграции таблицы users", e)
+                // Продолжаем выполнение, так как поля могут уже существовать или таблица может не существовать
+            }
+            
+            connection.commit()
             Log.d(TAG, "Удалённая БД успешно мигрирована.")
             return "Удалённая БД успешно мигрирована."
         } catch (e: Exception) {
+            try {
+                connection?.rollback()
+            } catch (rollbackEx: Exception) {
+                Log.e(TAG, "Ошибка при откате транзакции", rollbackEx)
+            }
             Log.e(TAG, "Ошибка при миграции удалённой БД", e)
-            throw RuntimeException("Ошибка миграции удалённой БД: ${e.message}", e)
+            return "Ошибка при миграции: ${e.message}"
         } finally {
             try {
                 connection?.close()
@@ -575,6 +639,22 @@ object MySqlSyncService {
                 `minValue` DOUBLE,
                 `maxValue` DOUBLE,
                 INDEX idx_templateId (templateId)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id VARCHAR(255) PRIMARY KEY,
+                login VARCHAR(255) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                name VARCHAR(255),
+                email VARCHAR(255),
+                phone VARCHAR(50),
+                role VARCHAR(50) DEFAULT 'USER',
+                permissions TEXT,
+                lastLoginAtEpoch BIGINT,
+                createdAtEpoch BIGINT NOT NULL,
+                updatedAtEpoch BIGINT NOT NULL,
+                INDEX idx_login (login)
             )
             """
         )
@@ -1229,6 +1309,199 @@ object MySqlSyncService {
         }
         rs.close()
         return fields
+    }
+    
+    /**
+     * Регистрирует нового пользователя в удаленной БД
+     * @return Pair<Boolean, String> - (успех, сообщение)
+     */
+    suspend fun registerUser(login: String, password: String, name: String? = null, email: String? = null, phone: String? = null): Pair<Boolean, String> {
+        var connection: Connection? = null
+        try {
+            Log.d(TAG, "Начало регистрации пользователя: $login")
+            
+            // Загружаем драйвер MySQL
+            try {
+                Class.forName("com.mysql.jdbc.Driver")
+            } catch (e: ClassNotFoundException) {
+                Log.e(TAG, "Ошибка загрузки MySQL драйвера", e)
+                return false to "Ошибка загрузки драйвера БД: ${e.message}"
+            }
+            
+            // Подключаемся к БД
+            try {
+                connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)
+                connection.autoCommit = false
+            } catch (e: SQLException) {
+                Log.e(TAG, "Ошибка подключения к MySQL БД", e)
+                return false to "Ошибка подключения к БД: ${e.message}"
+            }
+            
+            // Создаём таблицу пользователей, если её нет
+            createTablesIfNotExist(connection)
+            
+            // Проверяем, существует ли пользователь с таким логином (регистронезависимый поиск)
+            val checkSql = "SELECT COUNT(*) FROM users WHERE LOWER(login) = LOWER(?)"
+            val checkPs = connection.prepareStatement(checkSql)
+            checkPs.setString(1, login)
+            val rs = checkPs.executeQuery()
+            rs.next()
+            val count = rs.getInt(1)
+            rs.close()
+            checkPs.close()
+            
+            if (count > 0) {
+                connection.rollback()
+                return false to "Пользователь с логином \"$login\" уже существует"
+            }
+            
+            // Создаём нового пользователя (по умолчанию роль USER и права по умолчанию)
+            val userId = java.util.UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            val defaultPermissions = com.example.wassertech.auth.UserPermissions()
+            val permissionsJson = com.example.wassertech.auth.UserPermissions.toJson(defaultPermissions)
+            
+            val insertSql = """
+                INSERT INTO users (id, login, password, name, email, phone, role, permissions, createdAtEpoch, updatedAtEpoch)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent()
+            
+            val insertPs = connection.prepareStatement(insertSql)
+            insertPs.setString(1, userId)
+            insertPs.setString(2, login)
+            insertPs.setString(3, password)
+            insertPs.setString(4, name)
+            insertPs.setString(5, email)
+            insertPs.setString(6, phone)
+            insertPs.setString(7, com.example.wassertech.auth.UserRole.USER.name)
+            insertPs.setString(8, permissionsJson)
+            insertPs.setLong(9, now)
+            insertPs.setLong(10, now)
+            
+            insertPs.executeUpdate()
+            insertPs.close()
+            
+            connection.commit()
+            Log.d(TAG, "Пользователь успешно зарегистрирован: $login")
+            return true to "Пользователь успешно зарегистрирован"
+            
+        } catch (e: Exception) {
+            try {
+                connection?.rollback()
+            } catch (rollbackEx: Exception) {
+                Log.e(TAG, "Ошибка при откате транзакции", rollbackEx)
+            }
+            Log.e(TAG, "Ошибка при регистрации пользователя", e)
+            return false to "Ошибка при регистрации: ${e.message}"
+        } finally {
+            try {
+                connection?.close()
+            } catch (closeEx: Exception) {
+                Log.e(TAG, "Ошибка при закрытии соединения", closeEx)
+            }
+        }
+    }
+    
+    /**
+     * Проверяет логин и пароль пользователя и возвращает полную информацию о пользователе
+     * @return Triple<Boolean, UserEntity?, String?> - (успех, пользователь или null, сообщение об ошибке)
+     */
+    suspend fun loginUser(login: String, password: String): Triple<Boolean, com.example.wassertech.data.entities.UserEntity?, String?> {
+        var connection: Connection? = null
+        try {
+            Log.d(TAG, "Попытка входа пользователя: $login")
+            
+            // Загружаем драйвер MySQL
+            try {
+                Class.forName("com.mysql.jdbc.Driver")
+            } catch (e: ClassNotFoundException) {
+                Log.e(TAG, "Ошибка загрузки MySQL драйвера", e)
+                return Triple(false, null, "Ошибка загрузки драйвера БД")
+            }
+            
+            // Подключаемся к БД
+            try {
+                connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)
+                connection.autoCommit = false
+            } catch (e: SQLException) {
+                Log.e(TAG, "Ошибка подключения к MySQL БД", e)
+                return Triple(false, null, "Ошибка подключения к БД")
+            }
+            
+            // Создаём таблицу пользователей, если её нет
+            createTablesIfNotExist(connection)
+            
+            // Получаем полную информацию о пользователе (регистронезависимый поиск)
+            val sql = "SELECT id, login, password, name, email, phone, role, permissions, lastLoginAtEpoch, createdAtEpoch, updatedAtEpoch FROM users WHERE LOWER(login) = LOWER(?)"
+            val ps = connection.prepareStatement(sql)
+            ps.setString(1, login)
+            val rs = ps.executeQuery()
+            
+            if (!rs.next()) {
+                rs.close()
+                ps.close()
+                Log.d(TAG, "Пользователь не найден: $login")
+                return Triple(false, null, "Пользователь не найден")
+            }
+            
+            val userId = rs.getString("id")
+            val storedPassword = rs.getString("password")
+            
+            if (storedPassword != password) {
+                rs.close()
+                ps.close()
+                Log.d(TAG, "Неверный пароль для пользователя: $login")
+                return Triple(false, null, "Неверный пароль")
+            }
+            
+            // Читаем данные пользователя
+            val user = com.example.wassertech.data.entities.UserEntity(
+                id = userId,
+                login = rs.getString("login"),
+                password = storedPassword, // Возвращаем пароль (в реальном приложении лучше не возвращать)
+                name = rs.getString("name"),
+                email = rs.getString("email"),
+                phone = rs.getString("phone"),
+                role = rs.getString("role") ?: com.example.wassertech.auth.UserRole.USER.name,
+                permissions = rs.getString("permissions"),
+                lastLoginAtEpoch = rs.getObject("lastLoginAtEpoch") as? Long,
+                createdAtEpoch = rs.getLong("createdAtEpoch"),
+                updatedAtEpoch = rs.getLong("updatedAtEpoch")
+            )
+            
+            rs.close()
+            ps.close()
+            
+            // Обновляем время последнего входа
+            val now = System.currentTimeMillis()
+            val updateSql = "UPDATE users SET lastLoginAtEpoch = ?, updatedAtEpoch = ? WHERE id = ?"
+            val updatePs = connection.prepareStatement(updateSql)
+            updatePs.setLong(1, now)
+            updatePs.setLong(2, now)
+            updatePs.setString(3, userId)
+            updatePs.executeUpdate()
+            updatePs.close()
+            
+            connection.commit()
+            
+            Log.d(TAG, "Пользователь успешно авторизован: $login")
+            return Triple(true, user.copy(lastLoginAtEpoch = now), null)
+            
+        } catch (e: Exception) {
+            try {
+                connection?.rollback()
+            } catch (rollbackEx: Exception) {
+                Log.e(TAG, "Ошибка при откате транзакции", rollbackEx)
+            }
+            Log.e(TAG, "Ошибка при входе пользователя", e)
+            return Triple(false, null, "Ошибка при входе: ${e.message}")
+        } finally {
+            try {
+                connection?.close()
+            } catch (closeEx: Exception) {
+                Log.e(TAG, "Ошибка при закрытии соединения", closeEx)
+            }
+        }
     }
 }
 
