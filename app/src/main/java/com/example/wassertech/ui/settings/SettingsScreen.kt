@@ -13,6 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.example.wassertech.R
+import com.example.wassertech.auth.UserAuthService
 import com.example.wassertech.data.AppDatabase
 import com.example.wassertech.sync.MySqlSyncService
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +31,9 @@ fun SettingsScreen() {
     
     var syncing by remember { mutableStateOf(false) }
     var syncMessage by remember { mutableStateOf<String?>(null) }
+    
+    // Проверяем оффлайн режим
+    val isOfflineMode = UserAuthService.isOfflineMode(context)
     
     // Настройка сохранения HTML
     val saveHtmlFlow = db.settingsDao().getValue("save_html")
@@ -96,6 +102,36 @@ fun SettingsScreen() {
                 style = MaterialTheme.typography.titleLarge
             )
             
+            // Тултип оффлайн режима (если включен)
+            if (isOfflineMode) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cloud_offline_outline),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Для использования функций синхронизации требуется использовать онлайн режим. Просьба выйти из приложения и повторить вход.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
             // Кнопка "Отправить в удалённую БД"
             Button(
                 onClick = {
@@ -117,7 +153,7 @@ fun SettingsScreen() {
                         }
                     }
                 },
-                enabled = !syncing,
+                enabled = !syncing && !isOfflineMode,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (syncing && syncMessage?.contains("Отправка") == true) {
@@ -160,7 +196,7 @@ fun SettingsScreen() {
                         }
                     }
                 },
-                enabled = !syncing,
+                enabled = !syncing && !isOfflineMode,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (syncing && syncMessage?.contains("Получение") == true) {
@@ -211,7 +247,7 @@ fun SettingsScreen() {
                         }
                     }
                 },
-                enabled = !syncing,
+                enabled = !syncing && !isOfflineMode,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (syncing && syncMessage?.contains("Миграция") == true) {

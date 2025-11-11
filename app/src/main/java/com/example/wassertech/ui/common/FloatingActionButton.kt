@@ -14,13 +14,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.draw.shadow
-import androidx.compose.foundation.background
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
-import com.example.wassertech.ui.theme.FABScrimColor
-import com.example.wassertech.ui.theme.FABScrimElevation
 
 /**
  * Конфигурация для Floating Action Button
@@ -72,45 +68,6 @@ fun AppFloatingActionButton(
     } else {
         // FAB с выпрыгивающими кнопками
         Box(modifier = modifier) {
-            // Scrim (подложка) для визуального отделения выпрыгивающих кнопок от списка
-            // Показываем scrim только когда меню раскрыто, с анимацией появления
-            val scrimAlpha = remember { Animatable(0f) }
-            
-            LaunchedEffect(expanded) {
-                if (expanded && template.options.isNotEmpty()) {
-                    scrimAlpha.animateTo(1f, tween(300))
-                } else {
-                    scrimAlpha.animateTo(0f, tween(200))
-                }
-            }
-            
-            if (template.options.isNotEmpty() && scrimAlpha.value > 0f) {
-                // Вычисляем размер области scrim на основе количества опций
-                val fabSize = 56.dp
-                val buttonSpacing = 10.dp
-                val totalButtonsHeight = (fabSize + buttonSpacing) * template.options.size
-                val scrimHeight = totalButtonsHeight + fabSize + 32.dp // Высота всех кнопок + основной FAB + отступы
-                val scrimWidth = 220.dp // Ширина scrim (достаточно для кнопок с подписями)
-                
-                // Овальная подложка за всеми кнопками FAB
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(scrimWidth, scrimHeight)
-                        .offset(y = -fabSize / 2) // Смещаем вверх на половину размера основного FAB
-                        .background(
-                            color = FABScrimColor,
-                            shape = androidx.compose.foundation.shape.CircleShape
-                        )
-                        .shadow(
-                            elevation = FABScrimElevation,
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            spotColor = Color.Black.copy(alpha = 0.2f)
-                        )
-                        .alpha(scrimAlpha.value * 0.8f) // Анимируемая полупрозрачность
-                )
-            }
-            
             // Выпрыгивающие кнопки (сверху вниз) - позиционируются выше красного FABа
             template.options.reversed().forEachIndexed { index, option ->
                 // Интервал между кнопками: 10dp
@@ -181,22 +138,29 @@ fun AppFloatingActionButton(
                         )
                         
                         // Круглая кнопка справа (выровнена по горизонтали с красным FABом)
-                        FloatingActionButton(
+                        // Используем Surface с минимальной тенью вместо FloatingActionButton
+                        Surface(
                             onClick = {
                                 expanded = false
                                 option.onClick()
                             },
-                            containerColor = template.optionsColor,
-                            contentColor = Color.White,
+                            modifier = Modifier.size(56.dp),
                             shape = CircleShape,
-                            modifier = Modifier.size(56.dp)
+                            color = template.optionsColor,
+                            tonalElevation = 1.dp, // Очень минимальная тень
+                            shadowElevation = 1.dp // Очень минимальная тень
                         ) {
-                            Icon(
-                                imageVector = option.icon,
-                                contentDescription = option.label,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = option.icon,
+                                    contentDescription = option.label,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
