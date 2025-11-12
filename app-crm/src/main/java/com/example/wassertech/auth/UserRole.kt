@@ -1,4 +1,4 @@
-package com.example.wassertech.auth
+package ru.wassertech.auth
 
 import org.json.JSONObject
 

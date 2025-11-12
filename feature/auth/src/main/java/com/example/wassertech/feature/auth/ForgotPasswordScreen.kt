@@ -1,4 +1,4 @@
-package com.example.wassertech.feature.auth
+package ru.wassertech.feature.auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions

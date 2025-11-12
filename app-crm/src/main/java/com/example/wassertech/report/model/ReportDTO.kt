@@ -1,4 +1,4 @@
-package com.example.wassertech.report.model
+package ru.wassertech.report.model
 
 data class CompanyConfig(
     val legal_name: String,

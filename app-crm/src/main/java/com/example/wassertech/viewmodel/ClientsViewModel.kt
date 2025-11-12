@@ -1,13 +1,13 @@
-package com.example.wassertech.viewmodel
+package ru.wassertech.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.dao.ClientDao
-import com.example.wassertech.data.entities.ClientEntity
-import com.example.wassertech.data.entities.ClientGroupEntity
-import com.example.wassertech.sync.SafeDeletionHelper
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.dao.ClientDao
+import ru.wassertech.data.entities.ClientEntity
+import ru.wassertech.data.entities.ClientGroupEntity
+import ru.wassertech.sync.SafeDeletionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

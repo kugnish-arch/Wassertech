@@ -1,12 +1,12 @@
-package com.example.wassertech.report
+package ru.wassertech.report
 
 import android.content.Context
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.report.model.ComponentRowDTO
-import com.example.wassertech.report.model.ComponentWithFieldsDTO
-import com.example.wassertech.report.model.ComponentFieldDTO
-import com.example.wassertech.report.model.ReportDTO
-import com.example.wassertech.report.model.WaterAnalysisItem
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.report.model.ComponentRowDTO
+import ru.wassertech.report.model.ComponentWithFieldsDTO
+import ru.wassertech.report.model.ComponentFieldDTO
+import ru.wassertech.report.model.ReportDTO
+import ru.wassertech.report.model.WaterAnalysisItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -122,7 +122,7 @@ object ReportAssembler {
             } ?: emptyMap()
             
             // Получаем типы полей из шаблона для определения чекбоксов
-            val fieldTypes: Map<String, com.example.wassertech.data.types.FieldType> = component?.templateId?.let { templateId ->
+            val fieldTypes: Map<String, ru.wassertech.data.types.FieldType> = component?.templateId?.let { templateId ->
                 try {
                     db.templatesDao().getMaintenanceFieldsForTemplate(templateId)
                         .associate { it.key to it.type }
@@ -141,7 +141,7 @@ object ReportAssembler {
                 }
                 
                 // Определяем класс для чекбоксов
-                val checkboxClass = if (fieldType == com.example.wassertech.data.types.FieldType.CHECKBOX) {
+                val checkboxClass = if (fieldType == ru.wassertech.data.types.FieldType.CHECKBOX) {
                     when (valueText) {
                         "Да" -> " checkbox-yes"
                         "Нет" -> " checkbox-no"

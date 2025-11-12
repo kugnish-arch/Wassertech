@@ -1,8 +1,8 @@
-package com.example.wassertech.sync
+package ru.wassertech.sync
 
 import android.util.Log
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.*
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.*
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -464,8 +464,8 @@ object MySqlSyncService {
                 checkLastLoginRs.close()
                 
                 // Обновляем существующих пользователей: устанавливаем значения по умолчанию для новых полей
-                val defaultPermissions = com.example.wassertech.auth.UserPermissions()
-                val permissionsJson = com.example.wassertech.auth.UserPermissions.toJson(defaultPermissions)
+                val defaultPermissions = ru.wassertech.auth.UserPermissions()
+                val permissionsJson = ru.wassertech.auth.UserPermissions.toJson(defaultPermissions)
                 val updateUsersSql = """
                     UPDATE users 
                     SET role = COALESCE(role, 'USER'),
@@ -1017,7 +1017,7 @@ object MySqlSyncService {
     /**
      * Синхронизирует удаления: удаляет записи из MySQL БД
      */
-    private fun syncDeletions(conn: Connection, deletedRecords: List<com.example.wassertech.data.entities.DeletedRecordEntity>): Int {
+    private fun syncDeletions(conn: Connection, deletedRecords: List<ru.wassertech.data.entities.DeletedRecordEntity>): Int {
         if (deletedRecords.isEmpty()) return 0
         
         var deletedCount = 0
@@ -1184,10 +1184,10 @@ object MySqlSyncService {
         while (rs.next()) {
             val typeStr = rs.getString("type")
             val componentType = try {
-                com.example.wassertech.data.types.ComponentType.valueOf(typeStr)
+                ru.wassertech.data.types.ComponentType.valueOf(typeStr)
             } catch (e: Exception) {
                 // Если тип не найден, используем FILTER как дефолтный
-                com.example.wassertech.data.types.ComponentType.COMMON
+                ru.wassertech.data.types.ComponentType.COMMON
             }
             
             components.add(
@@ -1259,10 +1259,10 @@ object MySqlSyncService {
         while (rs.next()) {
             val typeStr = rs.getString("componentType")
             val componentType = try {
-                com.example.wassertech.data.types.ComponentType.valueOf(typeStr)
+                ru.wassertech.data.types.ComponentType.valueOf(typeStr)
             } catch (e: Exception) {
                 // Если тип не найден, используем FILTER как дефолтный
-                com.example.wassertech.data.types.ComponentType.COMMON
+                ru.wassertech.data.types.ComponentType.COMMON
             }
             
             templates.add(
@@ -1289,9 +1289,9 @@ object MySqlSyncService {
         while (rs.next()) {
             val typeStr = rs.getString("type")
             val fieldType = try {
-                com.example.wassertech.data.types.FieldType.valueOf(typeStr)
+                ru.wassertech.data.types.FieldType.valueOf(typeStr)
             } catch (e: Exception) {
-                com.example.wassertech.data.types.FieldType.TEXT
+                ru.wassertech.data.types.FieldType.TEXT
             }
             
             fields.add(
@@ -1358,8 +1358,8 @@ object MySqlSyncService {
             // Создаём нового пользователя (по умолчанию роль USER и права по умолчанию)
             val userId = java.util.UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
-            val defaultPermissions = com.example.wassertech.auth.UserPermissions()
-            val permissionsJson = com.example.wassertech.auth.UserPermissions.toJson(defaultPermissions)
+            val defaultPermissions = ru.wassertech.auth.UserPermissions()
+            val permissionsJson = ru.wassertech.auth.UserPermissions.toJson(defaultPermissions)
             
             val insertSql = """
                 INSERT INTO users (id, login, password, name, email, phone, role, permissions, createdAtEpoch, updatedAtEpoch)
@@ -1373,7 +1373,7 @@ object MySqlSyncService {
             insertPs.setString(4, name)
             insertPs.setString(5, email)
             insertPs.setString(6, phone)
-            insertPs.setString(7, com.example.wassertech.auth.UserRole.USER.name)
+            insertPs.setString(7, ru.wassertech.auth.UserRole.USER.name)
             insertPs.setString(8, permissionsJson)
             insertPs.setLong(9, now)
             insertPs.setLong(10, now)
@@ -1406,7 +1406,7 @@ object MySqlSyncService {
      * Проверяет логин и пароль пользователя и возвращает полную информацию о пользователе
      * @return Triple<Boolean, UserEntity?, String?> - (успех, пользователь или null, сообщение об ошибке)
      */
-    suspend fun loginUser(login: String, password: String): Triple<Boolean, com.example.wassertech.data.entities.UserEntity?, String?> {
+    suspend fun loginUser(login: String, password: String): Triple<Boolean, ru.wassertech.data.entities.UserEntity?, String?> {
         var connection: Connection? = null
         try {
             Log.d(TAG, "Попытка входа пользователя: $login")
@@ -1455,14 +1455,14 @@ object MySqlSyncService {
             }
             
             // Читаем данные пользователя
-            val user = com.example.wassertech.data.entities.UserEntity(
+            val user = ru.wassertech.data.entities.UserEntity(
                 id = userId,
                 login = rs.getString("login"),
                 password = storedPassword, // Возвращаем пароль (в реальном приложении лучше не возвращать)
                 name = rs.getString("name"),
                 email = rs.getString("email"),
                 phone = rs.getString("phone"),
-                role = rs.getString("role") ?: com.example.wassertech.auth.UserRole.USER.name,
+                role = rs.getString("role") ?: ru.wassertech.auth.UserRole.USER.name,
                 permissions = rs.getString("permissions"),
                 lastLoginAtEpoch = rs.getObject("lastLoginAtEpoch") as? Long,
                 createdAtEpoch = rs.getLong("createdAtEpoch"),

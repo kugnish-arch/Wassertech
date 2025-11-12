@@ -1,4 +1,4 @@
-package com.example.wassertech.core.auth
+package ru.wassertech.core.auth
 
 /**
  * Интерфейс репозитория для авторизации

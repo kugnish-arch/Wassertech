@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.clients
+package ru.wassertech.ui.clients
 
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
@@ -6,9 +6,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.viewmodel.ClientsViewModel
-import com.example.wassertech.viewmodel.ClientsViewModelFactory
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.viewmodel.ClientsViewModel
+import ru.wassertech.viewmodel.ClientsViewModelFactory
 
 @Composable
 fun ClientsRoute(

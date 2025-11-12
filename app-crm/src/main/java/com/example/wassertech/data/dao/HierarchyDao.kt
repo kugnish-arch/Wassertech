@@ -1,12 +1,12 @@
-package com.example.wassertech.data.dao
+package ru.wassertech.data.dao
 
 import androidx.room.*
-import com.example.wassertech.data.entities.*
+import ru.wassertech.data.entities.*
 import kotlinx.coroutines.flow.Flow
 
-import com.example.wassertech.data.entities.ComponentEntity
-import com.example.wassertech.data.entities.InstallationEntity
-import com.example.wassertech.data.entities.SiteEntity
+import ru.wassertech.data.entities.ComponentEntity
+import ru.wassertech.data.entities.InstallationEntity
+import ru.wassertech.data.entities.SiteEntity
 @Dao
 interface HierarchyDao {
 

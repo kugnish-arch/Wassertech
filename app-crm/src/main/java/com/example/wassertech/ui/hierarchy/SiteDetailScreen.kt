@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
-package com.example.wassertech.ui.hierarchy
+package ru.wassertech.ui.hierarchy
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,14 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.viewmodel.HierarchyViewModel
+import ru.wassertech.viewmodel.HierarchyViewModel
 import kotlinx.coroutines.launch
-import com.example.wassertech.data.entities.InstallationEntity
-import com.example.wassertech.ui.common.AppFloatingActionButton
-import com.example.wassertech.ui.common.FABTemplate
-import com.example.wassertech.ui.common.CommonAddDialog
+import ru.wassertech.data.entities.InstallationEntity
+import ru.wassertech.ui.common.AppFloatingActionButton
+import ru.wassertech.ui.common.FABTemplate
+import ru.wassertech.ui.common.CommonAddDialog
 import androidx.compose.ui.graphics.Color
-import com.example.wassertech.ui.icons.AppIcons
+import ru.wassertech.ui.icons.AppIcons
 import androidx.compose.ui.Alignment
 
 @Composable
@@ -79,26 +79,26 @@ fun SiteDetailScreen(
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = com.example.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
                 ),
-                shape = com.example.wassertech.core.ui.theme.HeaderCardStyle.shape
+                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(com.example.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                        .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = AppIcons.Site,
                         contentDescription = null,
-                        tint = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                        tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         siteName,
-                        style = com.example.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                        color = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                        style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                     )
                     Spacer(Modifier.weight(1f))
                     // Иконка редактирования видна только в режиме редактирования
@@ -107,7 +107,7 @@ fun SiteDetailScreen(
                             Icon(
                                 Icons.Filled.Edit,
                                 contentDescription = "Редактировать объект",
-                                tint = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                                tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                             )
                         }
                     }
@@ -148,7 +148,7 @@ fun SiteDetailScreen(
                                 headlineContent = { Text(inst.name) },
                                 trailingContent = {
                                     IconButton(onClick = { onOpenInstallation(inst.id) }) {
-                                        Icon(com.example.wassertech.core.ui.theme.NavigationIcons.NavigateIcon, contentDescription = "Открыть")
+                                        Icon(ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon, contentDescription = "Открыть")
                                     }
                                 }
                             )

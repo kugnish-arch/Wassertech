@@ -1,8 +1,8 @@
-package com.example.wassertech.report
+package ru.wassertech.report
 
 import android.content.Context
 import android.util.Log
-import com.example.wassertech.report.model.ReportDTO
+import ru.wassertech.report.model.ReportDTO
 import java.io.BufferedReader
 
 object HtmlTemplateEngine {
@@ -149,7 +149,7 @@ object HtmlTemplateEngine {
                     
                     // Функция для генерации HTML компонента
                     fun generateComponentHtml(
-                        component: com.example.wassertech.report.model.ComponentWithFieldsDTO,
+                        component: ru.wassertech.report.model.ComponentWithFieldsDTO,
                         isHead: Boolean,
                         hideHeader: Boolean = false
                     ): String {
@@ -212,7 +212,7 @@ object HtmlTemplateEngine {
                     // для упрощения логики, но они должны отрисовываться во всю ширину
                     
                     // Находим HEAD компоненты в начале (непрерывная последовательность)
-                    val headAtStart = mutableListOf<com.example.wassertech.report.model.ComponentWithFieldsDTO>()
+                    val headAtStart = mutableListOf<ru.wassertech.report.model.ComponentWithFieldsDTO>()
                     var startIndex = 0
                     for (component in dto.componentsWithFields) {
                         if (component.componentType == "HEAD") {
@@ -224,7 +224,7 @@ object HtmlTemplateEngine {
                     }
                     
                     // Находим HEAD компоненты в конце (непрерывная последовательность)
-                    val headAtEnd = mutableListOf<com.example.wassertech.report.model.ComponentWithFieldsDTO>()
+                    val headAtEnd = mutableListOf<ru.wassertech.report.model.ComponentWithFieldsDTO>()
                     var endIndex = dto.componentsWithFields.size - 1
                     for (i in dto.componentsWithFields.size - 1 downTo 0) {
                         val component = dto.componentsWithFields[i]

@@ -1,5 +1,5 @@
 
-package com.example.wassertech.ui
+package ru.wassertech.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,7 +12,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EditNote
-import com.example.wassertech.core.ui.theme.EditButtonStyle
+import ru.wassertech.core.ui.theme.EditButtonStyle
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -28,8 +28,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.wassertech.feature.auth.authGraph
-import com.example.wassertech.feature.auth.AuthRoutes
+import ru.wassertech.feature.auth.authGraph
+import ru.wassertech.feature.auth.AuthRoutes
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
@@ -40,22 +40,22 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.clickable
-import com.example.wassertech.R
-import com.example.wassertech.auth.UserAuthService
-import com.example.wassertech.ui.clients.ClientDetailScreen
-import com.example.wassertech.ui.clients.ClientsRoute
-import com.example.wassertech.ui.hierarchy.ComponentsScreen
-import com.example.wassertech.ui.hierarchy.SiteDetailScreen
-import com.example.wassertech.ui.maintenance.MaintenanceHistoryScreen
-import com.example.wassertech.ui.maintenance.MaintenanceScreen
-import com.example.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
-import com.example.wassertech.feature.reports.ReportsScreen
-import com.example.wassertech.ui.about.AboutScreen
-import com.example.wassertech.ui.settings.SettingsScreen
-import com.example.wassertech.ui.templates.TemplateEditorScreen
-import com.example.wassertech.ui.templates.TemplatesScreen
+import ru.wassertech.crm.R
+import ru.wassertech.auth.UserAuthService
+import ru.wassertech.ui.clients.ClientDetailScreen
+import ru.wassertech.ui.clients.ClientsRoute
+import ru.wassertech.ui.hierarchy.ComponentsScreen
+import ru.wassertech.ui.hierarchy.SiteDetailScreen
+import ru.wassertech.ui.maintenance.MaintenanceHistoryScreen
+import ru.wassertech.ui.maintenance.MaintenanceScreen
+import ru.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
+import ru.wassertech.feature.reports.ReportsScreen
+import ru.wassertech.ui.about.AboutScreen
+import ru.wassertech.ui.settings.SettingsScreen
+import ru.wassertech.ui.templates.TemplateEditorScreen
+import ru.wassertech.ui.templates.TemplatesScreen
 import android.net.Uri
-import com.example.wassertech.ui.common.NavigationBottomBar
+import ru.wassertech.crm.ui.common.NavigationBottomBar
 
 // Вспомогательные функции для анимаций переходов
 private fun slideInFromRight() = slideInHorizontally(
@@ -155,7 +155,7 @@ fun AppTopBar(
                         DropdownMenu(
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false },
-                            modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Шаблоны") },

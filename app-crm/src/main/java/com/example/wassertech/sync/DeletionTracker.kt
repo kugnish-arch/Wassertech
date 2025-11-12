@@ -1,7 +1,7 @@
-package com.example.wassertech.sync
+package ru.wassertech.sync
 
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.DeletedRecordEntity
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.DeletedRecordEntity
 
 /**
  * Утилита для отслеживания удалений объектов для синхронизации с удаленной БД

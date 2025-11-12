@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.wassertech.feature.reports"
+    namespace = "ru.wassertech.feature.reports"
     compileSdk = 36
 
     defaultConfig {
@@ -43,8 +43,5 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    
-    // Room (для базовых типов)
-    implementation("androidx.room:room-runtime:2.6.1")
 }
 

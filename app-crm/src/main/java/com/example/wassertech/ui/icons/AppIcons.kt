@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.icons
+package ru.wassertech.ui.icons
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*

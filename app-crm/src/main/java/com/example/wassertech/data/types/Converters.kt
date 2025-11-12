@@ -1,4 +1,4 @@
-package com.example.wassertech.data.types
+package ru.wassertech.data.types
 
 import androidx.room.TypeConverter
 

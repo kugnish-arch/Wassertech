@@ -1,8 +1,8 @@
-package com.example.wassertech.data.entities
+package ru.wassertech.data.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.wassertech.data.types.ComponentType
+import ru.wassertech.data.types.ComponentType
 
 @Entity(tableName = "checklist_templates")
 data class ChecklistTemplateEntity(

@@ -1,5 +1,5 @@
 
-package com.example.wassertech.ui.maintenance
+package ru.wassertech.ui.maintenance
 
 /*
 data class ObservationDetail(

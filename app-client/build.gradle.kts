@@ -1,14 +1,15 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp")
 }
 
 android {
-    namespace = "com.example.wassertech.client"
+    namespace = "ru.wassertech.client"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.wassertech.client"
+        applicationId = "ru.wassertech.client"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -51,6 +52,15 @@ android {
             )
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val outputFileName = "Wassertech-Client-${variant.name}-v${variant.versionName}.apk"
+            @Suppress("DEPRECATION")
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = outputFileName
+        }
+    }
 }
 
 dependencies {
@@ -61,6 +71,7 @@ dependencies {
     
     // Feature modules
     implementation(project(":feature:auth"))
+    implementation(project(":feature:reports"))
     
     // Compose BOM: 2024.10.01
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
@@ -79,7 +90,20 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.navigation:navigation-compose:2.8.3")
     
+    // Material XML (для XML тем)
+    implementation("com.google.android.material:material:1.12.0")
+    
+    // Room
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+    
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
 }
 

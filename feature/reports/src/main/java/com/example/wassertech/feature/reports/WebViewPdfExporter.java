@@ -1,4 +1,4 @@
-package com.example.wassertech.feature.reports;
+package ru.wassertech.feature.reports;
 
 import android.graphics.pdf.PdfDocument;
 import android.os.Handler;

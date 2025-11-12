@@ -1,4 +1,4 @@
-package com.example.wassertech.core.ui.splash
+package ru.wassertech.core.ui.splash
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -32,7 +32,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.core.ui.R
+import ru.wassertech.core.ui.R
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min

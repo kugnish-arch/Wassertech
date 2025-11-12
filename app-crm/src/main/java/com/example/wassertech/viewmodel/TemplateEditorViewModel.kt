@@ -1,13 +1,13 @@
 
-package com.example.wassertech.viewmodel
+package ru.wassertech.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.dao.ChecklistDao
-import com.example.wassertech.data.entities.ChecklistFieldEntity
-import com.example.wassertech.data.types.FieldType
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.dao.ChecklistDao
+import ru.wassertech.data.entities.ChecklistFieldEntity
+import ru.wassertech.data.types.FieldType
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID

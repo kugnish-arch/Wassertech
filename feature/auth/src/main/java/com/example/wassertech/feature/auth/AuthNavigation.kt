@@ -1,4 +1,4 @@
-package com.example.wassertech.feature.auth
+package ru.wassertech.feature.auth
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder

@@ -1,4 +1,4 @@
-package com.example.wassertech.report;
+package ru.wassertech.report;
 
 /**
  * Models for storing component and section header boundaries in PDF generation.

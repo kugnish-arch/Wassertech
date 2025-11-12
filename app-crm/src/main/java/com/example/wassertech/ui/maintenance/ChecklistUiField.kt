@@ -1,6 +1,6 @@
-package com.example.wassertech.ui.maintenance
+package ru.wassertech.ui.maintenance
 
-import com.example.wassertech.data.types.FieldType
+import ru.wassertech.data.types.FieldType
 
 data class ChecklistUiField(
     val key: String,

@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.clients
+package ru.wassertech.ui.clients
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
@@ -23,18 +23,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.data.entities.ClientEntity
-import com.example.wassertech.data.entities.ClientGroupEntity
-import com.example.wassertech.ui.common.EditDoneBottomBar
-import com.example.wassertech.ui.common.AppFloatingActionButton
-import com.example.wassertech.ui.common.FABTemplate
-import com.example.wassertech.ui.common.FABOption
-import com.example.wassertech.ui.common.CommonAddDialog
-import com.example.wassertech.core.ui.theme.ClientsGroupCollapsedBackground
-import com.example.wassertech.core.ui.theme.ClientsGroupExpandedBackground
-import com.example.wassertech.core.ui.theme.ClientsGroupExpandedText
-import com.example.wassertech.core.ui.theme.ClientsGroupBorder
-import com.example.wassertech.core.ui.theme.ClientsRowDivider
+import ru.wassertech.data.entities.ClientEntity
+import ru.wassertech.data.entities.ClientGroupEntity
+import ru.wassertech.ui.common.EditDoneBottomBar
+import ru.wassertech.ui.common.AppFloatingActionButton
+import ru.wassertech.ui.common.FABTemplate
+import ru.wassertech.ui.common.FABOption
+import ru.wassertech.ui.common.CommonAddDialog
+import ru.wassertech.core.ui.theme.ClientsGroupCollapsedBackground
+import ru.wassertech.core.ui.theme.ClientsGroupExpandedBackground
+import ru.wassertech.core.ui.theme.ClientsGroupExpandedText
+import ru.wassertech.core.ui.theme.ClientsGroupBorder
+import ru.wassertech.core.ui.theme.ClientsRowDivider
 
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
 
@@ -569,7 +569,7 @@ fun ClientsScreen(
                             DropdownMenu(
                                 expanded = groupPickerExpanded,
                                 onDismissRequest = { groupPickerExpanded = false },
-                                modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                                modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Без группы") },
@@ -674,7 +674,7 @@ fun ClientsScreen(
                             DropdownMenu(
                                 expanded = editClientGroupPicker,
                                 onDismissRequest = { editClientGroupPicker = false },
-                                modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                                modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Без группы") },
@@ -860,7 +860,7 @@ private fun GroupHeader(
                         }
                         IconButton(onClick = onDelete) {
                             Icon(
-                                imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                                imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                                 contentDescription = "Удалить группу",
                                 tint = MaterialTheme.colorScheme.error
                             )
@@ -869,7 +869,7 @@ private fun GroupHeader(
                 }
             }
             Icon(
-                imageVector = if (isExpanded) com.example.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else com.example.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
+                imageVector = if (isExpanded) ru.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else ru.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
                 contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
                 tint = contentColor
             )
@@ -1031,7 +1031,7 @@ private fun ClientRowWithEdit(
         // Иконка навигации справа (когда не в режиме редактирования)
         if (!isEditMode) {
             Icon(
-                imageVector = com.example.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
                 contentDescription = "Открыть",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
@@ -1052,7 +1052,7 @@ private fun ClientRowWithEdit(
                     }
                     IconButton(onClick = onDelete) {
                         Icon(
-                            imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                            imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                             contentDescription = "Удалить клиента",
                             tint = MaterialTheme.colorScheme.error
                         )
@@ -1078,7 +1078,7 @@ private fun ClientRowWithEdit(
                     DropdownMenu(
                         expanded = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                        modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                     ) {
                         DropdownMenuItem(
                             text = { Text("Переместить в: Без группы") },

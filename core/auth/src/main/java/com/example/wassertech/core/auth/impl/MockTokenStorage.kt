@@ -1,6 +1,6 @@
-package com.example.wassertech.core.auth.impl
+package ru.wassertech.core.auth.impl
 
-import com.example.wassertech.core.auth.TokenStorage
+import ru.wassertech.core.auth.TokenStorage
 
 /**
  * Мок-реализация TokenStorage для тестирования и разработки

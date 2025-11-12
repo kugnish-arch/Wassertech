@@ -1,4 +1,4 @@
-package com.example.wassertech
+package ru.wassertech.crm
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,11 +7,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import com.example.wassertech.auth.UserAuthService
-import com.example.wassertech.ui.AppNavHost
-import com.example.wassertech.core.ui.splash.SplashRouteFixed
-import com.example.wassertech.core.ui.theme.WassertechTheme
-import com.example.wassertech.feature.auth.AuthRoutes
+import ru.wassertech.auth.UserAuthService
+import ru.wassertech.ui.AppNavHost
+import ru.wassertech.core.ui.splash.SplashRouteFixed
+import ru.wassertech.core.ui.theme.WassertechTheme
+import ru.wassertech.feature.auth.AuthRoutes
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -61,7 +61,7 @@ private fun MainContent() {
         ) {
             // Auth navigation
             composable(AuthRoutes.LOGIN) {
-                com.example.wassertech.feature.auth.LoginScreen(
+                ru.wassertech.feature.auth.LoginScreen(
                     onLoginSuccess = {
                         navController.navigate("main") {
                             popUpTo(AuthRoutes.LOGIN) { inclusive = true }

@@ -1,4 +1,4 @@
-package com.example.wassertech.report
+package ru.wassertech.report
 
 import android.content.Context
 import android.util.Log

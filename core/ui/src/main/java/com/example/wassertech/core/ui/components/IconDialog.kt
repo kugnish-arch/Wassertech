@@ -1,4 +1,4 @@
-package com.example.wassertech.core.ui.components
+package ru.wassertech.core.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -10,8 +10,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.wassertech.core.ui.R
-import com.example.wassertech.core.ui.theme.DialogStyle
+import ru.wassertech.core.ui.R
+import ru.wassertech.core.ui.theme.DialogStyle
 
 /**
  * Диалог с иконкой и текстом

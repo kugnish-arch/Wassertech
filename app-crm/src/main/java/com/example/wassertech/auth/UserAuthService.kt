@@ -1,8 +1,8 @@
-package com.example.wassertech.auth
+package ru.wassertech.auth
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.wassertech.data.entities.UserEntity
+import ru.wassertech.data.entities.UserEntity
 import org.json.JSONArray
 import org.json.JSONObject
 

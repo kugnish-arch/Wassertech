@@ -1,6 +1,6 @@
-package com.example.wassertech.core.auth.impl
+package ru.wassertech.core.auth.impl
 
-import com.example.wassertech.core.auth.SessionStore
+import ru.wassertech.core.auth.SessionStore
 
 /**
  * Мок-реализация SessionStore для тестирования и разработки

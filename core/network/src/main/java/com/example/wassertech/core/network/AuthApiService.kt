@@ -1,4 +1,4 @@
-package com.example.wassertech.core.network
+package ru.wassertech.core.network
 
 import android.util.Log
 import java.sql.Connection

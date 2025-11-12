@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.empty
+package ru.wassertech.ui.empty
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable

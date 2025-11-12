@@ -1,4 +1,4 @@
-package com.example.wassertech.feature.reports;
+package ru.wassertech.feature.reports;
 
 import android.os.Handler;
 import android.os.Looper;

@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.templates
+package ru.wassertech.ui.templates
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -27,18 +27,18 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.types.ComponentType
-import com.example.wassertech.data.types.FieldType
-import com.example.wassertech.util.Translit
-import com.example.wassertech.viewmodel.TemplatesViewModel
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.types.ComponentType
+import ru.wassertech.data.types.FieldType
+import ru.wassertech.util.Translit
+import ru.wassertech.viewmodel.TemplatesViewModel
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.example.wassertech.core.ui.theme.SegmentedButtonStyle
+import ru.wassertech.core.ui.theme.SegmentedButtonStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -413,7 +413,7 @@ fun TemplateEditorScreen(
                                 }
                                 // Корзина справа от сегментированных кнопок
                                 IconButton(onClick = { vm.remove(f.id) }) {
-                                    Icon(imageVector = com.example.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить")
+                                    Icon(imageVector = ru.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить")
                                 }
                             }
 

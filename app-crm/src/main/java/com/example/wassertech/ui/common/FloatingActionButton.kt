@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.common
+package ru.wassertech.ui.common
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*

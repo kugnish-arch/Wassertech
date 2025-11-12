@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.maintenance
+package ru.wassertech.ui.maintenance
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -25,12 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import com.example.wassertech.R
+import ru.wassertech.crm.R
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.MaintenanceSessionEntity
-import com.example.wassertech.sync.SafeDeletionHelper
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.MaintenanceSessionEntity
+import ru.wassertech.sync.SafeDeletionHelper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -97,7 +97,7 @@ fun MaintenanceHistoryScreen(
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                        imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                         contentDescription = "Удалить выбранные",
                         modifier = Modifier.size(28.dp)
                     )
@@ -251,7 +251,7 @@ fun MaintenanceHistoryScreen(
                                     if (!isEditing) {
                                         Spacer(Modifier.width(8.dp))
                                         Icon(
-                                            imageVector = com.example.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                                            imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
                                             contentDescription = "Открыть детали",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                             modifier = Modifier.size(20.dp)

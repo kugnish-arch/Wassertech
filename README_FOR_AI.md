@@ -188,7 +188,7 @@ PdfExporter.export(context, html, fileUri) → сохраняем PDF (в SAF и
 
 Рабочая среда: Android Studio (Gradle 8.x, Kotlin 1.9.x, Compose Material 3, Room 2.6.x).
 
-Пакет: com.example.wassertech.
+Пакет: ru.wassertech.
 
 Если добавляешь новые DAO-методы:
 

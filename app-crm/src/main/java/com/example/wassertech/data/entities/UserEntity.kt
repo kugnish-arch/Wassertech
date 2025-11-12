@@ -1,7 +1,7 @@
-package com.example.wassertech.data.entities
+package ru.wassertech.data.entities
 
-import com.example.wassertech.auth.UserRole
-import com.example.wassertech.auth.UserPermissions
+import ru.wassertech.auth.UserRole
+import ru.wassertech.auth.UserPermissions
 
 /**
  * Entity для пользователей системы.

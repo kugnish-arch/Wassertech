@@ -1,4 +1,4 @@
-package com.example.wassertech.core.ui.theme
+package ru.wassertech.core.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -33,11 +33,11 @@ import android.os.Build
 
 /* ================== БАЗОВЫЕ ЦВЕТА ================== */
 // Графитово-серо-белая палитра с красным акцентом
-private val BrandRed = Color(0xFFE53935) // Акцентные элементы (FAB, активная вкладка)
+val BrandRed = Color(0xFFE53935) // Акцентные элементы (FAB, активная вкладка, кнопки)
 private val AppBackground = Color(0xFFFAFAFA) // Фон приложения
 private val CardSurface = Color(0xFFFFFFFF) // Карточки / поля
 private val TextPrimary = Color(0xFF1E1E1E) // Текст
-private val IconSecondary = Color(0xFF5A5A5A) // Иконки второстепенные
+val IconSecondary = Color(0xFF5A5A5A) // Иконки второстепенные
 private val ButtonSecondaryBorder = Color(0xFFD0D0D0) // Контур вторичных кнопок
 private val ButtonSecondaryText = Color(0xFF2C2C2C) // Текст вторичных кнопок
 
@@ -395,6 +395,60 @@ object SystemBarsStyle {
     fun isLightStatusBar(isDarkTheme: Boolean): Boolean {
         return isDarkTheme // Для темной темы - светлые иконки, для светлой - темные
     }
+}
+
+/* ================== СТИЛЬ АКЦЕНТНОЙ КНОПКИ ================== */
+// Стиль для акцентных кнопок (красные кнопки Wassertech)
+// Используется на экранах логина и других местах, где нужна акцентная кнопка
+object AccentButtonStyle {
+    /**
+     * Возвращает цвета для акцентной кнопки (красная кнопка Wassertech)
+     * Должен вызываться из @Composable контекста
+     */
+    @Composable
+    fun buttonColors() = androidx.compose.material3.ButtonDefaults.buttonColors(
+        containerColor = BrandRed,
+        contentColor = Color.White,
+        disabledContainerColor = BrandRed.copy(alpha = 0.38f),
+        disabledContentColor = Color.White.copy(alpha = 0.38f)
+    )
+}
+
+/* ================== СТИЛЬ НИЖНЕГО МЕНЮ (NAVIGATION BAR) ================== */
+// Стиль для нижнего меню переключения экранов
+// Используется в app-crm и app-client для навигации между основными разделами
+object NavigationBarStyle {
+    // Фон нижнего меню - полупрозрачный белый
+    val backgroundColor = Color.White.copy(alpha = 0.95f)
+    
+    // Красный цвет для активной иконки и индикатора
+    val activeIconColor = BrandRed
+    
+    // Серый цвет для неактивных иконок
+    val inactiveIconColor = IconSecondary
+    
+    // Красная линия-индикатор для активной вкладки
+    val activeIndicatorColor = BrandRed
+    
+    // Высота нижнего меню
+    val height = 90.dp
+    
+    // Высота красной линии-индикатора
+    val indicatorHeight = 3.dp
+    
+    // Ширина красной линии-индикатора
+    val indicatorWidth = 32.dp
+    
+    /**
+     * Возвращает цвета для NavigationBarItem
+     * Должен вызываться из @Composable контекста
+     */
+    @Composable
+    fun itemColors() = androidx.compose.material3.NavigationBarItemDefaults.colors(
+        selectedIconColor = activeIconColor,
+        unselectedIconColor = inactiveIconColor,
+        indicatorColor = Color.Transparent // Убираем стандартный индикатор, используем кастомную красную линию
+    )
 }
 
 @Composable

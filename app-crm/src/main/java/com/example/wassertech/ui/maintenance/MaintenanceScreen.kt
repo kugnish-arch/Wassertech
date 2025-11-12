@@ -1,5 +1,5 @@
 // MaintenanceScreen.kt
-package com.example.wassertech.ui.maintenance
+package ru.wassertech.ui.maintenance
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,9 +19,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.data.types.FieldType
-import com.example.wassertech.viewmodel.ChecklistUiField
-import com.example.wassertech.viewmodel.MaintenanceViewModel
+import ru.wassertech.data.types.FieldType
+import ru.wassertech.viewmodel.ChecklistUiField
+import ru.wassertech.viewmodel.MaintenanceViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.key
 
@@ -75,21 +75,21 @@ fun MaintenanceScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = com.example.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
                 ),
-                shape = com.example.wassertech.core.ui.theme.HeaderCardStyle.shape
+                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(com.example.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                        .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                 ) {
                     // Иконка шестеренки убрана по требованию
                     Text(
                         text = "Обслуживание установки $installationName",
-                        style = com.example.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                        color = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                        style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -151,7 +151,7 @@ fun MaintenanceScreen(
                                                 expandedMap[sec.componentId] = !expanded
                                             }) {
                                                 Icon(
-                                                    imageVector = if (expanded) com.example.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else com.example.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
+                                                    imageVector = if (expanded) ru.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else ru.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
                                                     contentDescription = if (expanded) "Свернуть" else "Развернуть"
                                                 )
                                             }

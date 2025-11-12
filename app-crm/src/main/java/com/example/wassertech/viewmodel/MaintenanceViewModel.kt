@@ -1,12 +1,12 @@
-package com.example.wassertech.viewmodel
+package ru.wassertech.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.MaintenanceSessionEntity
-import com.example.wassertech.data.entities.MaintenanceValueEntity
-import com.example.wassertech.data.types.FieldType
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.MaintenanceSessionEntity
+import ru.wassertech.data.entities.MaintenanceValueEntity
+import ru.wassertech.data.types.FieldType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,7 +95,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 // Определяем, является ли компонент заглавным через шаблон
                 val isHead = comp.templateId?.let { tmplId ->
                     val template = templatesDao.getTemplateById(tmplId)
-                    template?.componentType == com.example.wassertech.data.types.ComponentType.HEAD
+                    template?.componentType == ru.wassertech.data.types.ComponentType.HEAD
                 } ?: false
 
                 ComponentSectionUi(
@@ -150,7 +150,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 // Определяем, является ли компонент заглавным через шаблон
                 val isHead = comp.templateId?.let { tmplId ->
                     val template = templatesDao.getTemplateById(tmplId)
-                    template?.componentType == com.example.wassertech.data.types.ComponentType.HEAD
+                    template?.componentType == ru.wassertech.data.types.ComponentType.HEAD
                 } ?: false
 
                 ComponentSectionUi(

@@ -1,7 +1,7 @@
-package com.example.wassertech.report
+package ru.wassertech.report
 
 import android.content.Context
-import com.example.wassertech.report.model.ReportDTO
+import ru.wassertech.report.model.ReportDTO
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.xwpf.usermodel.XWPFParagraph
 import org.apache.poi.xwpf.usermodel.XWPFTable

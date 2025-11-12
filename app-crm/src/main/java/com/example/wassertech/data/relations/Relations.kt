@@ -1,8 +1,8 @@
-package com.example.wassertech.data.relations
+package ru.wassertech.data.relations
 
 import androidx.room.Embedded
 import androidx.room.Relation
-import com.example.wassertech.data.entities.*
+import ru.wassertech.data.entities.*
 
 data class ClientWithSites(
     @Embedded val client: ClientEntity,

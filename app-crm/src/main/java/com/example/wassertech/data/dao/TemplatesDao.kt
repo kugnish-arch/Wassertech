@@ -1,12 +1,12 @@
-package com.example.wassertech.data.dao
+package ru.wassertech.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.example.wassertech.data.entities.ChecklistFieldEntity
-import com.example.wassertech.data.entities.ChecklistTemplateEntity
-import com.example.wassertech.data.types.ComponentType
+import ru.wassertech.data.entities.ChecklistFieldEntity
+import ru.wassertech.data.entities.ChecklistTemplateEntity
+import ru.wassertech.data.types.ComponentType
 import kotlinx.coroutines.flow.Flow
 
 @Dao

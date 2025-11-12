@@ -1,15 +1,15 @@
 // app/src/main/java/com/example/wassertech/data/dao/SessionsDao.kt
-package com.example.wassertech.data.dao
+package ru.wassertech.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import com.example.wassertech.data.entities.IssueEntity
-import com.example.wassertech.data.entities.MaintenanceSessionEntity
-import com.example.wassertech.data.entities.MaintenanceValueEntity
-import com.example.wassertech.data.entities.ObservationEntity
+import ru.wassertech.data.entities.IssueEntity
+import ru.wassertech.data.entities.MaintenanceSessionEntity
+import ru.wassertech.data.entities.MaintenanceValueEntity
+import ru.wassertech.data.entities.ObservationEntity
 import kotlinx.coroutines.flow.Flow
 
 

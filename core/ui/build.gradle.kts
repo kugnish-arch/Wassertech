@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.wassertech.core.ui"
+    namespace = "ru.wassertech.core.ui"
     compileSdk = 36
 
     defaultConfig {

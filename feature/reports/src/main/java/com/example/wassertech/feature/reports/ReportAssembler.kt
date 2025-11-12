@@ -1,18 +1,137 @@
-package com.example.wassertech.feature.reports
+package ru.wassertech.feature.reports
 
 import android.content.Context
-import androidx.room.RoomDatabase
-import com.example.wassertech.feature.reports.model.ComponentRowDTO
-import com.example.wassertech.feature.reports.model.ComponentWithFieldsDTO
-import com.example.wassertech.feature.reports.model.ComponentFieldDTO
-import com.example.wassertech.feature.reports.model.ReportDTO
-import com.example.wassertech.feature.reports.model.WaterAnalysisItem
+import ru.wassertech.feature.reports.model.ComponentRowDTO
+import ru.wassertech.feature.reports.model.ComponentWithFieldsDTO
+import ru.wassertech.feature.reports.model.ComponentFieldDTO
+import ru.wassertech.feature.reports.model.ReportDTO
+import ru.wassertech.feature.reports.model.WaterAnalysisItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import java.text.SimpleDateFormat
 import java.util.*
+import java.lang.reflect.Method
+import java.util.concurrent.atomic.AtomicBoolean
+import android.util.Log
 
 object ReportAssembler {
+
+    /**
+     * Вспомогательная функция для вызова suspend функций через рефлексию.
+     * Suspend функции в Kotlin компилируются с дополнительным параметром Continuation.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T> callSuspendMethod(
+        receiver: Any,
+        methodName: String,
+        vararg args: Any?
+    ): T? = withTimeout(30000) { // Таймаут 30 секунд для каждого вызова
+        suspendCancellableCoroutine { cont ->
+            try {
+                Log.d("ReportAssembler", "Calling suspend method: $methodName with ${args.size} args on ${receiver.javaClass.simpleName}")
+                val clazz = receiver.javaClass
+                // Ищем все методы с таким именем (включая методы из интерфейсов)
+                val allMethods = (clazz.declaredMethods.asList() + clazz.methods.asList()).distinctBy { 
+                    "${it.name}${it.parameterTypes.joinToString { it.name }}"
+                }
+                val methods = allMethods.filter { it.name == methodName }
+                
+                Log.d("ReportAssembler", "Found ${methods.size} methods with name $methodName")
+                methods.forEach { m ->
+                    Log.d("ReportAssembler", "  Method: ${m.name}(${m.parameterTypes.joinToString { it.simpleName }})")
+                }
+                
+                // Ищем метод с правильным количеством параметров (args + Continuation в конце)
+                val method = methods.firstOrNull { method ->
+                    val paramTypes = method.parameterTypes
+                    val isSuspend = paramTypes.size == args.size + 1 &&
+                            Continuation::class.java.isAssignableFrom(paramTypes.last())
+                    if (isSuspend) {
+                        Log.d("ReportAssembler", "Found suspend method: ${method.name} with params: ${paramTypes.joinToString { it.simpleName }}")
+                    }
+                    isSuspend
+                }
+                
+                if (method == null) {
+                    val availableMethods = methods.map { 
+                        it.parameterTypes.joinToString(", ", "${it.name}(") + ")"
+                    }.joinToString("\n  ")
+                    val errorMsg = "Suspend method $methodName with ${args.size} parameters not found in ${clazz.name}.\n" +
+                            "Available methods:\n  $availableMethods"
+                    Log.e("ReportAssembler", errorMsg)
+                    cont.resumeWithException(NoSuchMethodException(errorMsg))
+                    return@suspendCancellableCoroutine
+                }
+                
+                method.isAccessible = true
+                
+                // Получаем тип Continuation из сигнатуры метода
+                val continuationParamType = method.parameterTypes.last()
+                Log.d("ReportAssembler", "Continuation type: ${continuationParamType.name}")
+                
+                // Флаг для отслеживания, был ли вызван continuation
+                val wasResumed = AtomicBoolean(false)
+                
+                // Создаем wrapper continuation, который отслеживает вызовы
+                // Используем дженерик T? для правильной типизации
+                val wrapperCont = object : Continuation<T?> {
+                    override val context = cont.context
+                    override fun resumeWith(result: kotlin.Result<T?>) {
+                        wasResumed.set(true)
+                        Log.d("ReportAssembler", "Continuation.resumeWith called for $methodName")
+                        cont.resumeWith(result)
+                    }
+                }
+                
+                // Создаем массив аргументов: исходные аргументы + Continuation
+                val allArgs = arrayOfNulls<Any?>(args.size + 1)
+                args.forEachIndexed { index, arg -> 
+                    allArgs[index] = arg
+                    Log.d("ReportAssembler", "  Arg[$index]: ${arg?.javaClass?.simpleName ?: "null"} = $arg")
+                }
+                
+                // Используем wrapper continuation вместо оригинального
+                // Кастим к Continuation<Any?>, так как Room ожидает этот тип
+                @Suppress("UNCHECKED_CAST")
+                allArgs[args.size] = wrapperCont as Continuation<Any?>
+                
+                Log.d("ReportAssembler", "Invoking method $methodName on thread: ${Thread.currentThread().name}")
+                
+                // Вызываем метод - он сам вызовет continuation.resume() или continuation.resumeWithException()
+                // Возвращаемое значение может быть COROUTINE_SUSPENDED или фактическое значение
+                val result = method.invoke(receiver, *allArgs)
+                Log.d("ReportAssembler", "Method $methodName returned: ${result?.javaClass?.simpleName ?: "null"}, result == COROUTINE_SUSPENDED: ${result === COROUTINE_SUSPENDED}")
+                
+                // Если метод вернул результат напрямую (не COROUTINE_SUSPENDED) и continuation не был вызван,
+                // значит Room не вызвал continuation, и нам нужно вызвать его самим
+                if (result !== COROUTINE_SUSPENDED && !wasResumed.get()) {
+                    Log.d("ReportAssembler", "Method returned result synchronously but continuation was not called, resuming manually")
+                    // Кастим результат к нужному типу
+                    @Suppress("UNCHECKED_CAST")
+                    val typedResult = result as? T
+                    if (cont.isActive) {
+                        cont.resume(typedResult)
+                    }
+                } else if (result === COROUTINE_SUSPENDED) {
+                    Log.d("ReportAssembler", "Method suspended, waiting for continuation to be called")
+                    // Метод приостановлен, continuation будет вызван асинхронно
+                } else {
+                    Log.d("ReportAssembler", "Continuation was already called by Room method")
+                }
+            } catch (e: Exception) {
+                Log.e("ReportAssembler", "Error calling suspend method $methodName", e)
+                if (cont.isActive) {
+                    cont.resumeWithException(e)
+                }
+            }
+        }
+    }
 
     /**
      * Assembles a report from session data.
@@ -20,19 +139,25 @@ object ReportAssembler {
      * @param context Context for loading configs
      * @param sessionId Session ID to assemble report for
      */
-    suspend fun assemble(db: RoomDatabase, context: Context, sessionId: String): ReportDTO = withContext(Dispatchers.IO) {
-        // Используем рефлексию для доступа к методам AppDatabase
-        // Это необходимо, чтобы избежать циклической зависимости
-        val sessionsDao = db.javaClass.getMethod("sessionsDao").invoke(db)
-        val hierarchyDao = db.javaClass.getMethod("hierarchyDao").invoke(db)
-        val clientDao = db.javaClass.getMethod("clientDao").invoke(db)
-        val templatesDao = db.javaClass.getMethod("templatesDao").invoke(db)
+    suspend fun assemble(db: Any, context: Context, sessionId: String): ReportDTO = withContext(Dispatchers.IO) {
+        Log.d("ReportAssembler", "Starting assemble for sessionId: $sessionId")
+        try {
+            // Используем рефлексию для доступа к методам AppDatabase
+            // Это необходимо, чтобы избежать циклической зависимости
+            Log.d("ReportAssembler", "Getting DAOs from database")
+            val sessionsDao = db.javaClass.getMethod("sessionsDao").invoke(db)
+            val hierarchyDao = db.javaClass.getMethod("hierarchyDao").invoke(db)
+            val clientDao = db.javaClass.getMethod("clientDao").invoke(db)
+            val templatesDao = db.javaClass.getMethod("templatesDao").invoke(db)
+            Log.d("ReportAssembler", "DAOs retrieved successfully")
 
-        // Получаем сессию (nullable)
-        val session = sessionsDao.javaClass.getMethod("getSessionById", String::class.java).invoke(sessionsDao, sessionId) as? Any
+            // Получаем сессию (nullable) через правильный вызов suspend функции
+            Log.d("ReportAssembler", "Getting session by id")
+            val session = callSuspendMethod<Any>(sessionsDao, "getSessionById", sessionId)
+            Log.d("ReportAssembler", "Session retrieved: ${session != null}")
 
-        // Без сессии - бросаем понятную ошибку
-        requireNotNull(session) { "Session $sessionId not found" }
+            // Без сессии - бросаем понятную ошибку
+            requireNotNull(session) { "Session $sessionId not found" }
 
         // Вспомогательная функция для получения поля объекта через рефлексию
         fun getField(obj: Any, fieldName: String): Any? {
@@ -48,18 +173,19 @@ object ReportAssembler {
 
         // Installation может быть null (installationId в сессии nullable)
         val installation = sessionInstallationId?.let { id ->
-            hierarchyDao.javaClass.getMethod("getInstallation", String::class.java).invoke(hierarchyDao, id) as? Any
+            callSuspendMethod<Any>(hierarchyDao, "getInstallation", id)
         }
         val installationSiteId = installation?.let { getField(it, "siteId") as? String }
         val installationName = installation?.let { getField(it, "name") as? String ?: "" }
         val installationId = installation?.let { getField(it, "id") as? String }
 
         val site = installationSiteId?.let { sid ->
-            hierarchyDao.javaClass.getMethod("getSite", String::class.java).invoke(hierarchyDao, sid) as? Any
+            callSuspendMethod<Any>(hierarchyDao, "getSite", sid)
         }
         val siteClientId = site?.let { getField(it, "clientId") as? String }
         val siteName = site?.let { getField(it, "name") as? String }
 
+        // getClient не suspend, вызываем напрямую
         val client = siteClientId?.let { cid ->
             clientDao.javaClass.getMethod("getClient", String::class.java).invoke(clientDao, cid) as? Any
         }
@@ -70,11 +196,11 @@ object ReportAssembler {
 
         // Компоненты установки — если нет установки, пустой список
         val components = installationId?.let { instId ->
-            hierarchyDao.javaClass.getMethod("getComponentsNow", String::class.java).invoke(hierarchyDao, instId) as? List<*> ?: emptyList<Any>()
+            callSuspendMethod<List<*>>(hierarchyDao, "getComponentsNow", instId) ?: emptyList<Any>()
         } ?: emptyList<Any>()
 
         // Старые observations (если есть) — возвращаем список, сортировка handled in DAO
-        val observations = sessionsDao.javaClass.getMethod("getObservations", String::class.java).invoke(sessionsDao, sessionId) as? List<*> ?: emptyList<Any>()
+        val observations = callSuspendMethod<List<*>>(sessionsDao, "getObservations", sessionId) ?: emptyList<Any>()
 
         // Сформируем строки компонентов — используем лишь поля, которые реально есть в сущности
         val rows = components.mapNotNull { cmp ->
@@ -128,7 +254,7 @@ object ReportAssembler {
         val waterAnalyses = emptyList<WaterAnalysisItem>() // Пока пусто, можно заполнить позже
 
         // Собираем данные из maintenance_values с разрешением меток полей
-        val maintenanceValues = sessionsDao.javaClass.getMethod("getValuesForSession", String::class.java).invoke(sessionsDao, sessionId) as? List<*> ?: emptyList<Any>()
+        val maintenanceValues = callSuspendMethod<List<*>>(sessionsDao, "getValuesForSession", sessionId) ?: emptyList<Any>()
         val valuesByComponent = maintenanceValues.groupBy { value ->
             (value as? Any)?.let { getField(it, "componentId") as? String } ?: ""
         }
@@ -140,7 +266,7 @@ object ReportAssembler {
         for ((componentId, values) in valuesByComponent) {
             if (componentId.isEmpty()) continue
             processedComponentIds.add(componentId)
-            val component = hierarchyDao.javaClass.getMethod("getComponent", String::class.java).invoke(hierarchyDao, componentId) as? Any
+            val component = callSuspendMethod<Any>(hierarchyDao, "getComponent", componentId)
             val componentName = component?.let { getField(it, "name") as? String } ?: componentId
             val componentTemplateId = component?.let { getField(it, "templateId") as? String }
             
@@ -148,7 +274,7 @@ object ReportAssembler {
             var componentType: String? = "COMMON" // По умолчанию COMMON
             componentTemplateId?.let { templateId ->
                 try {
-                    val template = templatesDao.javaClass.getMethod("getTemplateById", String::class.java).invoke(templatesDao, templateId) as? Any
+                    val template = callSuspendMethod<Any>(templatesDao, "getTemplateById", templateId)
                     val templateComponentType = template?.let { 
                         val typeObj = getField(it, "componentType")
                         typeObj?.javaClass?.getMethod("name")?.invoke(typeObj) as? String
@@ -163,7 +289,7 @@ object ReportAssembler {
             // Получаем метки полей из шаблона
             val fieldLabels: Map<String, String> = componentTemplateId?.let { templateId ->
                 try {
-                    val fields = templatesDao.javaClass.getMethod("getMaintenanceFieldsForTemplate", String::class.java).invoke(templatesDao, templateId) as? List<*> ?: emptyList<Any>()
+                    val fields = callSuspendMethod<List<*>>(templatesDao, "getMaintenanceFieldsForTemplate", templateId) ?: emptyList<Any>()
                     fields.mapNotNull { field ->
                         val key = (field as? Any)?.let { getField(it, "key") as? String } ?: return@mapNotNull null
                         val label = (field as? Any)?.let { getField(it, "label") as? String }
@@ -177,7 +303,7 @@ object ReportAssembler {
             // Получаем единицы измерения из шаблона
             val fieldUnits: Map<String, String?> = componentTemplateId?.let { templateId ->
                 try {
-                    val fields = templatesDao.javaClass.getMethod("getMaintenanceFieldsForTemplate", String::class.java).invoke(templatesDao, templateId) as? List<*> ?: emptyList<Any>()
+                    val fields = callSuspendMethod<List<*>>(templatesDao, "getMaintenanceFieldsForTemplate", templateId) ?: emptyList<Any>()
                     fields.mapNotNull { field ->
                         val key = (field as? Any)?.let { getField(it, "key") as? String } ?: return@mapNotNull null
                         val unit = (field as? Any)?.let { getField(it, "unit") as? String }
@@ -191,7 +317,7 @@ object ReportAssembler {
             // Получаем типы полей из шаблона для определения чекбоксов
             val fieldTypes: Map<String, String> = componentTemplateId?.let { templateId ->
                 try {
-                    val fields = templatesDao.javaClass.getMethod("getMaintenanceFieldsForTemplate", String::class.java).invoke(templatesDao, templateId) as? List<*> ?: emptyList<Any>()
+                    val fields = callSuspendMethod<List<*>>(templatesDao, "getMaintenanceFieldsForTemplate", templateId) ?: emptyList<Any>()
                     fields.mapNotNull { field ->
                         val key = (field as? Any)?.let { getField(it, "key") as? String } ?: return@mapNotNull null
                         val typeObj = (field as? Any)?.let { getField(it, "type") }
@@ -260,7 +386,7 @@ object ReportAssembler {
                 var componentType: String? = "COMMON"
                 componentTemplateId?.let { templateId ->
                     try {
-                        val template = templatesDao.javaClass.getMethod("getTemplateById", String::class.java).invoke(templatesDao, templateId) as? Any
+                        val template = callSuspendMethod<Any>(templatesDao, "getTemplateById", templateId)
                         val templateComponentType = template?.let { 
                             val typeObj = getField(it, "componentType")
                             typeObj?.javaClass?.getMethod("name")?.invoke(typeObj) as? String
@@ -344,5 +470,9 @@ object ReportAssembler {
             
             componentsWithFields = componentsWithFields
         )
+        } catch (e: Exception) {
+            Log.e("ReportAssembler", "Error in assemble", e)
+            throw e
+        }
     }
 }

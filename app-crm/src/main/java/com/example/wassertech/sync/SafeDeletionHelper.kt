@@ -1,6 +1,6 @@
-package com.example.wassertech.sync
+package ru.wassertech.sync
 
-import com.example.wassertech.data.AppDatabase
+import ru.wassertech.data.AppDatabase
 
 /**
  * Утилита для безопасного удаления объектов с отслеживанием для синхронизации

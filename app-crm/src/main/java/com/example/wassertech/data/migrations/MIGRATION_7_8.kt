@@ -1,4 +1,4 @@
-package com.example.wassertech.data.migrations
+package ru.wassertech.data.migrations
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase

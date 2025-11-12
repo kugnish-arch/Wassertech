@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.common
+package ru.wassertech.ui.common
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

@@ -1,4 +1,4 @@
-package com.example.wassertech.util
+package ru.wassertech.util
 
 object Translit {
     private val map = mapOf(

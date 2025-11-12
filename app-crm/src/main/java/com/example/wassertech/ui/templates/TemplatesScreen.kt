@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.templates
+package ru.wassertech.ui.templates
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -19,16 +19,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.ChecklistTemplateEntity
-import com.example.wassertech.data.types.ComponentType
-import com.example.wassertech.sync.SafeDeletionHelper
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.ChecklistTemplateEntity
+import ru.wassertech.data.types.ComponentType
+import ru.wassertech.sync.SafeDeletionHelper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.UUID
-import com.example.wassertech.ui.common.AppFloatingActionButton
-import com.example.wassertech.ui.common.FABTemplate
-import com.example.wassertech.ui.common.CommonAddDialog
+import ru.wassertech.ui.common.AppFloatingActionButton
+import ru.wassertech.ui.common.FABTemplate
+import ru.wassertech.ui.common.CommonAddDialog
 
 
 @Composable
@@ -357,7 +357,7 @@ private fun TemplateRowWithDrag(
                                 onClick = onDelete
                             ) {
                                 Icon(
-                                    imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                                    imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                                     contentDescription = "Удалить",
                                     tint = MaterialTheme.colorScheme.error
                                 )

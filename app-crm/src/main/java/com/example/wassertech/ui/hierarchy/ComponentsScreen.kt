@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
-package com.example.wassertech.ui.hierarchy
+package ru.wassertech.ui.hierarchy
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,22 +26,22 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.viewmodel.TemplatesViewModel
-import com.example.wassertech.data.entities.ChecklistTemplateEntity
-import com.example.wassertech.data.types.ComponentType
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.ui.common.EditDoneBottomBar
-import com.example.wassertech.ui.common.CommonAddDialog
-import com.example.wassertech.viewmodel.ClientsViewModel
-import com.example.wassertech.viewmodel.ClientsViewModelFactory
+import ru.wassertech.viewmodel.HierarchyViewModel
+import ru.wassertech.viewmodel.TemplatesViewModel
+import ru.wassertech.data.entities.ChecklistTemplateEntity
+import ru.wassertech.data.types.ComponentType
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.ui.common.EditDoneBottomBar
+import ru.wassertech.ui.common.CommonAddDialog
+import ru.wassertech.viewmodel.ClientsViewModel
+import ru.wassertech.viewmodel.ClientsViewModelFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import com.example.wassertech.ui.common.AppFloatingActionButton
-import com.example.wassertech.ui.common.FABTemplate
-import com.example.wassertech.core.ui.theme.SegmentedButtonStyle
+import ru.wassertech.ui.common.AppFloatingActionButton
+import ru.wassertech.ui.common.FABTemplate
+import ru.wassertech.core.ui.theme.SegmentedButtonStyle
 
 
 @Composable
@@ -77,7 +77,7 @@ fun ComponentsScreen(
         if (siteId != null) {
             vm.site(siteId)
         } else {
-            flowOf<com.example.wassertech.data.entities.SiteEntity?>(null)
+            flowOf<ru.wassertech.data.entities.SiteEntity?>(null)
         }
     }.collectAsState(initial = null)
 
@@ -158,7 +158,7 @@ fun ComponentsScreen(
     var editSelectedSiteIndex by remember { mutableStateOf(0) }
     
     // Получаем список всех объектов клиента для выбора в диалоге редактирования
-    var allSites by remember { mutableStateOf<List<com.example.wassertech.data.entities.SiteEntity>>(emptyList()) }
+    var allSites by remember { mutableStateOf<List<ru.wassertech.data.entities.SiteEntity>>(emptyList()) }
     val scope = rememberCoroutineScope()
     
     // Обновляем список объектов при изменении installation или site
@@ -230,11 +230,11 @@ fun ComponentsScreen(
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = com.example.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
                 ),
-                shape = com.example.wassertech.core.ui.theme.HeaderCardStyle.shape
+                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
             ) {
-                Column(Modifier.padding(com.example.wassertech.core.ui.theme.HeaderCardStyle.padding)) {
+                Column(Modifier.padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -242,8 +242,8 @@ fun ComponentsScreen(
                         // Иконка убрана по требованию
                         Text(
                             text = instName,
-                            style = com.example.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                            color = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                            style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                            color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
                             modifier = Modifier.weight(1f)
                         )
                         if (isEditing) {
@@ -378,7 +378,7 @@ fun ComponentsScreen(
                                             Spacer(Modifier.width(4.dp))
                                             IconButton(onClick = { pendingDeleteId = comp.id }) {
                                                 Icon(
-                                                    imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                                                    imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                                                     contentDescription = "Удалить компонент"
                                                 )
                                             }
@@ -422,7 +422,7 @@ fun ComponentsScreen(
                         ExposedDropdownMenu(
                             expanded = editSitePickerExpanded,
                             onDismissRequest = { editSitePickerExpanded = false },
-                            modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             allSites.forEachIndexed { index, s ->
                                 DropdownMenuItem(
@@ -486,7 +486,7 @@ fun ComponentsScreen(
                         ExposedDropdownMenu(
                             expanded = templateMenu,
                             onDismissRequest = { templateMenu = false },
-                            modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             if (allTemplates.isEmpty()) {
                                 DropdownMenuItem(

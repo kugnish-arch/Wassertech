@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.reports
+package ru.wassertech.ui.reports
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.ui.res.painterResource
-import com.example.wassertech.R
+import ru.wassertech.crm.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.core.ui.theme.PdfIconColor
+import ru.wassertech.core.ui.theme.PdfIconColor
 import androidx.core.content.FileProvider
 import android.content.Intent
 import android.net.Uri
@@ -130,7 +130,7 @@ fun ReportsScreen(
                         modifier = Modifier.size(56.dp)
                     ) {
                         Icon(
-                            imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                            imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                             contentDescription = "Удалить выбранные",
                             modifier = Modifier.size(28.dp)
                         )
@@ -244,7 +244,7 @@ fun ReportsScreen(
                                     modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = com.example.wassertech.core.ui.theme.DeleteIcon,
+                                        imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
                                         contentDescription = "Удалить",
                                         tint = MaterialTheme.colorScheme.error
                                     )

@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.hierarchy
+package ru.wassertech.ui.hierarchy
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,8 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.core.ui.theme.SegmentedButtonStyle
+import ru.wassertech.viewmodel.HierarchyViewModel
+import ru.wassertech.core.ui.theme.SegmentedButtonStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

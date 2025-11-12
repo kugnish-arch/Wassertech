@@ -1,4 +1,4 @@
-package com.example.wassertech.feature.auth
+package ru.wassertech.feature.auth
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -19,11 +19,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.core.ui.R
-import com.example.wassertech.core.auth.UserAuthService
-import com.example.wassertech.core.auth.UserInfo
-import com.example.wassertech.core.network.AuthApiService
-import com.example.wassertech.core.ui.components.IconDialog
+import ru.wassertech.core.ui.R
+import ru.wassertech.core.auth.UserAuthService
+import ru.wassertech.core.auth.UserInfo
+import ru.wassertech.core.network.AuthApiService
+import ru.wassertech.core.ui.components.IconDialog
+import ru.wassertech.core.ui.theme.AccentButtonStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -285,7 +286,8 @@ fun LoginScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            colors = AccentButtonStyle.buttonColors()
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(

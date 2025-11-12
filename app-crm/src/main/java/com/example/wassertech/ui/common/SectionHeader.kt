@@ -1,11 +1,11 @@
-package com.example.wassertech.ui.common
+package ru.wassertech.ui.common
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.core.ui.theme.Dimens
+import ru.wassertech.core.ui.theme.Dimens
 
 /**
  * Section header (subNavBar) - darker strip showing current location.

@@ -16,7 +16,7 @@
 // Важно: здесь НЕ создаём/НЕ меняем maintenance_sessions, предполагаем,
 // что она уже создана и соответствует MaintenanceSessionEntity.
 //
-package com.example.wassertech.data.migrations
+package ru.wassertech.data.migrations
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase

@@ -1,8 +1,8 @@
 
-package com.example.wassertech.repository
+package ru.wassertech.repository
 
-import com.example.wassertech.data.dao.ComponentTemplatesDao
-import com.example.wassertech.data.entities.ComponentTemplateEntity
+import ru.wassertech.data.dao.ComponentTemplatesDao
+import ru.wassertech.data.entities.ComponentTemplateEntity
 import kotlinx.coroutines.flow.Flow
 
 class ComponentTemplatesRepository(private val dao: ComponentTemplatesDao) {

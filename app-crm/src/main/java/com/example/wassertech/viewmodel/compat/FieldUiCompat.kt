@@ -1,3 +1,3 @@
-package com.example.wassertech.viewmodel.compat
+package ru.wassertech.viewmodel.compat
 
-typealias FieldUi = com.example.wassertech.viewmodel.TemplatesViewModel.UiField
+typealias FieldUi = ru.wassertech.viewmodel.TemplatesViewModel.UiField

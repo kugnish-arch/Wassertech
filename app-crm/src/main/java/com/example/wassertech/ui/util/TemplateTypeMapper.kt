@@ -1,6 +1,6 @@
-package com.example.wassertech.ui.util
+package ru.wassertech.ui.util
 
-import com.example.wassertech.data.types.ComponentType
+import ru.wassertech.data.types.ComponentType
 
 object TemplateTypeMapper {
     /**

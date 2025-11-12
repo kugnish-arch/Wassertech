@@ -1,22 +1,22 @@
-package com.example.wassertech.data
+package ru.wassertech.data
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.wassertech.data.dao.*
-import com.example.wassertech.data.entities.*
-import com.example.wassertech.data.entities.MaintenanceValueEntity
+import ru.wassertech.data.dao.*
+import ru.wassertech.data.entities.*
+import ru.wassertech.data.entities.MaintenanceValueEntity
 
 // Импорты миграций =========================================
-import com.example.wassertech.data.migrations.MIGRATION_1_2
-import com.example.wassertech.data.migrations.MIGRATION_2_3
-import com.example.wassertech.data.migrations.MIGRATION_3_4
-import com.example.wassertech.data.migrations.MIGRATION_4_5
-import com.example.wassertech.data.migrations.MIGRATION_5_6
-import com.example.wassertech.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
-import com.example.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
+import ru.wassertech.data.migrations.MIGRATION_1_2
+import ru.wassertech.data.migrations.MIGRATION_2_3
+import ru.wassertech.data.migrations.MIGRATION_3_4
+import ru.wassertech.data.migrations.MIGRATION_4_5
+import ru.wassertech.data.migrations.MIGRATION_5_6
+import ru.wassertech.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
+import ru.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
 
 @Database(
     version = 8, // ← Обновлено: добавлена таблица settings

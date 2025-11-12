@@ -1,12 +1,12 @@
-package com.example.wassertech.feature.reports
+package ru.wassertech.feature.reports
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
-import com.example.wassertech.feature.reports.model.CompanyConfig
-import com.example.wassertech.feature.reports.model.ContractConfig
+import ru.wassertech.feature.reports.model.CompanyConfig
+import ru.wassertech.feature.reports.model.ContractConfig
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.ByteArrayOutputStream

@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.templates.components
+package ru.wassertech.ui.templates.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

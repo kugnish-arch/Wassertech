@@ -1,11 +1,11 @@
-package com.example.wassertech.data.dao
+package ru.wassertech.data.dao
 
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
-import com.example.wassertech.data.entities.ClientEntity
-import com.example.wassertech.data.entities.ClientGroupEntity
+import ru.wassertech.data.entities.ClientEntity
+import ru.wassertech.data.entities.ClientGroupEntity
 
 
 /**

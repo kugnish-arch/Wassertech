@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.clients
+package ru.wassertech.ui.clients
 
 import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
@@ -26,23 +26,23 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wassertech.viewmodel.HierarchyViewModel
-import com.example.wassertech.viewmodel.ClientsViewModel
+import ru.wassertech.viewmodel.HierarchyViewModel
+import ru.wassertech.viewmodel.ClientsViewModel
 import androidx.compose.ui.platform.LocalContext
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.ui.icons.AppIcons
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.ui.icons.AppIcons
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
-import com.example.wassertech.ui.common.EditDoneBottomBar
-import com.example.wassertech.ui.common.BarAction
-import com.example.wassertech.data.entities.SiteEntity
-import com.example.wassertech.data.entities.InstallationEntity
-import com.example.wassertech.ui.common.AppFloatingActionButton
-import com.example.wassertech.ui.common.FABTemplate
-import com.example.wassertech.ui.common.FABOption
-import com.example.wassertech.ui.common.CommonAddDialog
+import ru.wassertech.ui.common.EditDoneBottomBar
+import ru.wassertech.ui.common.BarAction
+import ru.wassertech.data.entities.SiteEntity
+import ru.wassertech.data.entities.InstallationEntity
+import ru.wassertech.ui.common.AppFloatingActionButton
+import ru.wassertech.ui.common.FABTemplate
+import ru.wassertech.ui.common.FABOption
+import ru.wassertech.ui.common.CommonAddDialog
 import androidx.compose.material.icons.filled.Add
 
 private data class SiteDeleteDialogState(
@@ -240,27 +240,27 @@ fun ClientDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = com.example.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
                 ),
-                shape = com.example.wassertech.core.ui.theme.HeaderCardStyle.shape
+                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
             ) {
                 // Плашка имени — используем стиль из темы
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(com.example.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                        .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = if (isCorporate) AppIcons.ClientCorporate else AppIcons.ClientPrivate,
                         contentDescription = null,
-                        tint = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                        tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         clientName,
-                        style = com.example.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                        color = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                        style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                     )
 
                     Spacer(Modifier.weight(1f))
@@ -401,14 +401,14 @@ fun ClientDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(com.example.wassertech.core.ui.theme.ExpandableMenuBackground) // Светло-серый фон для разворачивающихся меню
+                        .background(ru.wassertech.core.ui.theme.ExpandableMenuBackground) // Светло-серый фон для разворачивающихся меню
                 ) {
                     items(sitesToShow, key = { it.id }) { s ->
                         val isExpanded = expandedSites.contains(s.id)
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.elevatedCardColors(
-                                containerColor = com.example.wassertech.core.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
+                                containerColor = ru.wassertech.core.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
@@ -427,7 +427,7 @@ fun ClientDetailScreen(
                                             expandedSites = if (isExpanded) expandedSites - s.id else expandedSites + s.id
                                         }) {
                                             Icon(
-                                                imageVector = if (isExpanded) com.example.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else com.example.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
+                                                imageVector = if (isExpanded) ru.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else ru.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
                                                 contentDescription = null
                                             )
                                         }
@@ -461,7 +461,7 @@ fun ClientDetailScreen(
                                                     onClick = { onOpenInstallation(inst.id) },
                                                     modifier = Modifier.fillMaxWidth(),
                                                     colors = CardDefaults.elevatedCardColors(
-                                                        containerColor = com.example.wassertech.core.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
+                                                        containerColor = ru.wassertech.core.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
                                                     ),
                                                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
                                                 ) {
@@ -479,7 +479,7 @@ fun ClientDetailScreen(
                                                         )
                                                         // Стрелочка справа (такая же как на экране "Клиенты")
                                                         Icon(
-                                                            imageVector = com.example.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                                                            imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
                                                             contentDescription = "Перейти к установке",
                                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                             modifier = Modifier.size(20.dp)
@@ -579,7 +579,7 @@ fun ClientDetailScreen(
                         ExposedDropdownMenu(
                             expanded = sitePickerExpanded,
                             onDismissRequest = { sitePickerExpanded = false },
-                            modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             sites.forEachIndexed { index, s ->
                                 DropdownMenuItem(
@@ -656,7 +656,7 @@ fun ClientDetailScreen(
                         ExposedDropdownMenu(
                             expanded = groupPickerExpanded,
                             onDismissRequest = { groupPickerExpanded = false },
-                            modifier = Modifier.background(com.example.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
+                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground) // Практически белый фон для выпадающих меню
                         ) {
                             groupOptions.forEachIndexed { index, pair ->
                                 DropdownMenuItem(
@@ -787,7 +787,7 @@ private fun SiteRowWithDrag(
                     Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить объект", tint = MaterialTheme.colorScheme.onSurface)
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(imageVector = com.example.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить объект", tint = MaterialTheme.colorScheme.error)
+                    Icon(imageVector = ru.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить объект", tint = MaterialTheme.colorScheme.error)
                 }
             }
         } else {
@@ -891,7 +891,7 @@ private fun InstallationRowWithDrag(
                         Icon(Icons.Filled.Unarchive, contentDescription = "Восстановить установку", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(imageVector = com.example.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить установку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Icon(imageVector = ru.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить установку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                     }
                 }
             } else {

@@ -1,3 +1,3 @@
-package com.example.wassertech.viewmodel
+package ru.wassertech.viewmodel
 
-typealias ChecklistUiField = com.example.wassertech.ui.maintenance.ChecklistUiField
+typealias ChecklistUiField = ru.wassertech.ui.maintenance.ChecklistUiField

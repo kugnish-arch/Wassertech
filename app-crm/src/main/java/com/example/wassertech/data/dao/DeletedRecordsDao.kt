@@ -1,10 +1,10 @@
-package com.example.wassertech.data.dao
+package ru.wassertech.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.example.wassertech.data.entities.DeletedRecordEntity
+import ru.wassertech.data.entities.DeletedRecordEntity
 
 @Dao
 interface DeletedRecordsDao {

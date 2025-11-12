@@ -1,9 +1,9 @@
-package com.example.wassertech.data
+package ru.wassertech.data
 
 import androidx.room.TypeConverter
-import com.example.wassertech.data.types.ComponentType
-import com.example.wassertech.data.types.FieldType
-import com.example.wassertech.data.types.Severity
+import ru.wassertech.data.types.ComponentType
+import ru.wassertech.data.types.FieldType
+import ru.wassertech.data.types.Severity
 
 class Converters {
     @TypeConverter

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.wassertech.core.network"
+    namespace = "ru.wassertech.core.network"
     compileSdk = 36
 
     defaultConfig {

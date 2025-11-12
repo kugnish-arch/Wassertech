@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.wassertech.feature.auth"
+    namespace = "ru.wassertech.feature.auth"
     compileSdk = 36
 
     defaultConfig {

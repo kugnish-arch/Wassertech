@@ -1,4 +1,4 @@
-package com.example.wassertech.core.auth
+package ru.wassertech.core.auth
 
 import android.content.Context
 import android.content.SharedPreferences

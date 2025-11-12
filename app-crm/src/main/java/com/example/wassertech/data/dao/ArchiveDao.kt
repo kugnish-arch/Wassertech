@@ -1,8 +1,8 @@
-package com.example.wassertech.data.dao
+package ru.wassertech.data.dao
 
 import androidx.room.Dao
 import androidx.room.Query
-import com.example.wassertech.data.entities.ClientEntity
+import ru.wassertech.data.entities.ClientEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

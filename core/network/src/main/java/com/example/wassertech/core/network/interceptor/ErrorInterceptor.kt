@@ -1,4 +1,4 @@
-package com.example.wassertech.core.network.interceptor
+package ru.wassertech.core.network.interceptor
 
 import okhttp3.Interceptor
 import okhttp3.Response

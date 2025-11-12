@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.about
+package ru.wassertech.ui.about
 
 import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.R
+import ru.wassertech.crm.R
 
 @Composable
 fun AboutScreen() {

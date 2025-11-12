@@ -1,10 +1,10 @@
-package com.example.wassertech.core.auth.impl
+package ru.wassertech.core.auth.impl
 
-import com.example.wassertech.core.auth.AuthRepository
-import com.example.wassertech.core.auth.AuthResult
-import com.example.wassertech.core.auth.TokenRefreshResult
-import com.example.wassertech.core.auth.TokenStorage
-import com.example.wassertech.core.auth.SessionStore
+import ru.wassertech.core.auth.AuthRepository
+import ru.wassertech.core.auth.AuthResult
+import ru.wassertech.core.auth.TokenRefreshResult
+import ru.wassertech.core.auth.TokenStorage
+import ru.wassertech.core.auth.SessionStore
 import kotlinx.coroutines.delay
 
 /**

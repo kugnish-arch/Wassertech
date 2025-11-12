@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.settings
+package ru.wassertech.ui.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,10 +14,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
-import com.example.wassertech.R
-import com.example.wassertech.auth.UserAuthService
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.sync.MySqlSyncService
+import ru.wassertech.crm.R
+import ru.wassertech.auth.UserAuthService
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.sync.MySqlSyncService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,7 +86,7 @@ fun SettingsScreen() {
                         onCheckedChange = { newValue ->
                             scope.launch(Dispatchers.IO) {
                                 db.settingsDao().setValue(
-                                    com.example.wassertech.data.entities.SettingsEntity(
+                                    ru.wassertech.data.entities.SettingsEntity(
                                         key = "save_html",
                                         value = newValue.toString()
                                     )

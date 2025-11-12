@@ -1,12 +1,12 @@
-package com.example.wassertech.viewmodel
+package ru.wassertech.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.ChecklistFieldEntity
-import com.example.wassertech.data.types.FieldType
-import com.example.wassertech.sync.DeletionTracker
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.ChecklistFieldEntity
+import ru.wassertech.data.types.FieldType
+import ru.wassertech.sync.DeletionTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +52,7 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
             templateId = templateId,
             key = "field_" + System.currentTimeMillis(),
             label = "Новое поле",
-            type = com.example.wassertech.data.types.FieldType.TEXT,
+            type = ru.wassertech.data.types.FieldType.TEXT,
             isForMaintenance = true,
             unit = null,
             min = null,
@@ -65,12 +65,12 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
         _fields.value = _fields.value.map { if (it.id == id) transform(it) else it }
     }
 
-    fun setType(id: String, type: com.example.wassertech.data.types.FieldType) {
+    fun setType(id: String, type: ru.wassertech.data.types.FieldType) {
         update(id) {
             it.copy(
                 type = type,
-                min = if (type == com.example.wassertech.data.types.FieldType.NUMBER) it.min else null,
-                max = if (type == com.example.wassertech.data.types.FieldType.NUMBER) it.max else null
+                min = if (type == ru.wassertech.data.types.FieldType.NUMBER) it.min else null,
+                max = if (type == ru.wassertech.data.types.FieldType.NUMBER) it.max else null
             )
         }
     }
@@ -108,7 +108,7 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun com.example.wassertech.data.entities.ChecklistFieldEntity.toUi(): UiField = UiField(
+    private fun ru.wassertech.data.entities.ChecklistFieldEntity.toUi(): UiField = UiField(
         id = id,
         templateId = templateId,
         key = key,
@@ -120,8 +120,8 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
         max = max?.toString()
     )
 
-    private fun UiField.toEntity(indexHint: Int): com.example.wassertech.data.entities.ChecklistFieldEntity =
-        com.example.wassertech.data.entities.ChecklistFieldEntity(
+    private fun UiField.toEntity(indexHint: Int): ru.wassertech.data.entities.ChecklistFieldEntity =
+        ru.wassertech.data.entities.ChecklistFieldEntity(
             id = id,
             templateId = templateId,
             key = key,

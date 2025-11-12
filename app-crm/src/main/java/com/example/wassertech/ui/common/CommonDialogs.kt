@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.common
+package ru.wassertech.ui.common
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -15,8 +15,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.wassertech.core.ui.theme.DialogStyle
-import com.example.wassertech.core.ui.theme.SaveIconColor
+import ru.wassertech.core.ui.theme.DialogStyle
+import ru.wassertech.core.ui.theme.SaveIconColor
 
 /**
  * Общий компонент для диалогов добавления/редактирования элементов

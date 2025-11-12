@@ -59,11 +59,11 @@ if (!useTimestamp) {
 }
 
 android {
-    namespace = "com.example.wassertech"
+    namespace = "ru.wassertech.crm"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.wassertech"
+        applicationId = "ru.wassertech.crm"
         minSdk = 26
         targetSdk = 36
         // versionCode автоматически увеличивается при каждой сборке
@@ -107,6 +107,17 @@ android {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}"
             )
+        }
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            // Replace colon with dash in filename (colons are invalid in Windows filenames)
+            val safeVersionName = variant.versionName.replace(":", "-")
+            val outputFileName = "Wassertech-CRM-${variant.name}-v${safeVersionName}.apk"
+            @Suppress("DEPRECATION")
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = outputFileName
         }
     }
 }

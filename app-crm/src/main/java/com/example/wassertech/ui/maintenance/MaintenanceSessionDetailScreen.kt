@@ -1,4 +1,4 @@
-package com.example.wassertech.ui.maintenance
+package ru.wassertech.ui.maintenance
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,29 +9,29 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.ui.res.painterResource
-import com.example.wassertech.R
+import ru.wassertech.crm.R
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.ui.graphics.Color
-import com.example.wassertech.ui.common.AppFloatingActionButton
-import com.example.wassertech.ui.common.FABTemplate
+import ru.wassertech.ui.common.AppFloatingActionButton
+import ru.wassertech.ui.common.FABTemplate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.MaintenanceSessionEntity
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.MaintenanceSessionEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import com.example.wassertech.feature.reports.ReportAssembler
-import com.example.wassertech.feature.reports.HtmlTemplateEngine
-import com.example.wassertech.feature.reports.PdfExporter
-import com.example.wassertech.feature.reports.ShareUtils
+import ru.wassertech.feature.reports.ReportAssembler
+import ru.wassertech.feature.reports.HtmlTemplateEngine
+import ru.wassertech.feature.reports.PdfExporter
+import ru.wassertech.feature.reports.ShareUtils
 import android.util.Log;
 
 @Composable
@@ -142,11 +142,15 @@ fun MaintenanceSessionDetailScreen(
         scope.launch {
             exporting = true
             try {
+                Log.d("PDF", "Starting PDF generation for sessionId: $sessionId")
+                
                 // Подготовка DTO на IO потоке
+                Log.d("PDF", "Assembling report DTO...")
                 val dto = withContext(Dispatchers.IO) {
                     val appDb = AppDatabase.getInstance(context)
                     ReportAssembler.assemble(appDb, context, sessionId)
                 }
+                Log.d("PDF", "Report DTO assembled successfully, reportNumber: ${dto.reportNumber}")
 
                 // Путь для PDF (заменяем "/" на "_" в номере отчета для имени файла)
                 val reportsDir = File(
@@ -155,8 +159,10 @@ fun MaintenanceSessionDetailScreen(
                 ).apply { mkdirs() }
                 val fileName = "Report_${dto.reportNumber.replace("/", "_")}.pdf"
                 val out = File(reportsDir, fileName)
+                Log.d("PDF", "PDF file path: ${out.absolutePath}")
 
                 // HTML шаблон
+                Log.d("PDF", "Rendering HTML template...")
                 val html = withContext(Dispatchers.IO) {
                     HtmlTemplateEngine.render(
                         context = context,
@@ -164,12 +170,15 @@ fun MaintenanceSessionDetailScreen(
                         dto = dto
                     )
                 }
+                Log.d("PDF", "HTML rendered, length: ${html.length}")
                 
                 // Проверяем настройку сохранения HTML
+                Log.d("PDF", "Checking save_html setting...")
                 val shouldSaveHtml = withContext(Dispatchers.IO) {
                     val setting = AppDatabase.getInstance(context).settingsDao().getValueSync("save_html")
                     setting?.toBoolean() ?: false
                 }
+                Log.d("PDF", "save_html setting: $shouldSaveHtml")
                 
                 // Сохраняем HTML рядом с PDF, если настройка включена
                 if (shouldSaveHtml) {
@@ -179,10 +188,16 @@ fun MaintenanceSessionDetailScreen(
                 }
                 
                 // HTML -> PDF (на Main потоке, так как WebView требует Main thread)
-                PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)
+                Log.d("PDF", "Starting PDF export on Main thread...")
+                withContext(Dispatchers.Main) {
+                    PdfExporter.exportHtmlToPdf(context, html, out, dto.reportNumber)
+                }
+                Log.d("PDF", "PDF export completed successfully")
 
                 // Шарим созданный файл
+                Log.d("PDF", "Sharing PDF file...")
                 ShareUtils.sharePdf(context, out)
+                Log.d("PDF", "PDF shared successfully")
                 
                 // Показываем информацию об успешной генерации PDF
                 snackbarHostState.showSnackbar(
@@ -190,6 +205,7 @@ fun MaintenanceSessionDetailScreen(
                     duration = SnackbarDuration.Short
                 )
             } catch (t: Throwable) {
+                Log.e("PDF", "Error creating PDF", t)
                 val errorMsg = when {
                     t is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания (30 сек). Попробуйте еще раз."
                     t.cause is kotlinx.coroutines.TimeoutCancellationException -> "Превышено время ожидания. Попробуйте еще раз."
@@ -200,6 +216,7 @@ fun MaintenanceSessionDetailScreen(
                 }
                 snackbarHostState.showSnackbar(errorMsg)
             } finally {
+                Log.d("PDF", "PDF generation finished, setting exporting = false")
                 exporting = false
             }
         }
@@ -278,20 +295,20 @@ fun MaintenanceSessionDetailScreen(
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.elevatedCardColors(
-                                containerColor = com.example.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                                containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
                             ),
-                            shape = com.example.wassertech.core.ui.theme.HeaderCardStyle.shape
+                            shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
                         ) {
                             Column(
-                                Modifier.fillMaxWidth().padding(com.example.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                                Modifier.fillMaxWidth().padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     val icon =
                                         if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
-                                    Icon(icon, contentDescription = null, tint = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor)
+                                    Icon(icon, contentDescription = null, tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor)
                                     Spacer(Modifier.width(8.dp))
-                                    Text(clientName, style = com.example.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle, color = com.example.wassertech.core.ui.theme.HeaderCardStyle.textColor)
+                                    Text(clientName, style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle, color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(

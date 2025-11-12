@@ -1,4 +1,4 @@
-package com.example.wassertech.ui
+package ru.wassertech.ui
 
 enum class AppSection {
     Clients,

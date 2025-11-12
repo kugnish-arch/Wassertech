@@ -1,9 +1,9 @@
-package com.example.wassertech.data.seed
+package ru.wassertech.data.seed
 
-import com.example.wassertech.data.AppDatabase
-import com.example.wassertech.data.entities.ChecklistFieldEntity
-import com.example.wassertech.data.entities.ChecklistTemplateEntity
-import com.example.wassertech.data.types.ComponentType
+import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.ChecklistFieldEntity
+import ru.wassertech.data.entities.ChecklistTemplateEntity
+import ru.wassertech.data.types.ComponentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -49,9 +49,9 @@ object TemplateSeeder {
             key = key,
             label = label,
             type = when (type) {
-                "CHECKBOX" -> com.example.wassertech.data.types.FieldType.CHECKBOX
-                "NUMBER" -> com.example.wassertech.data.types.FieldType.NUMBER
-                else -> com.example.wassertech.data.types.FieldType.TEXT
+                "CHECKBOX" -> ru.wassertech.data.types.FieldType.CHECKBOX
+                "NUMBER" -> ru.wassertech.data.types.FieldType.NUMBER
+                else -> ru.wassertech.data.types.FieldType.TEXT
             },
             unit = null,
             min = null,
