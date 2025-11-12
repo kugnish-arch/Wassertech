@@ -63,13 +63,15 @@ interface ClientDao {
      * Клиенты по группе (моментальный снимок):
      *  - groupId == NULL -> клиенты без группы
      *  - иначе клиенты указанной группы
+     *  - исключаются архивированные клиенты
      */
     @Query(
         """
         SELECT * FROM clients 
         WHERE 
-            (:groupId IS NULL AND clientGroupId IS NULL) OR 
-            (:groupId IS NOT NULL AND clientGroupId = :groupId)
+            ((:groupId IS NULL AND clientGroupId IS NULL) OR 
+            (:groupId IS NOT NULL AND clientGroupId = :groupId))
+            AND (isArchived IS NULL OR isArchived = 0)
         ORDER BY 
             CASE WHEN sortOrder IS NULL THEN 1 ELSE 0 END ASC,
             sortOrder ASC
@@ -129,8 +131,14 @@ interface ClientDao {
     @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
     suspend fun getClientNow(id: String): ClientEntity
 
-    /** Получить всех клиентов для синхронизации */
-    @Query("SELECT * FROM clients")
+    /** Получить всех клиентов для синхронизации (исключая архивированных) */
+    @Query("""
+        SELECT * FROM clients 
+        WHERE (isArchived IS NULL OR isArchived = 0)
+        ORDER BY 
+            CASE WHEN sortOrder IS NULL THEN 1 ELSE 0 END ASC,
+            sortOrder ASC
+    """)
     fun getAllClientsNow(): List<ClientEntity>
 
     /** Удалить группу клиентов навсегда */

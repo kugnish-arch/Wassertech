@@ -145,6 +145,14 @@ interface HierarchyDao {
     @Query("SELECT * FROM installations")
     fun getAllInstallationsNow(): List<InstallationEntity>
 
+    /** Получить все неархивные установки */
+    @Query("""
+        SELECT * FROM installations 
+        WHERE (isArchived = 0 OR isArchived IS NULL)
+        ORDER BY orderIndex ASC, name COLLATE NOCASE
+    """)
+    fun getAllNonArchivedInstallationsNow(): List<InstallationEntity>
+
     /** Получить все компоненты для синхронизации */
     @Query("SELECT * FROM components")
     fun getAllComponentsNow(): List<ComponentEntity>
