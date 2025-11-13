@@ -7,10 +7,24 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
 
+/**
+ * УСТАРЕВШИЙ КОД: Прямое подключение к MySQL больше не используется для загрузки установок.
+ * Установки теперь загружаются через HTTP API (см. InstallationsRepository).
+ * 
+ * Этот сервис оставлен для совместимости со старым кодом синхронизации в SettingsScreen,
+ * но в будущем должен быть полностью заменен на API.
+ */
 object MySqlSyncService {
     
+    // УСТАРЕВШИЙ КОД: Прямое подключение к MySQL
+    // Теперь используется HTTP API через WassertechApi
+    @Deprecated("Используйте HTTP API вместо прямого подключения к MySQL")
     private const val DB_URL = "jdbc:mysql://kugnis.beget.tech:3306/kugnis_app?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+    
+    @Deprecated("Используйте HTTP API вместо прямого подключения к MySQL")
     private const val DB_USER = "kugnis_app"
+    
+    @Deprecated("Используйте HTTP API вместо прямого подключения к MySQL")
     private const val DB_PASSWORD = "Umnik1985!"
     
     private const val TAG = "MySQLSync"
@@ -87,8 +101,11 @@ object MySqlSyncService {
     }
     
     /**
-     * Получает только клиентов из удалённой MySQL БД и сохраняет в локальную Room БД
+     * УСТАРЕВШИЙ МЕТОД: Получает только клиентов из удалённой MySQL БД и сохраняет в локальную Room БД
+     * 
+     * @deprecated Используйте HTTP API вместо прямого подключения к MySQL
      */
+    @Deprecated("Используйте HTTP API вместо прямого подключения к MySQL")
     suspend fun pullClientsFromRemote(db: AppDatabase): String {
         var connection: Connection? = null
         try {
@@ -154,9 +171,13 @@ object MySqlSyncService {
     }
     
     /**
-     * Получает клиентов из удалённой MySQL БД и сохраняет в локальную Room БД
+     * УСТАРЕВШИЙ МЕТОД: Получает клиентов из удалённой MySQL БД и сохраняет в локальную Room БД
      * Затем получает установки и сессии обслуживания для выбранного клиента
+     * 
+     * @deprecated Используйте HTTP API вместо прямого подключения к MySQL
+     * Установки теперь загружаются через InstallationsRepository и WassertechApi
      */
+    @Deprecated("Используйте HTTP API вместо прямого подключения к MySQL")
     suspend fun pullClientDataFromRemote(db: AppDatabase, clientId: String): String {
         var connection: Connection? = null
         try {

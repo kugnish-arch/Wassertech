@@ -36,7 +36,21 @@ class ErrorInterceptor : Interceptor {
             return response
         } catch (e: IOException) {
             // Обработка сетевых ошибок
-            throw NetworkException("Network error: ${e.message}", e)
+            // Сохраняем оригинальное сообщение об ошибке для лучшей диагностики
+            val errorMessage = e.message ?: "Unknown network error"
+            val detailedMessage = when {
+                errorMessage.contains("exhausted all routes") -> {
+                    "Failed to connect to server. Check internet connection and server availability. Original: $errorMessage"
+                }
+                errorMessage.contains("timeout") -> {
+                    "Connection timeout. Server may be unavailable. Original: $errorMessage"
+                }
+                errorMessage.contains("SSL") || errorMessage.contains("certificate") -> {
+                    "SSL certificate error. Original: $errorMessage"
+                }
+                else -> "Network error: $errorMessage"
+            }
+            throw NetworkException(detailedMessage, e)
         }
     }
 }

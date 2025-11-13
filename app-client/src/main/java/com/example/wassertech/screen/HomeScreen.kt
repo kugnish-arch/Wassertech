@@ -63,9 +63,22 @@ fun HomeScreen(navController: NavController? = null) {
                     databaseProvider = databaseProvider,
                     onNavigateToSessionDetail = { sessionId ->
                         navController?.navigate(AppRoutes.sessionDetail(sessionId))
+                    },
+                    onNavigateToLogin = {
+                        // Навигация на экран логина с очисткой стека
+                        navController?.navigate(AppRoutes.LOGIN) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 )
-                1 -> SettingsScreen()
+                1 -> SettingsScreen(
+                    onLogout = {
+                        // Навигация на экран логина с очисткой стека
+                        navController?.navigate(AppRoutes.LOGIN) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
             }
         }
     }

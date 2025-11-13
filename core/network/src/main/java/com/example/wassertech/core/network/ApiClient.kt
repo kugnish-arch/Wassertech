@@ -32,25 +32,26 @@ object ApiClient {
         enableLogging: Boolean = true
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(60, TimeUnit.SECONDS) // Увеличено до 60 секунд
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true) // Включаем retry при ошибках соединения
         
-        // Auth interceptor
+        // Auth interceptor (добавляем первым, чтобы токен был в заголовках)
         tokenStorage?.let {
             builder.addInterceptor(AuthInterceptor(it))
         }
         
-        // Error interceptor
-        builder.addInterceptor(ErrorInterceptor())
-        
-        // Logging interceptor
+        // Logging interceptor (добавляем перед ErrorInterceptor для лучшего логирования)
         if (enableLogging) {
             val loggingInterceptor = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             }
             builder.addInterceptor(loggingInterceptor)
         }
+        
+        // Error interceptor (добавляем последним)
+        builder.addInterceptor(ErrorInterceptor())
         
         return builder.build()
     }

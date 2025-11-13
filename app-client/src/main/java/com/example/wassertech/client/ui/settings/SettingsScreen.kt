@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,17 +15,23 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.wassertech.client.auth.AuthRepository
 import ru.wassertech.client.data.AppDatabase
+import ru.wassertech.client.data.OfflineModeManager
 import ru.wassertech.client.data.entities.ClientEntity
 import ru.wassertech.client.sync.MySqlSyncService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onLogout: () -> Unit = {}
+) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val authRepository = remember { AuthRepository(context) }
+    val offlineModeManager = remember { OfflineModeManager.getInstance(context) }
     
     var syncing by remember { mutableStateOf(false) }
     var loadingClients by remember { mutableStateOf(false) }
@@ -32,6 +39,7 @@ fun SettingsScreen() {
     var clients by remember { mutableStateOf<List<ClientEntity>>(emptyList()) }
     var selectedClientId by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     
     // Загружаем список клиентов из удалённой БД при первом открытии экрана
     LaunchedEffect(Unit) {
@@ -223,7 +231,73 @@ fun SettingsScreen() {
                     }
                 }
             }
+            
+            // Разделитель перед кнопкой выхода
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            
+            // Кнопка "Выйти из учетной записи"
+            OutlinedButton(
+                onClick = {
+                    showLogoutDialog = true
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    Icons.Default.Logout,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Выйти из учетной записи")
+            }
         }
+    }
+    
+    // Диалог подтверждения выхода
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = {
+                Text("Выход из учетной записи")
+            },
+            text = {
+                Text("Вы уверены, что хотите выйти из учетной записи?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            // Выполняем logout
+                            authRepository.logout()
+                            // Отключаем оффлайн режим
+                            offlineModeManager.setOfflineMode(false)
+                            // Закрываем диалог
+                            showLogoutDialog = false
+                            // Вызываем callback для навигации
+                            onLogout()
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Выйти")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLogoutDialog = false }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 }
 

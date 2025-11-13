@@ -6,7 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import ru.wassertech.feature.auth.LoginScreen
+import ru.wassertech.client.ui.auth.LoginScreen
 import ru.wassertech.screen.HomeScreen
 import ru.wassertech.client.ui.maintenance.MaintenanceSessionDetailScreen
 

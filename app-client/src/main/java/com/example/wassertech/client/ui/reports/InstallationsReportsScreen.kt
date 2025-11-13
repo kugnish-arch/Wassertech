@@ -5,12 +5,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.res.painterResource
@@ -20,9 +20,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
+import ru.wassertech.client.auth.AuthRepository
+import ru.wassertech.client.data.OfflineModeManager
+import ru.wassertech.client.repository.InstallationsRepository
+import ru.wassertech.core.ui.theme.ClientsGroupExpandedBackground
+import ru.wassertech.core.ui.theme.ClientsGroupExpandedText
+import ru.wassertech.core.ui.theme.ClientsGroupBorder
 import ru.wassertech.feature.reports.ReportsDatabaseProvider
 import ru.wassertech.feature.reports.InstallationData
 import ru.wassertech.feature.reports.MaintenanceSessionData
@@ -32,23 +42,45 @@ import java.util.*
 @Composable
 fun InstallationsReportsScreen(
     databaseProvider: ReportsDatabaseProvider,
-    onNavigateToSessionDetail: (String) -> Unit = {}
+    onNavigateToSessionDetail: (String) -> Unit = {},
+    onNavigateToLogin: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val authRepository = remember { AuthRepository(context) }
+    val installationsRepository = remember { InstallationsRepository(context, authRepository) }
+    val offlineModeManager = remember { OfflineModeManager.getInstance(context) }
+    val isOfflineMode by offlineModeManager.observeOfflineMode().collectAsState(initial = false)
+    
     var installations by remember { mutableStateOf<List<InstallationData>>(emptyList()) }
     var expandedInstallations by remember { mutableStateOf<Set<String>>(emptySet()) }
     var loading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var clientName by remember { mutableStateOf<String?>(null) }
+    var shouldNavigateToLogin by remember { mutableStateOf(false) }
     val dateFormatter = remember {
         SimpleDateFormat("d MMMM yyyy, HH:mm", Locale.forLanguageTag("ru"))
     }
     
-    // Загружаем установки
-    LaunchedEffect(databaseProvider) {
+    // Загружаем установки через API или из Room (в зависимости от режима)
+    LaunchedEffect(isOfflineMode) {
         loading = true
+        errorMessage = null
+        shouldNavigateToLogin = false
         try {
-            installations = withContext(Dispatchers.IO) {
-                databaseProvider.getAllNonArchivedInstallations()
+            val installationsDto = withContext(Dispatchers.IO) {
+                installationsRepository.loadInstallations()
             }
+            // Преобразуем DTO в InstallationData
+            installations = installationsDto.map { dto ->
+                InstallationData(
+                    id = dto.id,
+                    name = dto.name,
+                    siteId = dto.siteId,
+                    orderIndex = dto.orderIndex,
+                    isArchived = false // API возвращает только неархивные установки
+                )
+            }
+            
             // Получаем название клиента для первой установки
             if (installations.isNotEmpty()) {
                 clientName = withContext(Dispatchers.IO) {
@@ -57,14 +89,67 @@ fun InstallationsReportsScreen(
             }
         } catch (e: Exception) {
             android.util.Log.e("InstallationsReportsScreen", "Error loading installations", e)
+            // В оффлайн режиме не показываем ошибки сети
+            if (!isOfflineMode) {
+                when {
+                    // Проверяем HttpException с кодом 401
+                    e is HttpException && e.code() == 401 -> {
+                        // Сессия истекла - очищаем токен и переходим на экран логина
+                        android.util.Log.d("InstallationsReportsScreen", "Сессия истекла (401), очистка токена и переход на экран логина")
+                        withContext(Dispatchers.IO) {
+                            authRepository.logout()
+                        }
+                        shouldNavigateToLogin = true
+                    }
+                    e.message?.contains("401") == true || e.message?.contains("недействителен") == true -> {
+                        // Сессия истекла - очищаем токен и переходим на экран логина
+                        android.util.Log.d("InstallationsReportsScreen", "Сессия истекла, очистка токена и переход на экран логина")
+                        withContext(Dispatchers.IO) {
+                            authRepository.logout()
+                        }
+                        shouldNavigateToLogin = true
+                    }
+                    e is HttpException && e.code() == 403 -> {
+                        errorMessage = "Доступ запрещен"
+                    }
+                    e.message?.contains("403") == true -> {
+                        errorMessage = "Доступ запрещен"
+                    }
+                    else -> {
+                        errorMessage = "Ошибка загрузки установок: ${e.message}"
+                    }
+                }
+            }
         } finally {
             loading = false
+        }
+    }
+    
+    // Навигация на экран логина при истечении сессии
+    LaunchedEffect(shouldNavigateToLogin) {
+        if (shouldNavigateToLogin) {
+            onNavigateToLogin()
         }
     }
     
     if (loading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
+        }
+    } else if (errorMessage != null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    errorMessage!!,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     } else if (installations.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -102,7 +187,7 @@ fun InstallationsReportsScreen(
                 contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // Плашка с названием клиента
+                // Шапка с названием клиента
                 if (clientName != null) {
                     item {
                         ClientHeaderBar(clientName = clientName!!)
@@ -136,6 +221,37 @@ fun InstallationsReportsScreen(
                         )
                     }
                 }
+                
+                // Индикатор оффлайн режима внизу списка
+                if (isOfflineMode) {
+                    item {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Оффлайн режим",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -147,19 +263,19 @@ private fun ClientHeaderBar(clientName: String) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(ru.wassertech.core.ui.theme.ClientsGroupExpandedBackground)
+                .background(ClientsGroupExpandedBackground)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 clientName,
-                color = ru.wassertech.core.ui.theme.ClientsGroupExpandedText,
+                color = ClientsGroupExpandedText,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
         }
         HorizontalDivider(
-            color = ru.wassertech.core.ui.theme.ClientsGroupBorder,
+            color = ClientsGroupBorder,
             thickness = 1.dp
         )
     }
