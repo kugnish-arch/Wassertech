@@ -12,7 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import ru.wassertech.core.ui.theme.NavigationBarStyle
+
+// Цвета для Bottom Navigation Bar
+private val BottomBarBackground = Color.White.copy(alpha = 0.95f) // Полупрозрачный белый
+private val BottomBarActiveIcon = Color(0xFFE53935) // Красный для активной иконки
+private val BottomBarInactiveIcon = Color(0xFF5A5A5A) // Серый для неактивных иконок
+private val BottomBarActiveIndicator = Color(0xFFE53935) // Красная линия для активной вкладки
 
 @Composable
 fun NavigationBottomBar(
@@ -23,8 +28,8 @@ fun NavigationBottomBar(
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
-        modifier = modifier.height(NavigationBarStyle.height),
-        containerColor = NavigationBarStyle.backgroundColor,
+        modifier = modifier.height(90.dp),
+        containerColor = BottomBarBackground,
         tonalElevation = 3.dp
     ) {
         // Клиенты
@@ -39,13 +44,13 @@ fun NavigationBottomBar(
                     if (isClientsSelected) {
                         Box(
                             modifier = Modifier
-                                .width(NavigationBarStyle.indicatorWidth)
-                                .height(NavigationBarStyle.indicatorHeight)
+                                .width(32.dp)
+                                .height(3.dp)
                                 .clip(RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
-                                .background(NavigationBarStyle.activeIndicatorColor)
+                                .background(BottomBarActiveIndicator)
                         )
                     } else {
-                        Spacer(modifier = Modifier.height(NavigationBarStyle.indicatorHeight))
+                        Spacer(modifier = Modifier.height(3.dp))
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box(
@@ -57,7 +62,7 @@ fun NavigationBottomBar(
                         Icon(
                             Icons.Filled.Person,
                             contentDescription = "Клиенты",
-                            tint = if (isClientsSelected) NavigationBarStyle.activeIconColor else NavigationBarStyle.inactiveIconColor
+                            tint = if (isClientsSelected) BottomBarActiveIcon else BottomBarInactiveIcon
                         )
                     }
                 }
@@ -65,7 +70,11 @@ fun NavigationBottomBar(
             label = {},
             selected = isClientsSelected,
             onClick = onNavigateToClients,
-            colors = NavigationBarStyle.itemColors()
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = BottomBarActiveIcon,
+                unselectedIconColor = BottomBarInactiveIcon,
+                indicatorColor = Color.Transparent // Убираем стандартный индикатор
+            )
         )
         
         // История ТО
@@ -80,13 +89,13 @@ fun NavigationBottomBar(
                     if (isMaintenanceSelected) {
                         Box(
                             modifier = Modifier
-                                .width(NavigationBarStyle.indicatorWidth)
-                                .height(NavigationBarStyle.indicatorHeight)
+                                .width(32.dp)
+                                .height(3.dp)
                                 .clip(RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
-                                .background(NavigationBarStyle.activeIndicatorColor)
+                                .background(BottomBarActiveIndicator)
                         )
                     } else {
-                        Spacer(modifier = Modifier.height(NavigationBarStyle.indicatorHeight))
+                        Spacer(modifier = Modifier.height(3.dp))
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box(
@@ -98,7 +107,7 @@ fun NavigationBottomBar(
                         Icon(
                             Icons.Filled.Schedule,
                             contentDescription = "Обслуживание",
-                            tint = if (isMaintenanceSelected) NavigationBarStyle.activeIconColor else NavigationBarStyle.inactiveIconColor
+                            tint = if (isMaintenanceSelected) BottomBarActiveIcon else BottomBarInactiveIcon
                         )
                     }
                 }
@@ -106,7 +115,11 @@ fun NavigationBottomBar(
             label = {},
             selected = isMaintenanceSelected,
             onClick = onNavigateToMaintenanceHistory,
-            colors = NavigationBarStyle.itemColors()
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = BottomBarActiveIcon,
+                unselectedIconColor = BottomBarInactiveIcon,
+                indicatorColor = Color.Transparent
+            )
         )
         
         // Отчёты
@@ -121,13 +134,13 @@ fun NavigationBottomBar(
                     if (isReportsSelected) {
                         Box(
                             modifier = Modifier
-                                .width(NavigationBarStyle.indicatorWidth)
-                                .height(NavigationBarStyle.indicatorHeight)
+                                .width(32.dp)
+                                .height(3.dp)
                                 .clip(RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
-                                .background(NavigationBarStyle.activeIndicatorColor)
+                                .background(BottomBarActiveIndicator)
                         )
                     } else {
-                        Spacer(modifier = Modifier.height(NavigationBarStyle.indicatorHeight))
+                        Spacer(modifier = Modifier.height(3.dp))
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box(
@@ -139,7 +152,7 @@ fun NavigationBottomBar(
                         Icon(
                             Icons.Filled.Description,
                             contentDescription = "Отчёты",
-                            tint = if (isReportsSelected) NavigationBarStyle.activeIconColor else NavigationBarStyle.inactiveIconColor
+                            tint = if (isReportsSelected) BottomBarActiveIcon else BottomBarInactiveIcon
                         )
                     }
                 }
@@ -147,7 +160,11 @@ fun NavigationBottomBar(
             label = {},
             selected = isReportsSelected,
             onClick = onNavigateToReports,
-            colors = NavigationBarStyle.itemColors()
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = BottomBarActiveIcon,
+                unselectedIconColor = BottomBarInactiveIcon,
+                indicatorColor = Color.Transparent
+            )
         )
     }
 }

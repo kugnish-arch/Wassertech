@@ -17,9 +17,10 @@ import ru.wassertech.data.migrations.MIGRATION_4_5
 import ru.wassertech.data.migrations.MIGRATION_5_6
 import ru.wassertech.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
 import ru.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
+import ru.wassertech.data.migrations.MIGRATION_8_9   // ← Добавление полей синхронизации
 
 @Database(
-    version = 8, // ← Обновлено: добавлена таблица settings
+    version = 9, // ← Обновлено: добавлены поля синхронизации во все сущности
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -27,6 +28,7 @@ import ru.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление
         SiteEntity::class,
         InstallationEntity::class,
         ComponentEntity::class,
+        ComponentTemplateEntity::class,
         ChecklistTemplateEntity::class,
         ChecklistFieldEntity::class,
         MaintenanceSessionEntity::class,
@@ -48,6 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun archiveDao(): ArchiveDao
     abstract fun deletedRecordsDao(): DeletedRecordsDao
     abstract fun settingsDao(): SettingsDao
+    abstract fun componentTemplatesDao(): ComponentTemplatesDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -67,7 +70,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,    // ← Обновление ComponentType
-                        MIGRATION_7_8    // ← Добавление таблицы settings
+                        MIGRATION_7_8,   // ← Добавление таблицы settings
+                        MIGRATION_8_9    // ← Добавление полей синхронизации
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

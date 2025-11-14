@@ -160,4 +160,90 @@ interface HierarchyDao {
     /** Вставка компонента (для синхронизации) */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComponent(component: ComponentEntity)
+    
+    // ========== Методы синхронизации ==========
+    
+    /** Получить все "грязные" объекты */
+    @Query("SELECT * FROM sites WHERE dirtyFlag = 1")
+    fun getDirtySitesNow(): List<SiteEntity>
+    
+    /** Получить все "грязные" установки */
+    @Query("SELECT * FROM installations WHERE dirtyFlag = 1")
+    fun getDirtyInstallationsNow(): List<InstallationEntity>
+    
+    /** Получить все "грязные" компоненты */
+    @Query("SELECT * FROM components WHERE dirtyFlag = 1")
+    fun getDirtyComponentsNow(): List<ComponentEntity>
+    
+    /** Пометить объекты как синхронизированные */
+    @Query("""
+        UPDATE sites 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markSitesAsSynced(ids: List<String>)
+    
+    /** Пометить установки как синхронизированные */
+    @Query("""
+        UPDATE installations 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markInstallationsAsSynced(ids: List<String>)
+    
+    /** Пометить компоненты как синхронизированные */
+    @Query("""
+        UPDATE components 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markComponentsAsSynced(ids: List<String>)
+    
+    /** Пометить объекты как конфликтные */
+    @Query("""
+        UPDATE sites 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markSitesAsConflict(ids: List<String>)
+    
+    /** Пометить установки как конфликтные */
+    @Query("""
+        UPDATE installations 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markInstallationsAsConflict(ids: List<String>)
+    
+    /** Пометить компоненты как конфликтные */
+    @Query("""
+        UPDATE components 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markComponentsAsConflict(ids: List<String>)
+    
+    /** Снять флаг "грязный" у объектов */
+    @Query("""
+        UPDATE sites 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearSitesDirtyFlag(ids: List<String>)
+    
+    /** Снять флаг "грязный" у установок */
+    @Query("""
+        UPDATE installations 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearInstallationsDirtyFlag(ids: List<String>)
+    
+    /** Снять флаг "грязный" у компонентов */
+    @Query("""
+        UPDATE components 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearComponentsDirtyFlag(ids: List<String>)
 }

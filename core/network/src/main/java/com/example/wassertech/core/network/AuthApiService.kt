@@ -24,7 +24,15 @@ data class UserInfo(
 
 /**
  * API сервис для авторизации пользователей
+ * 
+ * @deprecated Используйте REST API через AuthRepository.login() и AuthRepository.loadCurrentUser()
+ * Этот класс использует прямое JDBC-подключение к MySQL, что не поддерживает password_hash.
+ * Перейдите на REST API через ru.wassertech.auth.AuthRepository
  */
+@Deprecated(
+    message = "Используйте REST API через AuthRepository (ru.wassertech.auth.AuthRepository)",
+    replaceWith = ReplaceWith("ru.wassertech.auth.AuthRepository")
+)
 object AuthApiService {
     
     private const val DB_URL = "jdbc:mysql://kugnis.beget.tech:3306/kugnis_app?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"

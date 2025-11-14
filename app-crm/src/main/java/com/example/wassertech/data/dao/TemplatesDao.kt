@@ -176,5 +176,63 @@ interface TemplatesDao {
     /** Вставка поля (для синхронизации) */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertField(field: ChecklistFieldEntity)
+    
+    // ========== Методы синхронизации ==========
+    
+    /** Получить все "грязные" шаблоны */
+    @Query("SELECT * FROM checklist_templates WHERE dirtyFlag = 1")
+    fun getDirtyTemplatesNow(): List<ChecklistTemplateEntity>
+    
+    /** Получить все "грязные" поля шаблонов */
+    @Query("SELECT * FROM checklist_fields WHERE dirtyFlag = 1")
+    fun getDirtyFieldsNow(): List<ChecklistFieldEntity>
+    
+    /** Пометить шаблоны как синхронизированные */
+    @Query("""
+        UPDATE checklist_templates 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markTemplatesAsSynced(ids: List<String>)
+    
+    /** Пометить поля как синхронизированные */
+    @Query("""
+        UPDATE checklist_fields 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markFieldsAsSynced(ids: List<String>)
+    
+    /** Пометить шаблоны как конфликтные */
+    @Query("""
+        UPDATE checklist_templates 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markTemplatesAsConflict(ids: List<String>)
+    
+    /** Пометить поля как конфликтные */
+    @Query("""
+        UPDATE checklist_fields 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markFieldsAsConflict(ids: List<String>)
+    
+    /** Снять флаг "грязный" у шаблонов */
+    @Query("""
+        UPDATE checklist_templates 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearTemplatesDirtyFlag(ids: List<String>)
+    
+    /** Снять флаг "грязный" у полей */
+    @Query("""
+        UPDATE checklist_fields 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearFieldsDirtyFlag(ids: List<String>)
 
 }

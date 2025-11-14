@@ -2,9 +2,20 @@ package ru.wassertech.data.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Index
 import ru.wassertech.data.types.ComponentType
 
-@Entity(tableName = "checklist_templates")
+/**
+ * Сущность шаблона чеклиста для компонентов.
+ * Реализует контракт SyncMetaEntity (все поля синхронизации присутствуют).
+ */
+@Entity(
+    tableName = "checklist_templates",
+    indices = [
+        Index("dirtyFlag"),
+        Index("syncStatus")
+    ]
+)
 data class ChecklistTemplateEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -14,18 +25,16 @@ data class ChecklistTemplateEntity(
 
     /** Optional link to component template (future use) */
     val componentTemplateId: String? = null,
-
-    /** ---------- Новые поля ---------- */
-
-    /** Порядок сортировки (чем меньше значение — тем выше в списке). null = в конце */
-    val sortOrder: Int? = null,
-
-    /** Признак архивации шаблона */
+    // Поля синхронизации (SyncMetaEntity)
+    val createdAtEpoch: Long = 0,
+    val updatedAtEpoch: Long? = null,
     val isArchived: Boolean = false,
-
-    /** Время архивации в миллисекундах (или null, если не архивирован) */
     val archivedAtEpoch: Long? = null,
-
-    /** Время последнего обновления (для синхронизации и сортировки) */
-    val updatedAtEpoch: Long? = null
+    val deletedAtEpoch: Long? = null,
+    // Локальные поля для оффлайн-очереди (не отправляются на сервер)
+    val dirtyFlag: Boolean = false,
+    val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
+    // Другие поля
+    /** Порядок сортировки (чем меньше значение — тем выше в списке). null = в конце */
+    val sortOrder: Int? = null
 )

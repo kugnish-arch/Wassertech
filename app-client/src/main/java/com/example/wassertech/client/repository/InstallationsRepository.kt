@@ -3,7 +3,7 @@ package ru.wassertech.client.repository
 import android.content.Context
 import android.util.Log
 import retrofit2.HttpException
-import ru.wassertech.client.api.ApiConfig
+import ru.wassertech.core.network.ApiConfig
 import ru.wassertech.client.api.WassertechApi
 import ru.wassertech.client.api.dto.InstallationDto
 import ru.wassertech.client.auth.AuthRepository

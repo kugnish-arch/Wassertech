@@ -141,5 +141,63 @@ interface ClientDao {
     @Query("DELETE FROM clients WHERE id = :clientId")
     suspend fun deleteClient(clientId: String)
 
+    // ========== Методы синхронизации ==========
+    
+    /** Получить всех "грязных" клиентов (требующих синхронизации) */
+    @Query("SELECT * FROM clients WHERE dirtyFlag = 1")
+    fun getDirtyClientsNow(): List<ClientEntity>
+    
+    /** Получить все "грязные" группы клиентов */
+    @Query("SELECT * FROM client_groups WHERE dirtyFlag = 1")
+    fun getDirtyGroupsNow(): List<ClientGroupEntity>
+    
+    /** Пометить клиентов как синхронизированные */
+    @Query("""
+        UPDATE clients 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markClientsAsSynced(ids: List<String>)
+    
+    /** Пометить группы клиентов как синхронизированные */
+    @Query("""
+        UPDATE client_groups 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markGroupsAsSynced(ids: List<String>)
+    
+    /** Пометить клиентов как конфликтные */
+    @Query("""
+        UPDATE clients 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markClientsAsConflict(ids: List<String>)
+    
+    /** Пометить группы клиентов как конфликтные */
+    @Query("""
+        UPDATE client_groups 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markGroupsAsConflict(ids: List<String>)
+    
+    /** Снять флаг "грязный" у клиентов */
+    @Query("""
+        UPDATE clients 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearClientsDirtyFlag(ids: List<String>)
+    
+    /** Снять флаг "грязный" у групп клиентов */
+    @Query("""
+        UPDATE client_groups 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearGroupsDirtyFlag(ids: List<String>)
+
 }
 

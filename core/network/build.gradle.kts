@@ -37,7 +37,4 @@ dependencies {
     
     // MySQL JDBC driver (старая версия для совместимости с Android)
     implementation("mysql:mysql-connector-java:5.1.49")
-    
-    // Core auth dependency
-    implementation(project(":core:auth"))
 }

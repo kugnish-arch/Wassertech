@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.data.types.Severity
+import ru.wassertech.data.types.SyncStatus
 
 class Converters {
     @TypeConverter
@@ -28,4 +29,13 @@ class Converters {
 
     @TypeConverter
     fun fromSeverity(value: Severity?): String? = value?.name
+
+    @TypeConverter
+    fun toSyncStatus(value: Int?): SyncStatus {
+        if (value == null) return SyncStatus.SYNCED
+        return SyncStatus.fromInt(value)
+    }
+
+    @TypeConverter
+    fun fromSyncStatus(value: SyncStatus?): Int = value?.value ?: SyncStatus.SYNCED.value
 }

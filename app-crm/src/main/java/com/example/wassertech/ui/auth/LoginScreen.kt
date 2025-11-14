@@ -21,7 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.wassertech.crm.R
 import ru.wassertech.auth.UserAuthService
-import ru.wassertech.sync.MySqlSyncService
+import ru.wassertech.auth.toUserEntity
+import ru.wassertech.core.auth.createAuthRepository
+import ru.wassertech.data.entities.UserEntity
 import ru.wassertech.ui.common.IconDialog
 import ru.wassertech.core.ui.theme.AccentButtonStyle
 import kotlinx.coroutines.Dispatchers
@@ -193,45 +195,17 @@ fun LoginScreen(
                                         isLoading = true
                                         errorMessage = null
                                         try {
-                                            // Переводим логин в нижний регистр для регистронезависимости
-                                            val loginLower = login.trim().lowercase()
-                                            
-                                            val (success, message) = withContext(Dispatchers.IO) {
-                                                MySqlSyncService.registerUser(
-                                                    login = loginLower,
-                                                    password = password,
-                                                    name = name.takeIf { it.isNotBlank() },
-                                                    email = email.takeIf { it.isNotBlank() }
-                                                )
-                                            }
-                                            
-                                            if (success) {
-                                                // После успешной регистрации автоматически входим
-                                                val (loginSuccess, user, errorMsg) = withContext(Dispatchers.IO) {
-                                                    MySqlSyncService.loginUser(
-                                                        login = loginLower,
-                                                        password = password
-                                                    )
-                                                }
-                                                
-                                                if (loginSuccess && user != null) {
-                                                    UserAuthService.saveLogin(context, user, isOfflineMode = false)
-                                                    snackbarHostState.showSnackbar(message)
-                                                    onLoginSuccess()
-                                                } else {
-                                                    errorMessage = errorMsg ?: "Регистрация успешна, но не удалось войти. Попробуйте войти вручную."
-                                                }
-                                            } else {
-                                                errorMessage = message
-                                            }
+                                            // Регистрация временно отключена, так как на backend-е может не быть /auth/register
+                                            // Пользователь должен быть создан администратором
+                                            errorMessage = "Регистрация временно недоступна. Обратитесь к администратору для создания учетной записи."
+                                            isLoading = false
                                         } catch (e: Exception) {
                                             errorMessage = "Ошибка при регистрации: ${e.message}"
-                                        } finally {
                                             isLoading = false
                                         }
                                     }
                                 } else {
-                                    // Вход
+                                    // Вход через REST API
                                     if (login.isBlank() || password.isBlank()) {
                                         errorMessage = "Заполните логин и пароль"
                                         return@Button
@@ -241,25 +215,60 @@ fun LoginScreen(
                                         isLoading = true
                                         errorMessage = null
                                         try {
-                                            // Переводим логин в нижний регистр для регистронезависимости
-                                            val loginLower = login.trim().lowercase()
+                                            android.util.Log.d("LoginScreen", "=== Начало логина через REST API ===")
+                                            android.util.Log.d("LoginScreen", "Используется AuthRepository (REST), НЕ AuthApiService (JDBC)")
                                             
-                                            val (success, user, errorMsg) = withContext(Dispatchers.IO) {
-                                                MySqlSyncService.loginUser(
-                                                    login = loginLower,
+                                            val authRepository = createAuthRepository(context)
+                                            
+                                            // Выполняем вход через REST API
+                                            android.util.Log.d("LoginScreen", "Вызов authRepository.login() с login='${login.trim()}'")
+                                            val loginResult = withContext(Dispatchers.IO) {
+                                                authRepository.login(
+                                                    login = login.trim(),
                                                     password = password
                                                 )
                                             }
+                                            android.util.Log.d("LoginScreen", "Получен результат loginResult: isSuccess=${loginResult.isSuccess}")
                                             
-                                            if (success && user != null) {
-                                                UserAuthService.saveLogin(context, user, isOfflineMode = false)
-                                                onLoginSuccess()
+                                            if (loginResult.isSuccess) {
+                                                val tokenData = loginResult.getOrNull()
+                                                if (tokenData != null) {
+                                                    // После успешного логина загружаем информацию о пользователе
+                                                    val userResult = withContext(Dispatchers.IO) {
+                                                        authRepository.loadCurrentUser()
+                                                    }
+                                                    
+                                                    if (userResult.isSuccess) {
+                                                        val userData = userResult.getOrNull()
+                                                        if (userData != null) {
+                                                            // Сохраняем информацию о пользователе
+                                                            // Преобразуем CurrentUserData в UserEntity для совместимости с app-crm UserAuthService
+                                                            val userEntity = userData.toUserEntity()
+                                                            UserAuthService.saveLogin(context, userEntity, isOfflineMode = false)
+                                                            isLoading = false
+                                                            onLoginSuccess()
+                                                        } else {
+                                                            // Токен сохранен, но не удалось загрузить пользователя
+                                                            errorMessage = "Вход выполнен, но не удалось загрузить информацию о пользователе"
+                                                            isLoading = false
+                                                        }
+                                                    } else {
+                                                        // Токен сохранен, но не удалось загрузить пользователя
+                                                        val error = userResult.exceptionOrNull()
+                                                        errorMessage = "Вход выполнен, но не удалось загрузить информацию о пользователе: ${error?.message ?: "Неизвестная ошибка"}"
+                                                        isLoading = false
+                                                    }
+                                                } else {
+                                                    errorMessage = "Неверный логин или пароль"
+                                                    isLoading = false
+                                                }
                                             } else {
-                                                errorMessage = errorMsg ?: "Неверный логин или пароль"
+                                                val error = loginResult.exceptionOrNull()
+                                                errorMessage = error?.message ?: "Неверный логин или пароль"
+                                                isLoading = false
                                             }
                                         } catch (e: Exception) {
                                             errorMessage = "Ошибка при входе: ${e.message}"
-                                        } finally {
                                             isLoading = false
                                         }
                                     }

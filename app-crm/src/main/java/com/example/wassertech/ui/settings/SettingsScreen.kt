@@ -17,7 +17,7 @@ import androidx.compose.ui.res.painterResource
 import ru.wassertech.crm.R
 import ru.wassertech.auth.UserAuthService
 import ru.wassertech.data.AppDatabase
-import ru.wassertech.sync.MySqlSyncService
+import ru.wassertech.sync.SyncEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -132,111 +132,31 @@ fun SettingsScreen() {
                 }
             }
             
-            // Кнопка "Отправить в удалённую БД"
+            // Кнопка "Отправить на сервер" (push + pull)
             Button(
                 onClick = {
                     scope.launch {
                         syncing = true
                         syncMessage = null
                         try {
+                            val syncEngine = SyncEngine(context)
                             val result = withContext(Dispatchers.IO) {
-                                MySqlSyncService.pushToRemote(db)
+                                syncEngine.syncFull()
                             }
-                            syncMessage = result
-                            snackbarHostState.showSnackbar(result)
-                        } catch (e: Exception) {
-                            val errorMsg = "Ошибка при отправке: ${e.message}"
-                            syncMessage = errorMsg
-                            snackbarHostState.showSnackbar(errorMsg)
-                        } finally {
-                            syncing = false
-                        }
-                    }
-                },
-                enabled = !syncing && !isOfflineMode,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (syncing && syncMessage?.contains("Отправка") == true) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Отправка...")
-                } else {
-                    Icon(
-                        Icons.Outlined.CloudUpload,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Отправить в удалённую БД")
-                }
-            }
-            
-            // Кнопка "Получить из удаленной БД"
-            Button(
-                onClick = {
-                    scope.launch {
-                        syncing = true
-                        syncMessage = null
-                        try {
-                            val result = withContext(Dispatchers.IO) {
-                                MySqlSyncService.pullFromRemote(db)
+                            syncMessage = result.message
+                            if (result.success) {
+                                snackbarHostState.showSnackbar(
+                                    message = result.message,
+                                    duration = SnackbarDuration.Short
+                                )
+                            } else {
+                                snackbarHostState.showSnackbar(
+                                    message = result.message,
+                                    duration = SnackbarDuration.Long
+                                )
                             }
-                            syncMessage = result
-                            snackbarHostState.showSnackbar(result)
                         } catch (e: Exception) {
-                            val errorMsg = "Ошибка при получении: ${e.message}"
-                            syncMessage = errorMsg
-                            snackbarHostState.showSnackbar(errorMsg)
-                        } finally {
-                            syncing = false
-                        }
-                    }
-                },
-                enabled = !syncing && !isOfflineMode,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (syncing && syncMessage?.contains("Получение") == true) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Получение...")
-                } else {
-                    Icon(
-                        Icons.Outlined.CloudDownload,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Получить из удаленной БД")
-                }
-            }
-            
-            Spacer(Modifier.height(8.dp))
-            
-            // Кнопка "Мигрировать удалённую БД"
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        syncing = true
-                        syncMessage = null
-                        try {
-                            val result = withContext(Dispatchers.IO) {
-                                MySqlSyncService.migrateRemoteDatabase()
-                            }
-                            syncMessage = result
-                            snackbarHostState.showSnackbar(
-                                message = result,
-                                duration = SnackbarDuration.Short
-                            )
-                        } catch (e: Exception) {
-                            val errorMsg = "Ошибка при миграции: ${e.message}"
+                            val errorMsg = "Ошибка при синхронизации: ${e.message}"
                             syncMessage = errorMsg
                             snackbarHostState.showSnackbar(
                                 message = errorMsg,
@@ -250,13 +170,71 @@ fun SettingsScreen() {
                 enabled = !syncing && !isOfflineMode,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (syncing && syncMessage?.contains("Миграция") == true) {
+                if (syncing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Миграция...")
+                    Text("Синхронизация...")
+                } else {
+                    Icon(
+                        Icons.Outlined.CloudUpload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Отправить на сервер")
+                }
+            }
+            
+            // Кнопка "Загрузить с сервера" (только pull)
+            Button(
+                onClick = {
+                    scope.launch {
+                        syncing = true
+                        syncMessage = null
+                        try {
+                            val syncEngine = SyncEngine(context)
+                            val result = withContext(Dispatchers.IO) {
+                                syncEngine.syncPull()
+                            }
+                            syncMessage = result.message
+                            if (result.success) {
+                                snackbarHostState.showSnackbar(
+                                    message = result.message,
+                                    duration = SnackbarDuration.Short
+                                )
+                            } else {
+                                snackbarHostState.showSnackbar(
+                                    message = result.message,
+                                    duration = SnackbarDuration.Long
+                                )
+                            }
+                        } catch (e: Exception) {
+                            val errorMsg = "Ошибка при загрузке: ${e.message}"
+                            syncMessage = errorMsg
+                            snackbarHostState.showSnackbar(
+                                message = errorMsg,
+                                duration = SnackbarDuration.Long
+                            )
+                        } finally {
+                            syncing = false
+                        }
+                    }
+                },
+                enabled = !syncing && !isOfflineMode,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (syncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Загрузка...")
                 } else {
                     Icon(
                         Icons.Outlined.CloudDownload,
@@ -264,7 +242,7 @@ fun SettingsScreen() {
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Мигрировать удалённую БД")
+                    Text("Загрузить с сервера")
                 }
             }
             

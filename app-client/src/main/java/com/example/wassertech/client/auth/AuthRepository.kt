@@ -3,17 +3,17 @@ package ru.wassertech.client.auth
 import android.content.Context
 import android.util.Log
 import retrofit2.HttpException
-import ru.wassertech.client.api.ApiConfig
-import ru.wassertech.client.api.WassertechApi
-import ru.wassertech.client.api.dto.LoginRequest
 import ru.wassertech.core.network.ApiClient
+import ru.wassertech.core.network.ApiConfig
+import ru.wassertech.core.network.api.WassertechApi
+import ru.wassertech.core.network.dto.LoginRequest
 
 /**
  * Репозиторий для работы с авторизацией через API
  */
 class AuthRepository(private val context: Context) {
     
-    private val tokenStorage = DataStoreTokenStorage(context)
+    private val tokenStorage = ru.wassertech.core.auth.DataStoreTokenStorage(context)
     private val api: WassertechApi by lazy {
         ApiClient.createService<WassertechApi>(
             tokenStorage = tokenStorage,

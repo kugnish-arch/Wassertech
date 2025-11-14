@@ -171,5 +171,63 @@ interface SessionsDao {
             insertValues(values)
         }
     }
+    
+    // ========== Методы синхронизации ==========
+    
+    /** Получить все "грязные" сессии ТО */
+    @Query("SELECT * FROM maintenance_sessions WHERE dirtyFlag = 1")
+    fun getDirtySessionsNow(): List<MaintenanceSessionEntity>
+    
+    /** Получить все "грязные" значения ТО */
+    @Query("SELECT * FROM maintenance_values WHERE dirtyFlag = 1")
+    fun getDirtyValuesNow(): List<MaintenanceValueEntity>
+    
+    /** Пометить сессии как синхронизированные */
+    @Query("""
+        UPDATE maintenance_sessions 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markSessionsAsSynced(ids: List<String>)
+    
+    /** Пометить значения как синхронизированные */
+    @Query("""
+        UPDATE maintenance_values 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markValuesAsSynced(ids: List<String>)
+    
+    /** Пометить сессии как конфликтные */
+    @Query("""
+        UPDATE maintenance_sessions 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markSessionsAsConflict(ids: List<String>)
+    
+    /** Пометить значения как конфликтные */
+    @Query("""
+        UPDATE maintenance_values 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markValuesAsConflict(ids: List<String>)
+    
+    /** Снять флаг "грязный" у сессий */
+    @Query("""
+        UPDATE maintenance_sessions 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearSessionsDirtyFlag(ids: List<String>)
+    
+    /** Снять флаг "грязный" у значений */
+    @Query("""
+        UPDATE maintenance_values 
+        SET dirtyFlag = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun clearValuesDirtyFlag(ids: List<String>)
 
 }

@@ -14,10 +14,15 @@ import java.util.UUID
         Index("email"),
         Index("isArchived"),
         Index("sortOrder"),
-        Index("clientGroupId") // ← ДОБАВИЛИ: быстрый выбор по группе
+        Index("clientGroupId"), // ← ДОБАВИЛИ: быстрый выбор по группе
+        Index("dirtyFlag"),
+        Index("syncStatus")
     ]
 )
-
+/**
+ * Сущность клиента.
+ * Реализует контракт SyncMetaEntity (все поля синхронизации присутствуют).
+ */
 data class ClientEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val name: String,
@@ -39,10 +44,16 @@ data class ClientEntity(
     val tagsJson: String? = null,
     val notes: String? = null,
     val isCorporate: Boolean = false,
-    val isArchived: Boolean = false,
-    val archivedAtEpoch: Long? = null,
+    // Поля синхронизации (SyncMetaEntity)
     val createdAtEpoch: Long = System.currentTimeMillis(),
     val updatedAtEpoch: Long = System.currentTimeMillis(),
+    val isArchived: Boolean = false,
+    val archivedAtEpoch: Long? = null,
+    val deletedAtEpoch: Long? = null,
+    // Локальные поля для оффлайн-очереди (не отправляются на сервер)
+    val dirtyFlag: Boolean = false,
+    val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
+    // Другие поля
     val sortOrder: Int = 0,
     val clientGroupId: String? = null
 )

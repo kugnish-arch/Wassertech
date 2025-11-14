@@ -7,6 +7,17 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
 
+/**
+ * @deprecated Используйте REST API вместо прямого доступа к MySQL.
+ * - Авторизация: используйте AuthRepository.login() и AuthRepository.loadCurrentUser()
+ * - Синхронизация: используйте SyncEngine.syncFull(), SyncEngine.syncPush(), SyncEngine.syncPull()
+ * 
+ * Этот класс оставлен в проекте для обратной совместимости, но больше не должен использоваться.
+ */
+@Deprecated(
+    message = "Используйте REST API через AuthRepository (авторизация) и SyncEngine (синхронизация)",
+    replaceWith = ReplaceWith("ru.wassertech.auth.AuthRepository или ru.wassertech.sync.SyncEngine")
+)
 object MySqlSyncService {
     
     private const val DB_URL = "jdbc:mysql://kugnis.beget.tech:3306/kugnis_app?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
@@ -1314,7 +1325,9 @@ object MySqlSyncService {
     /**
      * Регистрирует нового пользователя в удаленной БД
      * @return Pair<Boolean, String> - (успех, сообщение)
+     * @deprecated Используйте REST API через AuthRepository. Этот метод будет удален.
      */
+    @Deprecated("Используйте REST API через AuthRepository", ReplaceWith("ru.wassertech.auth.AuthRepository"))
     suspend fun registerUser(login: String, password: String, name: String? = null, email: String? = null, phone: String? = null): Pair<Boolean, String> {
         var connection: Connection? = null
         try {
@@ -1405,7 +1418,9 @@ object MySqlSyncService {
     /**
      * Проверяет логин и пароль пользователя и возвращает полную информацию о пользователе
      * @return Triple<Boolean, UserEntity?, String?> - (успех, пользователь или null, сообщение об ошибке)
+     * @deprecated Используйте REST API через AuthRepository.login() и AuthRepository.loadCurrentUser()
      */
+    @Deprecated("Используйте REST API через AuthRepository", ReplaceWith("ru.wassertech.auth.AuthRepository.login() и loadCurrentUser()"))
     suspend fun loginUser(login: String, password: String): Triple<Boolean, ru.wassertech.data.entities.UserEntity?, String?> {
         var connection: Connection? = null
         try {

@@ -3,7 +3,7 @@ package ru.wassertech.core.auth.impl
 import ru.wassertech.core.auth.AuthRepository
 import ru.wassertech.core.auth.AuthResult
 import ru.wassertech.core.auth.TokenRefreshResult
-import ru.wassertech.core.auth.TokenStorage
+import ru.wassertech.core.network.TokenStorage
 import ru.wassertech.core.auth.SessionStore
 import kotlinx.coroutines.delay
 

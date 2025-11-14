@@ -12,7 +12,7 @@ plugins {
 }
 
 // Базовая версия приложения (можно менять вручную)
-val baseVersionName = "1.0.1"
+val baseVersionName = "1.0.3"
 
 // Файл для хранения build number
 val versionPropertiesFile = file("version.properties")
@@ -131,6 +131,12 @@ dependencies {
     // Feature modules
     implementation(project(":feature:auth"))
     implementation(project(":feature:reports"))
+    
+    // Retrofit (транзитивно из core:network, но добавляем явно для надежности)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     
     // Compose BOM: 2024.10.01
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
