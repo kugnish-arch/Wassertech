@@ -1,60 +1,70 @@
 package ru.wassertech.data.seed
 
 import ru.wassertech.data.AppDatabase
-import ru.wassertech.data.entities.ChecklistFieldEntity
-import ru.wassertech.data.entities.ChecklistTemplateEntity
-import ru.wassertech.data.types.ComponentType
+import ru.wassertech.data.entities.ComponentTemplateEntity
+import ru.wassertech.data.entities.ComponentTemplateFieldEntity
+import ru.wassertech.sync.markCreatedForSync
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
 object TemplateSeeder {
 
     suspend fun seedOnce(db: AppDatabase) = withContext(Dispatchers.IO) {
-        val templatesDao = db.templatesDao()
+        val templatesDao = db.componentTemplatesDao()
+        val fieldsDao = db.componentTemplateFieldsDao()
 
-        for (type in ComponentType.values()) {
-            val existing = templatesDao.getTemplateByType(type)
-            if (existing == null) {
-                val template = ChecklistTemplateEntity(
-                    id = UUID.randomUUID().toString(),
-                    title = when (type) {
-                        ComponentType.COMMON -> "Компонент — базовый"
-                        ComponentType.HEAD -> "Заглавный шаблон — базовый"
-                    },
-                    componentType = type
-                )
-                templatesDao.upsertTemplate(template)
+        // Создаем базовые шаблоны компонентов
+        val basicTemplateName = "Компонент — базовый"
+        val allTemplates = templatesDao.observeAll().first()
+        val existingBasic = allTemplates.firstOrNull { it.name == basicTemplateName }
+        
+        if (existingBasic == null) {
+            val template = ComponentTemplateEntity(
+                id = UUID.randomUUID().toString(),
+                name = basicTemplateName,
+                category = null,
+                defaultParamsJson = null,
+                sortOrder = 0
+            ).markCreatedForSync()
+            templatesDao.upsert(template)
 
-                val fields: List<ChecklistFieldEntity> = when (type) {
-                    ComponentType.COMMON -> listOf(
-                        field(template.id, "pressure_in", "Давление до", "NUMBER"),
-                        field(template.id, "pressure_out", "Давление после", "NUMBER"),
-                        field(template.id, "status", "Состояние", "TEXT")
-                    )
-                    ComponentType.HEAD -> listOf(
-                        field(template.id, "description", "Описание", "TEXT"),
-                        field(template.id, "notes", "Заметки", "TEXT")
-                    )
-                }
-                fields.forEach { templatesDao.upsertField(it) }
-            }
+            val fields = listOf(
+                field(template.id, 0, "pressure_in", "Давление до", "NUMBER", "бар", false),
+                field(template.id, 1, "pressure_out", "Давление после", "NUMBER", "бар", false),
+                field(template.id, 2, "status", "Состояние", "TEXT", null, false)
+            )
+            fields.forEach { fieldsDao.upsertField(it) }
         }
     }
 
-    private fun field(templateId: String, key: String, label: String, type: String) =
-        ChecklistFieldEntity(
-            id = UUID.randomUUID().toString(),
-            templateId = templateId,
-            key = key,
-            label = label,
-            type = when (type) {
-                "CHECKBOX" -> ru.wassertech.data.types.FieldType.CHECKBOX
-                "NUMBER" -> ru.wassertech.data.types.FieldType.NUMBER
-                else -> ru.wassertech.data.types.FieldType.TEXT
-            },
-            unit = null,
-            min = null,
-            max = null
-        )
+    private fun field(
+        templateId: String,
+        sortOrder: Int,
+        key: String,
+        label: String,
+        type: String,
+        unit: String?,
+        isCharacteristic: Boolean
+    ) = ComponentTemplateFieldEntity(
+        id = UUID.randomUUID().toString(),
+        templateId = templateId,
+        key = key,
+        label = label,
+        type = when (type) {
+            "CHECKBOX" -> ru.wassertech.data.types.FieldType.CHECKBOX
+            "NUMBER" -> ru.wassertech.data.types.FieldType.NUMBER
+            else -> ru.wassertech.data.types.FieldType.TEXT
+        },
+        unit = unit,
+        isCharacteristic = isCharacteristic,
+        isRequired = false,
+        defaultValueText = null,
+        defaultValueNumber = null,
+        defaultValueBool = null,
+        min = null,
+        max = null,
+        sortOrder = sortOrder
+    ).markCreatedForSync()
 }

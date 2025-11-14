@@ -15,11 +15,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import ru.wassertech.client.auth.AuthRepository
-import ru.wassertech.client.data.AppDatabase
-import ru.wassertech.client.data.OfflineModeManager
-import ru.wassertech.client.data.entities.ClientEntity
-import ru.wassertech.client.sync.MySqlSyncService
+import ru.wassertech.core.auth.UserAuthService
+import ru.wassertech.client.repository.InstallationsRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,43 +24,14 @@ fun SettingsScreen(
     onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val db = remember { AppDatabase.getInstance(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val authRepository = remember { AuthRepository(context) }
-    val offlineModeManager = remember { OfflineModeManager.getInstance(context) }
     
     var syncing by remember { mutableStateOf(false) }
-    var loadingClients by remember { mutableStateOf(false) }
     var syncMessage by remember { mutableStateOf<String?>(null) }
-    var clients by remember { mutableStateOf<List<ClientEntity>>(emptyList()) }
-    var selectedClientId by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     
-    // Загружаем список клиентов из удалённой БД при первом открытии экрана
-    LaunchedEffect(Unit) {
-        loadingClients = true
-        try {
-            withContext(Dispatchers.IO) {
-                MySqlSyncService.pullClientsFromRemote(db)
-            }
-            // После загрузки из удалённой БД, читаем из локальной БД
-            withContext(Dispatchers.IO) {
-                clients = db.clientDao().getAllClientsNow()
-            }
-        } catch (e: Exception) {
-            // Если не удалось загрузить из удалённой БД, загружаем из локальной
-            withContext(Dispatchers.IO) {
-                clients = db.clientDao().getAllClientsNow()
-            }
-            scope.launch {
-                snackbarHostState.showSnackbar("Не удалось загрузить клиентов из удалённой БД. Используется локальный список.")
-            }
-        } finally {
-            loadingClients = false
-        }
-    }
+    val installationsRepository = remember { InstallationsRepository(context) }
     
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -80,100 +48,47 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
             
             Text(
-                text = "Синхронизация с удалённой БД",
+                text = "Синхронизация данных",
                 style = MaterialTheme.typography.titleLarge
             )
             
-            // Индикатор загрузки клиентов
-            if (loadingClients) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Загрузка клиентов...")
-                }
-            }
+            Text(
+                text = "Синхронизация данных с сервером через REST API",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
             
-            // Выпадающий список клиентов
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Выберите клиента",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
-                    ) {
-                        OutlinedTextField(
-                            value = clients.find { it.id == selectedClientId }?.name ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Клиент") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-                        
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            clients.forEach { client ->
-                                DropdownMenuItem(
-                                    text = { Text(client.name) },
-                                    onClick = {
-                                        selectedClientId = client.id
-                                        expanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Кнопка "Получить из удалённой БД"
+            // Кнопка "Синхронизировать данные"
             Button(
                 onClick = {
-                    if (selectedClientId == null) {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Пожалуйста, выберите клиента")
-                        }
-                        return@Button
-                    }
-                    
                     scope.launch {
                         syncing = true
                         syncMessage = null
                         try {
-                            val result = withContext(Dispatchers.IO) {
-                                MySqlSyncService.pullClientDataFromRemote(db, selectedClientId!!)
+                            if (!UserAuthService.isLoggedIn(context)) {
+                                syncMessage = "Необходимо войти в систему для синхронизации"
+                                snackbarHostState.showSnackbar(syncMessage!!)
+                                return@launch
                             }
-                            syncMessage = result
-                            snackbarHostState.showSnackbar(result)
                             
-                            // Обновляем список клиентов после синхронизации
-                            clients = db.clientDao().getAllClientsNow()
+                            val result = withContext(Dispatchers.IO) {
+                                installationsRepository.syncInstallations()
+                            }
+                            
+                            result.fold(
+                                onSuccess = { count ->
+                                    syncMessage = "Синхронизация завершена. Загружено установок: $count"
+                                    snackbarHostState.showSnackbar(syncMessage!!)
+                                },
+                                onFailure = { error ->
+                                    val errorMsg = "Ошибка при синхронизации: ${error.message}"
+                                    syncMessage = errorMsg
+                                    snackbarHostState.showSnackbar(errorMsg)
+                                }
+                            )
                         } catch (e: Exception) {
-                            val errorMsg = "Ошибка при получении: ${e.message}"
+                            val errorMsg = "Ошибка при синхронизации: ${e.message}"
                             syncMessage = errorMsg
                             snackbarHostState.showSnackbar(errorMsg)
                         } finally {
@@ -181,7 +96,7 @@ fun SettingsScreen(
                         }
                     }
                 },
-                enabled = !syncing && selectedClientId != null,
+                enabled = !syncing && UserAuthService.isLoggedIn(context),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (syncing) {
@@ -191,7 +106,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Получение...")
+                    Text("Синхронизация...")
                 } else {
                     Icon(
                         Icons.Outlined.CloudDownload,
@@ -199,7 +114,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Получить из удалённой БД")
+                    Text("Синхронизировать данные")
                 }
             }
             
@@ -272,16 +187,12 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        scope.launch {
-                            // Выполняем logout
-                            authRepository.logout()
-                            // Отключаем оффлайн режим
-                            offlineModeManager.setOfflineMode(false)
-                            // Закрываем диалог
-                            showLogoutDialog = false
-                            // Вызываем callback для навигации
-                            onLogout()
-                        }
+                        // Выполняем logout через UserAuthService
+                        UserAuthService.logout(context)
+                        // Закрываем диалог
+                        showLogoutDialog = false
+                        // Вызываем callback для навигации
+                        onLogout()
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error

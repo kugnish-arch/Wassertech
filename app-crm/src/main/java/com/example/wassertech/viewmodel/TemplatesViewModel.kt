@@ -1,10 +1,11 @@
 package ru.wassertech.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ru.wassertech.data.AppDatabase
-import ru.wassertech.data.entities.ChecklistFieldEntity
+import ru.wassertech.data.entities.ComponentTemplateFieldEntity
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.sync.DeletionTracker
 import ru.wassertech.sync.markCreatedForSync
@@ -18,13 +19,17 @@ import java.util.UUID
 
 class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
 
+    companion object {
+        private const val TAG = "TemplatesViewModel"
+    }
+
     data class UiField(
         val id: String,
         val templateId: String,
         val key: String,
         val label: String,
         val type: FieldType,
-        val isForMaintenance: Boolean,
+        val isCharacteristic: Boolean, // true = характеристика, false = чек-лист ТО
         val unit: String?,
         val min: String?,   // UI-friendly (TextField)
         val max: String?,   // UI-friendly (TextField)
@@ -32,7 +37,7 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     private val db = AppDatabase.getInstance(app)
-    private val templatesDao = db.templatesDao()
+    private val fieldsDao = db.componentTemplateFieldsDao()
 
     private val _fields = MutableStateFlow<List<UiField>>(emptyList())
     val fields: StateFlow<List<UiField>> = _fields
@@ -43,7 +48,7 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
     fun load(templateId: String) {
         this.templateId = templateId
         viewModelScope.launch(Dispatchers.IO) {
-            val raw = templatesDao.getFieldsForTemplate(templateId)
+            val raw = fieldsDao.getFieldsForTemplate(templateId)
             _fields.value = raw.map { it.toUi() }
         }
     }
@@ -55,7 +60,7 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
             key = "field_" + System.currentTimeMillis(),
             label = "Новое поле",
             type = ru.wassertech.data.types.FieldType.TEXT,
-            isForMaintenance = true,
+            isCharacteristic = false, // По умолчанию чек-лист ТО
             unit = null,
             min = null,
             max = null
@@ -93,55 +98,83 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun saveAll(fieldOrder: List<String>? = null) {
         withContext(Dispatchers.IO) {
-            pendingDelete.forEach { 
-                templatesDao.deleteField(it)
-                DeletionTracker.markFieldDeleted(db, it)
+            // Удаляем помеченные поля
+            val deletedCount = pendingDelete.size
+            pendingDelete.forEach { fieldId ->
+                Log.d(TAG, "Удаление поля шаблона: templateId=$templateId, fieldId=$fieldId")
+                fieldsDao.deleteField(fieldId)
+                DeletionTracker.markComponentTemplateFieldDeleted(db, fieldId)
             }
             pendingDelete.clear()
+            
             // Если передан порядок полей, используем его, иначе используем текущий порядок
             val orderedFields = if (fieldOrder != null) {
                 fieldOrder.mapNotNull { id -> _fields.value.find { it.id == id } }
             } else {
                 _fields.value
             }
+            
             // Получаем существующие поля для определения новых
-            val existingFields = templatesDao.getFieldsForTemplate(templateId)
+            val existingFields = fieldsDao.getFieldsForTemplate(templateId)
             val existingIds = existingFields.map { it.id }.toSet()
             
+            var createdCount = 0
+            var updatedCount = 0
+            
             orderedFields.forEachIndexed { index, ui ->
-                val entity = ui.toEntity(indexHint = index)
+                val entity = ui.toEntity(sortOrder = index)
                 val markedEntity = if (existingIds.contains(ui.id)) {
-                    entity.markUpdatedForSync()
+                    updatedCount++
+                    val updated = entity.markUpdatedForSync()
+                    Log.d(TAG, "Обновление поля шаблона: templateId=$templateId, fieldId=${ui.id}, " +
+                            "label=${ui.label}, isCharacteristic=${ui.isCharacteristic}, " +
+                            "dirtyFlag=${updated.dirtyFlag}, syncStatus=${updated.syncStatus}, " +
+                            "updatedAtEpoch=${updated.updatedAtEpoch}")
+                    updated
                 } else {
-                    entity.markCreatedForSync()
+                    createdCount++
+                    val created = entity.markCreatedForSync()
+                    Log.d(TAG, "Создание поля шаблона: templateId=$templateId, fieldId=${ui.id}, " +
+                            "label=${ui.label}, isCharacteristic=${ui.isCharacteristic}, " +
+                            "dirtyFlag=${created.dirtyFlag}, syncStatus=${created.syncStatus}, " +
+                            "createdAtEpoch=${created.createdAtEpoch}, updatedAtEpoch=${created.updatedAtEpoch}")
+                    created
                 }
-                templatesDao.upsertField(markedEntity)
+                fieldsDao.upsertField(markedEntity)
             }
+            
+            Log.d(TAG, "Сохранение полей шаблона завершено: templateId=$templateId, " +
+                    "создано=$createdCount, обновлено=$updatedCount, удалено=$deletedCount")
         }
     }
 
-    private fun ru.wassertech.data.entities.ChecklistFieldEntity.toUi(): UiField = UiField(
+    private fun ComponentTemplateFieldEntity.toUi(): UiField = UiField(
         id = id,
         templateId = templateId,
         key = key,
-        label = label ?: "",
+        label = label,
         type = type,
-        isForMaintenance = isForMaintenance == true || (isForMaintenance == null),
+        isCharacteristic = isCharacteristic,
         unit = unit,
         min = min?.toString(),
         max = max?.toString()
     )
 
-    private fun UiField.toEntity(indexHint: Int): ru.wassertech.data.entities.ChecklistFieldEntity =
-        ru.wassertech.data.entities.ChecklistFieldEntity(
+    private fun UiField.toEntity(sortOrder: Int): ComponentTemplateFieldEntity =
+        ComponentTemplateFieldEntity(
             id = id,
             templateId = templateId,
             key = key,
             label = label,
             type = type,
-            isForMaintenance = isForMaintenance,
             unit = unit,
+            isCharacteristic = isCharacteristic,
+            isRequired = false,
+            defaultValueText = null,
+            defaultValueNumber = null,
+            defaultValueBool = null,
             min = min?.toDoubleOrNull(),
-            max = max?.toDoubleOrNull()
+            max = max?.toDoubleOrNull(),
+            sortOrder = sortOrder
         )
 }

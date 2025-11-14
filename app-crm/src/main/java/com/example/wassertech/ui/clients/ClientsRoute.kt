@@ -29,10 +29,13 @@ fun ClientsRoute(
     val selectedGroupId by vm.selectedGroupId.collectAsState()
 
     // Обновляем клиентов при возврате на экран
+    // Важно: reloadClients() использует текущее значение includeArchived из ViewModel,
+    // поэтому состояние сохраняется автоматически
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                // Просто перезагружаем клиентов - includeArchived уже сохранен в ViewModel
                 vm.reloadClients()
             }
         }

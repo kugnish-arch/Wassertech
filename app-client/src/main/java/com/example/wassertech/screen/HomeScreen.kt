@@ -18,6 +18,7 @@ import ru.wassertech.client.ui.reports.ReportsDatabaseProvider
 import ru.wassertech.client.ui.reports.InstallationsReportsScreen
 import ru.wassertech.feature.reports.ReportsDatabaseProvider as IReportsDatabaseProvider
 import ru.wassertech.navigation.AppRoutes
+import ru.wassertech.feature.auth.AuthRoutes
 
 /**
  * Главный экран с табами
@@ -66,7 +67,7 @@ fun HomeScreen(navController: NavController? = null) {
                     },
                     onNavigateToLogin = {
                         // Навигация на экран логина с очисткой стека
-                        navController?.navigate(AppRoutes.LOGIN) {
+                        navController?.navigate(AuthRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
@@ -74,7 +75,7 @@ fun HomeScreen(navController: NavController? = null) {
                 1 -> SettingsScreen(
                     onLogout = {
                         // Навигация на экран логина с очисткой стека
-                        navController?.navigate(AppRoutes.LOGIN) {
+                        navController?.navigate(AuthRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }
                         }
                     }

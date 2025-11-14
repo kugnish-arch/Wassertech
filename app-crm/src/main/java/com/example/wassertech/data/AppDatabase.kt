@@ -18,9 +18,11 @@ import ru.wassertech.data.migrations.MIGRATION_5_6
 import ru.wassertech.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
 import ru.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
 import ru.wassertech.data.migrations.MIGRATION_8_9   // ← Добавление полей синхронизации
+import ru.wassertech.data.migrations.MIGRATION_9_10  // ← Обновление deleted_records
+import ru.wassertech.data.migrations.MIGRATION_10_11  // ← Объединение шаблонов
 
 @Database(
-    version = 9, // ← Обновлено: добавлены поля синхронизации во все сущности
+    version = 11, // ← Обновлено: объединение шаблонов (component_templates + component_template_fields)
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -29,8 +31,7 @@ import ru.wassertech.data.migrations.MIGRATION_8_9   // ← Добавление
         InstallationEntity::class,
         ComponentEntity::class,
         ComponentTemplateEntity::class,
-        ChecklistTemplateEntity::class,
-        ChecklistFieldEntity::class,
+        ComponentTemplateFieldEntity::class, // ← Новая сущность вместо ChecklistTemplateEntity и ChecklistFieldEntity
         MaintenanceSessionEntity::class,
         MaintenanceValueEntity::class,
         ObservationEntity::class,
@@ -43,7 +44,7 @@ import ru.wassertech.data.migrations.MIGRATION_8_9   // ← Добавление
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun hierarchyDao(): HierarchyDao
-    abstract fun templatesDao(): TemplatesDao
+    abstract fun templatesDao(): TemplatesDao // Оставлен для обратной совместимости
     abstract fun sessionsDao(): SessionsDao
     abstract fun checklistDao(): ChecklistDao
     abstract fun clientDao(): ClientDao
@@ -51,6 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deletedRecordsDao(): DeletedRecordsDao
     abstract fun settingsDao(): SettingsDao
     abstract fun componentTemplatesDao(): ComponentTemplatesDao
+    abstract fun componentTemplateFieldsDao(): ComponentTemplateFieldsDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -71,7 +73,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6,
                         MIGRATION_6_7,    // ← Обновление ComponentType
                         MIGRATION_7_8,   // ← Добавление таблицы settings
-                        MIGRATION_8_9    // ← Добавление полей синхронизации
+                        MIGRATION_8_9,   // ← Добавление полей синхронизации
+                        MIGRATION_9_10,  // ← Обновление deleted_records
+                        MIGRATION_10_11  // ← Объединение шаблонов (component_templates + component_template_fields)
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

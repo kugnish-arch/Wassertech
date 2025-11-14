@@ -6,7 +6,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import ru.wassertech.client.ui.auth.LoginScreen
+import ru.wassertech.feature.auth.LoginScreen
+import ru.wassertech.feature.auth.AuthRoutes
 import ru.wassertech.screen.HomeScreen
 import ru.wassertech.client.ui.maintenance.MaintenanceSessionDetailScreen
 
@@ -16,18 +17,18 @@ import ru.wassertech.client.ui.maintenance.MaintenanceSessionDetailScreen
 @Composable
 fun AppNavigation(
     navController: NavHostController,
-    startDestination: String = AppRoutes.LOGIN
+    startDestination: String = AuthRoutes.LOGIN
 ) {
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
-        composable(AppRoutes.LOGIN) {
+        composable(AuthRoutes.LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
                     navController.navigate(AppRoutes.HOME) {
                         // Очищаем стек навигации, чтобы нельзя было вернуться на экран логина
-                        popUpTo(AppRoutes.LOGIN) { inclusive = true }
+                        popUpTo(AuthRoutes.LOGIN) { inclusive = true }
                     }
                 }
             )

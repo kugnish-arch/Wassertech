@@ -27,7 +27,7 @@ import androidx.compose.foundation.background
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
-import ru.wassertech.client.auth.AuthRepository
+import ru.wassertech.core.auth.UserAuthService
 import ru.wassertech.client.data.OfflineModeManager
 import ru.wassertech.client.repository.InstallationsRepository
 import ru.wassertech.core.ui.theme.ClientsGroupExpandedBackground
@@ -46,8 +46,7 @@ fun InstallationsReportsScreen(
     onNavigateToLogin: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val authRepository = remember { AuthRepository(context) }
-    val installationsRepository = remember { InstallationsRepository(context, authRepository) }
+    val installationsRepository = remember { InstallationsRepository(context) }
     val offlineModeManager = remember { OfflineModeManager.getInstance(context) }
     val isOfflineMode by offlineModeManager.observeOfflineMode().collectAsState(initial = false)
     
@@ -96,17 +95,13 @@ fun InstallationsReportsScreen(
                     e is HttpException && e.code() == 401 -> {
                         // Сессия истекла - очищаем токен и переходим на экран логина
                         android.util.Log.d("InstallationsReportsScreen", "Сессия истекла (401), очистка токена и переход на экран логина")
-                        withContext(Dispatchers.IO) {
-                            authRepository.logout()
-                        }
+                        UserAuthService.logout(context)
                         shouldNavigateToLogin = true
                     }
                     e.message?.contains("401") == true || e.message?.contains("недействителен") == true -> {
                         // Сессия истекла - очищаем токен и переходим на экран логина
                         android.util.Log.d("InstallationsReportsScreen", "Сессия истекла, очистка токена и переход на экран логина")
-                        withContext(Dispatchers.IO) {
-                            authRepository.logout()
-                        }
+                        UserAuthService.logout(context)
                         shouldNavigateToLogin = true
                     }
                     e is HttpException && e.code() == 403 -> {

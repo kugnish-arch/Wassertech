@@ -2,171 +2,160 @@ package ru.wassertech.client.repository
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
-import ru.wassertech.core.network.ApiConfig
-import ru.wassertech.client.api.WassertechApi
-import ru.wassertech.client.api.dto.InstallationDto
-import ru.wassertech.client.auth.AuthRepository
-import ru.wassertech.client.data.AppDatabase
-import ru.wassertech.client.data.OfflineModeManager
-import ru.wassertech.client.data.entities.InstallationEntity
+import ru.wassertech.core.auth.DataStoreTokenStorage
 import ru.wassertech.core.network.ApiClient
+import ru.wassertech.core.network.ApiConfig
+import ru.wassertech.core.network.api.SyncApi
+import ru.wassertech.core.network.dto.SyncInstallationDto
+import ru.wassertech.core.network.interceptor.NetworkException
+import ru.wassertech.client.data.AppDatabase
+import ru.wassertech.client.data.entities.InstallationEntity
+import ru.wassertech.client.data.entities.SettingsEntity
+import ru.wassertech.core.auth.UserAuthService
 
 /**
- * Репозиторий для работы с установками через API с сохранением в Room
+ * Репозиторий для работы с установками через SyncApi с сохранением в Room
  */
 class InstallationsRepository(
-    private val context: Context,
-    private val authRepository: AuthRepository
+    private val context: Context
 ) {
     
-    private val api: WassertechApi by lazy {
-        ApiClient.createService<WassertechApi>(
-            tokenStorage = null, // Токен передаем вручную через заголовок
+    private val syncApi: SyncApi by lazy {
+        ApiClient.createService<SyncApi>(
+            tokenStorage = DataStoreTokenStorage(context),
             baseUrl = ApiConfig.getBaseUrl(),
             enableLogging = true
         )
     }
     
     private val database = AppDatabase.getInstance(context)
-    private val offlineModeManager = OfflineModeManager.getInstance(context)
+    private val tokenStorage = DataStoreTokenStorage(context)
     
     companion object {
         private const val TAG = "InstallationsRepository"
     }
     
     /**
-     * Загрузить список установок (с сервера или из Room в зависимости от режима)
+     * Загрузить список установок из Room (после синхронизации через SyncEngine)
      */
-    suspend fun loadInstallations(): List<InstallationDto> {
-        val isOffline = offlineModeManager.isOfflineMode()
-        
-        if (isOffline) {
-            // Оффлайн режим: читаем из Room
-            Log.d(TAG, "Оффлайн режим: загрузка установок из Room")
-            return loadInstallationsFromRoom()
-        } else {
-            // Онлайн режим: загружаем с сервера и сохраняем в Room
-            Log.d(TAG, "Онлайн режим: загрузка установок с сервера")
-            return loadInstallationsFromServer()
-        }
-    }
-    
-    /**
-     * Загрузить установки с сервера и сохранить в Room
-     */
-    private suspend fun loadInstallationsFromServer(): List<InstallationDto> {
-        val token = authRepository.getToken()
-            ?: throw IllegalStateException("Пользователь не авторизован")
-        
-        return try {
-            val response = api.getInstallations("Bearer $token")
-            
-            if (response.isSuccessful) {
-                val installationsDto = response.body() ?: emptyList()
-                Log.d(TAG, "Успешно загружено установок с сервера: ${installationsDto.size}")
-                
-                // Сохраняем в Room
-                saveInstallationsToRoom(installationsDto)
-                
-                installationsDto
-            } else {
-                when (response.code()) {
-                    401 -> {
-                        Log.e(TAG, "Токен недействителен (401)")
-                        throw HttpException(response)
-                    }
-                    403 -> {
-                        Log.e(TAG, "Доступ запрещен (403)")
-                        throw HttpException(response)
-                    }
-                    else -> {
-                        Log.e(TAG, "Ошибка загрузки установок: ${response.code()}")
-                        throw HttpException(response)
-                    }
-                }
-            }
-        } catch (e: HttpException) {
-            Log.e(TAG, "HTTP ошибка при загрузке установок", e)
-            throw e
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка при загрузке установок", e)
-            throw e
-        }
-    }
-    
-    /**
-     * Загрузить установки из Room
-     */
-    private suspend fun loadInstallationsFromRoom(): List<InstallationDto> {
-        val installations = database.hierarchyDao().getAllNonArchivedInstallationsNow()
-        Log.d(TAG, "Загружено установок из Room: ${installations.size}")
-        return installations.map { entity ->
-            InstallationDto(
-                id = entity.id,
-                siteId = entity.siteId,
-                name = entity.name,
-                orderIndex = entity.orderIndex
-            )
-        }
-    }
-    
-    /**
-     * Сохранить установки в Room и синхронизировать (удалить лишние)
-     */
-    private suspend fun saveInstallationsToRoom(installationsDto: List<InstallationDto>) {
-        try {
-            val installationsEntity = installationsDto.map { dto ->
-                InstallationEntity(
-                    id = dto.id,
-                    siteId = dto.siteId,
-                    name = dto.name,
-                    orderIndex = dto.orderIndex,
-                    isArchived = false,
-                    archivedAtEpoch = null
+    suspend fun loadInstallations(): List<SyncInstallationDto> {
+        return withContext(Dispatchers.IO) {
+            val installations = database.hierarchyDao().getAllNonArchivedInstallationsNow()
+            Log.d(TAG, "Загружено установок из Room: ${installations.size}")
+            installations.map { entity ->
+                SyncInstallationDto(
+                    id = entity.id,
+                    siteId = entity.siteId,
+                    name = entity.name,
+                    orderIndex = entity.orderIndex,
+                    createdAtEpoch = entity.createdAtEpoch ?: 0L,
+                    updatedAtEpoch = entity.updatedAtEpoch ?: 0L,
+                    isArchived = entity.isArchived ?: false,
+                    archivedAtEpoch = entity.archivedAtEpoch
                 )
             }
-            
-            // Получаем множество ID установок с сервера
-            val serverInstallationIds = installationsDto.map { it.id }.toSet()
-            
-            // Получаем все установки из Room
-            val roomInstallations = database.hierarchyDao().getAllInstallationsNow()
-            val roomInstallationIds = roomInstallations.map { it.id }.toSet()
-            
-            // Находим установки, которые есть в Room, но отсутствуют на сервере
-            val installationsToDelete = roomInstallationIds - serverInstallationIds
-            
-            // Удаляем лишние установки из Room
-            if (installationsToDelete.isNotEmpty()) {
-                Log.d(TAG, "Удаление установок из Room, которых нет на сервере: ${installationsToDelete.size}")
-                installationsToDelete.forEach { installationId ->
-                    try {
-                        database.hierarchyDao().deleteInstallation(installationId)
-                        Log.d(TAG, "Удалена установка из Room: $installationId")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Ошибка при удалении установки $installationId из Room", e)
-                    }
-                }
-            }
-            
-            // Используем upsert для обновления существующих и добавления новых
-            installationsEntity.forEach { installation ->
-                database.hierarchyDao().upsertInstallation(installation)
-            }
-            
-            Log.d(TAG, "Синхронизация завершена. Сохранено установок в Room: ${installationsEntity.size}, удалено: ${installationsToDelete.size}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка при сохранении установок в Room", e)
-            // Не прерываем выполнение, если не удалось сохранить
         }
     }
     
     /**
-     * Проверить, доступен ли онлайн режим
+     * Синхронизировать установки с сервером через SyncApi
      */
-    suspend fun isOnlineModeAvailable(): Boolean {
-        return !offlineModeManager.isOfflineMode()
+    suspend fun syncInstallations(): Result<Int> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Проверяем наличие токена
+                val token = tokenStorage.getAccessToken()
+                if (token == null) {
+                    return@withContext Result.failure(IllegalStateException("Пользователь не авторизован"))
+                }
+                
+                // Получаем timestamp последней синхронизации (в миллисекундах)
+                val lastSyncTimestampMs = database.settingsDao().getValueSync("last_sync_timestamp")?.toLongOrNull() ?: 0L
+                // Backend ожидает timestamp в секундах и требует since > 0
+                val lastSyncTimestampSec = if (lastSyncTimestampMs == 0L) 1L else lastSyncTimestampMs / 1000
+                
+                Log.d(TAG, "Синхронизация установок: since=$lastSyncTimestampSec")
+                
+                // Запрашиваем изменения
+                val response = syncApi.syncPull(since = lastSyncTimestampSec)
+                
+                if (!response.isSuccessful) {
+                    val errorMsg = when (response.code()) {
+                        401 -> "Токен авторизации недействителен"
+                        403 -> "Доступ запрещен"
+                        else -> "Ошибка синхронизации: ${response.code()}"
+                    }
+                    Log.e(TAG, errorMsg)
+                    return@withContext Result.failure(HttpException(response))
+                }
+                
+                val pullResponse = response.body()
+                if (pullResponse == null) {
+                    return@withContext Result.failure(IllegalStateException("Пустой ответ от сервера"))
+                }
+                
+                // Применяем установки к Room
+                pullResponse.installations.forEach { dto ->
+                    applyInstallationToRoom(dto)
+                }
+                
+                // Обновляем timestamp последней синхронизации
+                val timestampMs = pullResponse.timestamp * 1000
+                database.settingsDao().setValue(
+                    SettingsEntity(
+                        key = "last_sync_timestamp",
+                        value = timestampMs.toString()
+                    )
+                )
+                
+                Log.d(TAG, "Синхронизация завершена. Загружено установок: ${pullResponse.installations.size}")
+                Result.success(pullResponse.installations.size)
+            } catch (e: HttpException) {
+                Log.e(TAG, "HTTP ошибка при синхронизации", e)
+                Result.failure(e)
+            } catch (e: NetworkException) {
+                Log.e(TAG, "Сетевая ошибка при синхронизации", e)
+                Result.failure(e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при синхронизации", e)
+                Result.failure(e)
+            }
+        }
+    }
+    
+    /**
+     * Применить установку к Room (с проверкой версий)
+     */
+    private suspend fun applyInstallationToRoom(dto: SyncInstallationDto) {
+        val existing = database.hierarchyDao().getInstallationNow(dto.id)
+        val entity = InstallationEntity(
+            id = dto.id,
+            siteId = dto.siteId,
+            name = dto.name,
+            createdAtEpoch = dto.createdAtEpoch,
+            updatedAtEpoch = dto.updatedAtEpoch,
+            isArchived = dto.isArchived,
+            archivedAtEpoch = dto.archivedAtEpoch,
+            deletedAtEpoch = null,
+            dirtyFlag = false,
+            syncStatus = 0, // SYNCED
+            orderIndex = dto.orderIndex
+        )
+        if (existing == null) {
+            database.hierarchyDao().insertInstallation(entity)
+        } else if (dto.updatedAtEpoch > existing.updatedAtEpoch) {
+            database.hierarchyDao().upsertInstallation(entity)
+        }
+    }
+    
+    /**
+     * Проверить, авторизован ли пользователь
+     */
+    suspend fun isAuthenticated(): Boolean {
+        return UserAuthService.isLoggedIn(context)
     }
 }
 

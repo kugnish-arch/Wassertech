@@ -94,11 +94,8 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     } ?: emptyList()
 
-                // Определяем, является ли компонент заглавным через шаблон
-                val isHead = comp.templateId?.let { tmplId ->
-                    val template = templatesDao.getTemplateById(tmplId)
-                    template?.componentType == ru.wassertech.data.types.ComponentType.HEAD
-                } ?: false
+                // Определяем, является ли компонент заглавным через тип компонента
+                val isHead = comp.type == ru.wassertech.data.types.ComponentType.HEAD
 
                 ComponentSectionUi(
                     componentId = comp.id,
@@ -149,11 +146,8 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     } ?: emptyList()
 
-                // Определяем, является ли компонент заглавным через шаблон
-                val isHead = comp.templateId?.let { tmplId ->
-                    val template = templatesDao.getTemplateById(tmplId)
-                    template?.componentType == ru.wassertech.data.types.ComponentType.HEAD
-                } ?: false
+                // Определяем, является ли компонент заглавным через тип компонента
+                val isHead = comp.type == ru.wassertech.data.types.ComponentType.HEAD
 
                 ComponentSectionUi(
                     componentId = comp.id,

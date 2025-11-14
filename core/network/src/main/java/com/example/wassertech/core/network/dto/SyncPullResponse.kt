@@ -11,18 +11,23 @@ data class SyncPullResponse(
     val components: List<SyncComponentDto> = emptyList(),
     val maintenance_sessions: List<SyncMaintenanceSessionDto> = emptyList(),
     val maintenance_values: List<SyncMaintenanceValueDto> = emptyList(),
-    val checklist_templates: List<SyncChecklistTemplateDto> = emptyList(),
-    val checklist_fields: List<SyncChecklistFieldDto> = emptyList(),
     val component_templates: List<SyncComponentTemplateDto> = emptyList(),
+    val component_template_fields: List<SyncChecklistFieldDto> = emptyList(), // Используем SyncChecklistFieldDto для совместимости структуры
     val deleted: List<DeletedRecordDto> = emptyList()
 )
 
 /**
  * Информация об удаленной записи
+ * Поддерживает оба варианта: entity (новый формат) и tableName (старый формат для совместимости с сервером)
  */
 data class DeletedRecordDto(
-    val tableName: String,
+    val entity: String? = null,        // Имя сущности (clients, sites, installations, etc.) - новый формат
+    val tableName: String? = null,     // Имя таблицы (для обратной совместимости с сервером)
     val recordId: String,
     val deletedAtEpoch: Long
-)
-
+) {
+    /**
+     * Получить имя сущности (использует entity, если доступно, иначе tableName)
+     */
+    fun getEntityName(): String? = entity ?: tableName
+}

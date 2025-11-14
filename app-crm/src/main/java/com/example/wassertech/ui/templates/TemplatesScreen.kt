@@ -1,5 +1,6 @@
 package ru.wassertech.ui.templates
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -24,8 +25,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import ru.wassertech.core.ui.R
 import ru.wassertech.data.AppDatabase
-import ru.wassertech.data.entities.ChecklistTemplateEntity
-import ru.wassertech.data.types.ComponentType
+import ru.wassertech.data.entities.ComponentTemplateEntity
 import ru.wassertech.sync.SafeDeletionHelper
 import ru.wassertech.sync.markCreatedForSync
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +36,8 @@ import ru.wassertech.ui.common.FABTemplate
 import ru.wassertech.ui.common.CommonAddDialog
 
 
+private const val TAG = "TemplatesScreen"
+
 @Composable
 fun TemplatesScreen(
     isEditing: Boolean = false,
@@ -44,11 +46,11 @@ fun TemplatesScreen(
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
-    val dao = remember { db.templatesDao() }
+    val dao = remember { db.componentTemplatesDao() }
     val scope = rememberCoroutineScope()
 
-    val templatesFlow: Flow<List<ChecklistTemplateEntity>> =
-        remember { dao.observeAllTemplates() }
+    val templatesFlow: Flow<List<ComponentTemplateEntity>> =
+        remember { dao.observeAll() }
     val templates by templatesFlow.collectAsState(initial = emptyList())
 
     // Диалог «Создать шаблон»
@@ -67,8 +69,8 @@ fun TemplatesScreen(
         } else {
             // При входе в режим редактирования фиксируем текущий порядок
             val allTemplatesOrdered = templates.sortedWith(
-                compareBy<ChecklistTemplateEntity> { it.sortOrder ?: Int.MAX_VALUE }
-                    .thenBy { it.title.lowercase() }
+                compareBy<ComponentTemplateEntity> { it.sortOrder }
+                    .thenBy { it.name.lowercase() }
             )
             localOrder = allTemplatesOrdered.map { it.id }
         }
@@ -79,22 +81,22 @@ fun TemplatesScreen(
         if (!isEditing && localOrder.isNotEmpty()) {
             // сохранить локальный порядок в БД
             scope.launch {
-                val now = System.currentTimeMillis()
+                Log.d(TAG, "Сохранение порядка шаблонов: количество=${localOrder.size}")
                 localOrder.forEachIndexed { index, id ->
-                    dao.updateTemplateOrder(id, index, now)
+                    dao.setSortOrder(id, index)
                 }
             }
         }
     }
 
     // Диалог подтверждения удаления
-    var deleteDialogState by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
+    var deleteDialogState by remember { mutableStateOf<ComponentTemplateEntity?>(null) }
 
-    // Базовый порядок — как в БД (sortOrder ↑, затем title для стабильности)
+    // Базовый порядок — как в БД (sortOrder ↑, затем name для стабильности)
     val dbOrdered = remember(templates) {
         templates.sortedWith(
-            compareBy<ChecklistTemplateEntity> { it.sortOrder ?: Int.MAX_VALUE }
-                .thenBy { it.title.lowercase() }
+            compareBy<ComponentTemplateEntity> { it.sortOrder }
+                .thenBy { it.name.lowercase() }
         )
     }
 
@@ -168,14 +170,14 @@ fun TemplatesScreen(
                     },
                     onArchive = {
                         scope.launch {
-                            val now = System.currentTimeMillis()
-                            dao.setTemplateArchived(t.id, true, now, now)
+                            Log.d(TAG, "Архивирование шаблона: id=${t.id}, name=${t.name}")
+                            dao.setArchived(t.id, true)
                         }
                     },
                     onRestore = {
                         scope.launch {
-                            val now = System.currentTimeMillis()
-                            dao.setTemplateArchived(t.id, false, now, now)
+                            Log.d(TAG, "Разархивирование шаблона: id=${t.id}, name=${t.name}")
+                            dao.setArchived(t.id, false)
                         }
                     },
                     onDelete = {
@@ -213,14 +215,18 @@ fun TemplatesScreen(
                     scope.launch {
                         val id = UUID.randomUUID().toString()
                         val nextOrder =
-                            (templates.maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
-                        val entity = ChecklistTemplateEntity(
+                            (templates.maxOfOrNull { it.sortOrder } ?: -1) + 1
+                        val entity = ComponentTemplateEntity(
                             id = id,
-                            title = title,
-                            componentType = ComponentType.COMMON, // дефолт
+                            name = title,
+                            category = null,
+                            defaultParamsJson = null,
                             sortOrder = nextOrder
                         ).markCreatedForSync()
-                        dao.upsertTemplate(entity)
+                        Log.d(TAG, "Создание шаблона: id=$id, name=$title, " +
+                                "dirtyFlag=${entity.dirtyFlag}, syncStatus=${entity.syncStatus}, " +
+                                "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}")
+                        dao.upsert(entity)
                         onOpenTemplate(id)
                     }
                     showCreate = false
@@ -237,14 +243,14 @@ fun TemplatesScreen(
             title = { Text("Подтверждение удаления") },
             text = {
                 Text(
-                    "Вы уверены, что хотите удалить шаблон \"${template.title}\"?\n\nЭто действие нельзя отменить."
+                    "Вы уверены, что хотите удалить шаблон \"${template.name}\"?\n\nЭто действие нельзя отменить."
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         scope.launch {
-                            SafeDeletionHelper.deleteTemplate(db, template.id)
+                            SafeDeletionHelper.deleteComponentTemplate(db, template.id)
                             deleteDialogState = null
                         }
                     },
@@ -267,7 +273,7 @@ fun TemplatesScreen(
 // Компонент для строки шаблона с drag-and-drop
 @Composable
 private fun TemplateRowWithDrag(
-    template: ChecklistTemplateEntity,
+    template: ComponentTemplateEntity,
     index: Int,
     isEditing: Boolean,
     onMoveUp: () -> Unit,
@@ -337,7 +343,7 @@ private fun TemplateRowWithDrag(
             },
             headlineContent = {
                 Text(
-                    template.title,
+                    template.name,
                     color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                 )
             },

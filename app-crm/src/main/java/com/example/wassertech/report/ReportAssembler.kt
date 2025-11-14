@@ -89,17 +89,9 @@ object ReportAssembler {
             val component = db.hierarchyDao().getComponent(componentId)
             val componentName = component?.name ?: componentId
             
-            // Получаем componentType из шаблона (COMMON или HEAD)
-            var componentType: String? = "COMMON" // По умолчанию COMMON
-            component?.templateId?.let { templateId ->
-                try {
-                    val template = db.templatesDao().getTemplateById(templateId)
-                    componentType = template?.componentType?.name ?: "COMMON"
-                } catch (e: Exception) {
-                    // Если шаблон не найден, используем COMMON по умолчанию
-                    componentType = "COMMON"
-                }
-            }
+            // Получаем componentType из самого компонента (COMMON или HEAD)
+            // В новой модели тип хранится в ComponentEntity.type, а не в шаблоне
+            val componentType: String = component?.type?.name ?: "COMMON"
             
             // Получаем метки полей из шаблона
             val fieldLabels: Map<String, String> = component?.templateId?.let { templateId ->
@@ -177,16 +169,9 @@ object ReportAssembler {
         // Эти компоненты должны быть добавлены в отчёт даже без полей
         for (component in components) {
             if (component.id !in processedComponentIds) {
-                // Получаем componentType из шаблона
-                var componentType: String? = "COMMON"
-                component.templateId?.let { templateId ->
-                    try {
-                        val template = db.templatesDao().getTemplateById(templateId)
-                        componentType = template?.componentType?.name ?: "COMMON"
-                    } catch (e: Exception) {
-                        componentType = "COMMON"
-                    }
-                }
+                // Получаем componentType из самого компонента (COMMON или HEAD)
+                // В новой модели тип хранится в ComponentEntity.type, а не в шаблоне
+                val componentType: String = component.type.name
                 
                 // Добавляем HEAD компоненты даже без полей
                 if (componentType == "HEAD") {

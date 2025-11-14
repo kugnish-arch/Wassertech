@@ -19,9 +19,8 @@ data class ProcessedCounts(
     val components: Int = 0,
     val maintenance_sessions: Int = 0,
     val maintenance_values: Int = 0,
-    val checklist_templates: Int = 0,
-    val checklist_fields: Int = 0,
-    val component_templates: Int = 0
+    val component_templates: Int = 0,
+    val component_template_fields: Int = 0
 )
 
 /**
@@ -32,4 +31,3 @@ data class SyncError(
     val entityId: String,
     val message: String
 )
-

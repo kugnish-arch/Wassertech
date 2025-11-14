@@ -156,8 +156,17 @@ class ClientsViewModel(
         val groupsNow = clientDao.getAllGroupsNow()
         val g = groupsNow.firstOrNull { it.id == groupId } ?: return@launch
 
+        // Восстанавливаем группу
         clientDao.upsertGroup(g.markUnarchivedForSync())
-        // клиентов НЕ разворачиваем автоматически (обычно группы восстанавливают пустыми)
+        
+        // Каскадно восстанавливаем клиентов этой группы из архива
+        val clientsInGroup = clientDao.getClientsNow(groupId)
+        clientsInGroup.forEach { c ->
+            if (c.isArchived == true) {
+                clientDao.upsertClient(c.markUnarchivedForSync())
+            }
+        }
+        
         reloadAll()
     }
 
@@ -228,6 +237,8 @@ class ClientsViewModel(
     private fun reloadGroups() = viewModelScope.launch(Dispatchers.IO) {
         val all = clientDao.getAllGroupsNow()
             .sortedBy { it.sortOrder ?: Int.MAX_VALUE }
+        // Группы фильтруются по includeArchived, но это состояние управляется извне
+        // В ClientsScreen будет дополнительная фильтрация по isEditMode
         _groups.value = if (_includeArchived.value) all else all.filter { it.isArchived != true }
     }
 

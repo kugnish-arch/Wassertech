@@ -81,6 +81,18 @@ class SyncEngine(private val context: Context) {
             try {
                 Log.d(TAG, "Начало отправки локальных изменений")
                 
+                // Проверяем наличие токена перед синхронизацией
+                val token = tokenStorage.getAccessToken()
+                if (token == null) {
+                    val errorMsg = "Токен авторизации отсутствует. Необходимо войти в систему."
+                    Log.e(TAG, errorMsg)
+                    return@withContext SyncResult(
+                        success = false,
+                        message = errorMsg
+                    )
+                }
+                Log.d(TAG, "Токен найден, длина: ${token.length}")
+                
                 // Собираем все "грязные" записи
                 val request = buildSyncPushRequest()
                 
@@ -91,17 +103,43 @@ class SyncEngine(private val context: Context) {
                 val dirtyComponents = request.components.size
                 val dirtySessions = request.maintenance_sessions.size
                 val dirtyValues = request.maintenance_values.size
-                val dirtyTemplates = request.checklist_templates.size
-                val dirtyFields = request.checklist_fields.size
                 val dirtyComponentTemplates = request.component_templates.size
+                val dirtyComponentTemplateFields = request.component_template_fields.size
+                val dirtyDeleted = request.deleted.size
                 val totalCount = dirtyClients + dirtySites + dirtyInstallations + dirtyComponents +
-                    dirtySessions + dirtyValues + dirtyTemplates + dirtyFields + dirtyComponentTemplates
+                    dirtySessions + dirtyValues + dirtyComponentTemplates + dirtyComponentTemplateFields + dirtyDeleted
                 
                 Log.d(TAG, "Dirty counts: clients=$dirtyClients, sites=$dirtySites, " +
                     "installations=$dirtyInstallations, components=$dirtyComponents, " +
                     "sessions=$dirtySessions, values=$dirtyValues, " +
-                    "templates=$dirtyTemplates, fields=$dirtyFields, " +
-                    "componentTemplates=$dirtyComponentTemplates")
+                    "componentTemplates=$dirtyComponentTemplates, componentTemplateFields=$dirtyComponentTemplateFields, deleted=$dirtyDeleted")
+                
+                if (dirtyComponentTemplates > 0) {
+                    Log.d(TAG, "Отправка шаблонов компонентов: количество=$dirtyComponentTemplates")
+                }
+                if (dirtyComponentTemplateFields > 0) {
+                    Log.d(TAG, "Отправка полей шаблонов компонентов: количество=$dirtyComponentTemplateFields")
+                }
+                
+                // Логируем содержимое запроса
+                Log.d(TAG, "Содержимое запроса sync/push: " +
+                        "component_templates=${request.component_templates.size}, " +
+                        "component_template_fields=${request.component_template_fields.size}")
+                if (request.component_templates.isNotEmpty()) {
+                    request.component_templates.forEach { t ->
+                        Log.d(TAG, "  → Шаблон: id=${t.id}, name=${t.name}, createdAt=${t.createdAtEpoch}, updatedAt=${t.updatedAtEpoch}")
+                    }
+                }
+                if (request.component_template_fields.isNotEmpty()) {
+                    request.component_template_fields.forEach { f ->
+                        Log.d(TAG, "  → Поле: id=${f.id}, templateId=${f.templateId}, label=${f.label}, isForMaintenance=${f.isForMaintenance}")
+                    }
+                }
+                
+                if (dirtyDeleted > 0) {
+                    val deletedByEntity = request.deleted.groupBy { it.entity }
+                    Log.d(TAG, "Deleted records by entity: ${deletedByEntity.mapValues { it.value.size }}")
+                }
                 
                 if (totalCount == 0) {
                     Log.d(TAG, "Нет локальных изменений для отправки")
@@ -112,14 +150,36 @@ class SyncEngine(private val context: Context) {
                     )
                 }
                 
-                Log.d(TAG, "Отправка $totalCount записей на сервер")
+                Log.d(TAG, "Отправка $totalCount записей на сервер через sync/push")
                 
                 // Отправляем запрос
                 val response = syncApi.syncPush(request)
+                Log.d(TAG, "Получен ответ от sync/push: код=${response.code()}, успешно=${response.isSuccessful}")
                 
                 if (!response.isSuccessful) {
-                    val errorMsg = "Ошибка отправки: ${response.code()}"
-                    Log.e(TAG, errorMsg)
+                    val errorCode = response.code()
+                    val errorBody = try {
+                        response.errorBody()?.string()
+                    } catch (e: Exception) {
+                        null
+                    }
+                    
+                    val errorMsg = when (errorCode) {
+                        401 -> {
+                            Log.e(TAG, "Ошибка 401: Токен недействителен или истек. Тело ошибки: $errorBody")
+                            Log.e(TAG, "Текущий токен: ${token.take(50)}...")
+                            "Токен авторизации недействителен или истек. Необходимо войти в систему заново."
+                        }
+                        403 -> {
+                            Log.e(TAG, "Ошибка 403: Доступ запрещен. Тело ошибки: $errorBody")
+                            "Доступ запрещен. Проверьте права доступа."
+                        }
+                        else -> {
+                            Log.e(TAG, "Ошибка отправки: код=$errorCode, тело=$errorBody")
+                            "Ошибка отправки: код $errorCode${if (errorBody != null) " ($errorBody)" else ""}"
+                        }
+                    }
+                    
                     return@withContext SyncResult(
                         success = false,
                         message = errorMsg
@@ -128,14 +188,28 @@ class SyncEngine(private val context: Context) {
                 
                 val pushResponse = response.body()
                 if (pushResponse == null) {
+                    Log.e(TAG, "Пустой ответ от сервера sync/push")
                     return@withContext SyncResult(
                         success = false,
                         message = "Пустой ответ от сервера"
                     )
                 }
                 
+                // Логируем ответ от сервера
+                Log.d(TAG, "Ответ sync/push: success=${pushResponse.success}, " +
+                        "processed=${pushResponse.processed}, errors=${pushResponse.errors.size}")
+                if (pushResponse.processed != null) {
+                    Log.d(TAG, "Обработано сервером: component_templates=${pushResponse.processed.component_templates}, " +
+                            "component_template_fields=${pushResponse.processed.component_template_fields}")
+                }
+                if (pushResponse.errors.isNotEmpty()) {
+                    pushResponse.errors.forEach { error ->
+                        Log.e(TAG, "Ошибка синхронизации: entityType=${error.entityType}, entityId=${error.entityId}, message=${error.message}")
+                    }
+                }
+                
                 // Обрабатываем ответ и обновляем статусы в Room
-                processPushResponse(pushResponse)
+                processPushResponse(pushResponse, request)
                 
                 val stats = calculatePushStats(pushResponse)
                 val message = buildString {
@@ -185,6 +259,17 @@ class SyncEngine(private val context: Context) {
             try {
                 Log.d(TAG, "Начало получения изменений с сервера")
                 
+                // Проверяем наличие токена перед синхронизацией
+                val token = tokenStorage.getAccessToken()
+                if (token == null) {
+                    val errorMsg = "Токен авторизации отсутствует. Необходимо войти в систему."
+                    Log.e(TAG, errorMsg)
+                    return@withContext SyncResult(
+                        success = false,
+                        message = errorMsg
+                    )
+                }
+                
                 // Получаем timestamp последней синхронизации (в миллисекундах)
                 val lastSyncTimestampMs = getLastSyncTimestamp() ?: 0L
                 // Backend ожидает timestamp в секундах и требует since > 0
@@ -197,8 +282,28 @@ class SyncEngine(private val context: Context) {
                 val response = syncApi.syncPull(since = lastSyncTimestampSec)
                 
                 if (!response.isSuccessful) {
-                    val errorMsg = "Ошибка получения: ${response.code()}"
-                    Log.e(TAG, errorMsg)
+                    val errorCode = response.code()
+                    val errorBody = try {
+                        response.errorBody()?.string()
+                    } catch (e: Exception) {
+                        null
+                    }
+                    
+                    val errorMsg = when (errorCode) {
+                        401 -> {
+                            Log.e(TAG, "Ошибка 401: Токен недействителен или истек. Тело ошибки: $errorBody")
+                            "Токен авторизации недействителен или истек. Необходимо войти в систему заново."
+                        }
+                        403 -> {
+                            Log.e(TAG, "Ошибка 403: Доступ запрещен. Тело ошибки: $errorBody")
+                            "Доступ запрещен. Проверьте права доступа."
+                        }
+                        else -> {
+                            Log.e(TAG, "Ошибка получения: код=$errorCode, тело=$errorBody")
+                            "Ошибка получения: код $errorCode${if (errorBody != null) " ($errorBody)" else ""}"
+                        }
+                    }
+                    
                     return@withContext SyncResult(
                         success = false,
                         message = errorMsg
@@ -281,9 +386,42 @@ class SyncEngine(private val context: Context) {
         }
         
         val values = database.sessionsDao().getDirtyValuesNow().map { it.toSyncDto() }
-        val templates = database.templatesDao().getDirtyTemplatesNow().map { it.toSyncDto() }
-        val fields = database.templatesDao().getDirtyFieldsNow().map { it.toSyncDto() }
+        
+        // Новая модель: собираем componentTemplates и componentTemplateFields
         val componentTemplates = database.componentTemplatesDao().getDirtyComponentTemplatesNow().map { it.toSyncDto() }
+        val componentTemplateFields = database.componentTemplateFieldsDao().getDirtyComponentTemplateFieldsNow()
+        
+        if (componentTemplates.isNotEmpty()) {
+            Log.d(TAG, "Найдено dirty шаблонов компонентов для отправки: ${componentTemplates.size}")
+            componentTemplates.forEach { template ->
+                Log.d(TAG, "  - Шаблон компонента: id=${template.id}, name=${template.name}")
+            }
+        }
+        
+        if (componentTemplateFields.isNotEmpty()) {
+            Log.d(TAG, "Найдено dirty полей шаблонов компонентов для отправки: ${componentTemplateFields.size}")
+            componentTemplateFields.forEach { field ->
+                Log.d(TAG, "  - Поле шаблона: id=${field.id}, templateId=${field.templateId}, " +
+                        "label=${field.label}, isCharacteristic=${field.isCharacteristic}, " +
+                        "dirtyFlag=${field.dirtyFlag}, syncStatus=${field.syncStatus}")
+            }
+        }
+        
+        // Маппим component_template_fields в DTO для отправки
+        val componentTemplateFieldsDto = componentTemplateFields.map { it.toChecklistFieldDto() }
+        
+        Log.d(TAG, "Итоговые данные для отправки: component_templates=${componentTemplates.size}, " +
+                "component_template_fields=${componentTemplateFieldsDto.size}")
+        
+        // Собираем dirty-записи об удалениях
+        val dirtyDeletedRecords = database.deletedRecordsDao().getDirtyDeletedRecordsNow()
+        val deleted = dirtyDeletedRecords.map {
+            DeletedRecordDto(
+                entity = it.entity,
+                recordId = it.recordId,
+                deletedAtEpoch = it.deletedAtEpoch
+            )
+        }
         
         return SyncPushRequest(
             clients = clients,
@@ -292,24 +430,33 @@ class SyncEngine(private val context: Context) {
             components = components,
             maintenance_sessions = sessions,
             maintenance_values = values,
-            checklist_templates = templates,
-            checklist_fields = fields,
-            component_templates = componentTemplates
+            component_templates = componentTemplates,
+            component_template_fields = componentTemplateFieldsDto,
+            deleted = deleted
         )
     }
     
-    private suspend fun processPushResponse(response: SyncPushResponse) {
+    private suspend fun processPushResponse(response: SyncPushResponse, request: SyncPushRequest) {
         // Обрабатываем ответ и обновляем статусы в Room
         // Для успешно обработанных записей - помечаем как SYNCED
         // Для записей с ошибками - помечаем как CONFLICT
         
         if (!response.success) {
-            Log.w(TAG, "Push не успешен, не обновляем статусы")
+            Log.w(TAG, "Push не успешен (success=false), не обновляем статусы")
             return
         }
         
-        // Собираем ID всех отправленных записей
-        val request = buildSyncPushRequest()
+        // Проверяем, что сервер действительно обработал записи
+        val processed = response.processed
+        if (processed == null) {
+            Log.w(TAG, "Push успешен, но processed=null, не обновляем статусы")
+            return
+        }
+        
+        Log.d(TAG, "Обработка ответа push: processed.component_templates=${processed.component_templates}, " +
+                "processed.component_template_fields=${processed.component_template_fields}")
+        
+        // Собираем ID всех отправленных записей из переданного request
         val allSentIds = mutableMapOf<String, List<String>>()
         allSentIds["clients"] = request.clients.map { it.id }
         allSentIds["sites"] = request.sites.map { it.id }
@@ -317,18 +464,40 @@ class SyncEngine(private val context: Context) {
         allSentIds["components"] = request.components.map { it.id }
         allSentIds["maintenance_sessions"] = request.maintenance_sessions.map { it.id }
         allSentIds["maintenance_values"] = request.maintenance_values.mapNotNull { it.id }
-        allSentIds["checklist_templates"] = request.checklist_templates.map { it.id }
-        allSentIds["checklist_fields"] = request.checklist_fields.map { it.id }
         allSentIds["component_templates"] = request.component_templates.map { it.id }
+        allSentIds["component_template_fields"] = request.component_template_fields.map { it.id }
+        
+        // Обрабатываем удаления отдельно
+        val deletedRecords = database.deletedRecordsDao().getDirtyDeletedRecordsNow()
+        val deletedRecordIds = deletedRecords.map { it.id }
         
         // Собираем ID записей с ошибками
         val errorIdsByType = response.errors.groupBy { it.entityType }
             .mapValues { (_, errors) -> errors.map { it.entityId } }
         
         // Помечаем успешно обработанные записи как синхронизированные
+        // Используем processed для проверки, что сервер действительно обработал записи
         allSentIds.forEach { (entityType, ids) ->
             val errorIds = errorIdsByType[entityType] ?: emptyList()
-            val successIds = ids - errorIds.toSet()
+            
+            // Проверяем, сколько записей сервер обработал для этого типа сущности
+            val processedCount = when (entityType) {
+                "clients" -> processed.clients
+                "sites" -> processed.sites
+                "installations" -> processed.installations
+                "components" -> processed.components
+                "maintenance_sessions" -> processed.maintenance_sessions
+                "maintenance_values" -> processed.maintenance_values
+                "component_templates" -> processed.component_templates
+                "component_template_fields" -> processed.component_template_fields
+                else -> 0
+            }
+            
+            Log.d(TAG, "Обработка $entityType: отправлено=${ids.size}, обработано сервером=$processedCount, ошибок=${errorIds.size}")
+            
+            // Помечаем как синхронизированные только те записи, которые сервер обработал и которые не имеют ошибок
+            // Берем первые processedCount записей без ошибок
+            val successIds = (ids - errorIds.toSet()).take(processedCount)
             
             if (successIds.isNotEmpty()) {
                 when (entityType) {
@@ -338,11 +507,21 @@ class SyncEngine(private val context: Context) {
                     "components" -> database.hierarchyDao().markComponentsAsSynced(successIds)
                     "maintenance_sessions" -> database.sessionsDao().markSessionsAsSynced(successIds)
                     "maintenance_values" -> database.sessionsDao().markValuesAsSynced(successIds)
-                    "checklist_templates" -> database.templatesDao().markTemplatesAsSynced(successIds)
-                    "checklist_fields" -> database.templatesDao().markFieldsAsSynced(successIds)
-                    "component_templates" -> database.componentTemplatesDao().markComponentTemplatesAsSynced(successIds)
+                    "component_templates" -> {
+                        database.componentTemplatesDao().markComponentTemplatesAsSynced(successIds)
+                        Log.d(TAG, "Помечено как синхронизировано шаблонов компонентов: ${successIds.size}, IDs=${successIds.take(5)}")
+                    }
+                    "component_template_fields" -> {
+                        database.componentTemplateFieldsDao().markComponentTemplateFieldsAsSynced(successIds)
+                        Log.d(TAG, "Помечено как синхронизировано полей шаблонов компонентов: ${successIds.size}, IDs=${successIds.take(5)}")
+                    }
                 }
-                Log.d(TAG, "Помечено как синхронизировано: $entityType = ${successIds.size}")
+                if (entityType != "component_templates" && entityType != "component_template_fields") {
+                    Log.d(TAG, "Помечено как синхронизировано: $entityType = ${successIds.size}")
+                }
+            } else if (ids.isNotEmpty() && processedCount == 0 && errorIds.isEmpty()) {
+                Log.w(TAG, "ВНИМАНИЕ: $entityType отправлено ${ids.size} записей, но сервер обработал 0 (processed.$entityType=0). " +
+                        "Записи НЕ помечены как синхронизированные.")
             }
             
             // Помечаем записи с ошибками как конфликтные
@@ -354,12 +533,29 @@ class SyncEngine(private val context: Context) {
                     "components" -> database.hierarchyDao().markComponentsAsConflict(errorIds)
                     "maintenance_sessions" -> database.sessionsDao().markSessionsAsConflict(errorIds)
                     "maintenance_values" -> database.sessionsDao().markValuesAsConflict(errorIds)
-                    "checklist_templates" -> database.templatesDao().markTemplatesAsConflict(errorIds)
-                    "checklist_fields" -> database.templatesDao().markFieldsAsConflict(errorIds)
-                    "component_templates" -> database.componentTemplatesDao().markComponentTemplatesAsConflict(errorIds)
+                    "component_templates" -> {
+                        database.componentTemplatesDao().markComponentTemplatesAsConflict(errorIds)
+                        Log.w(TAG, "Помечено как конфликт шаблонов компонентов: ${errorIds.size}, IDs=${errorIds.take(5)}")
+                    }
+                    "component_template_fields" -> {
+                        database.componentTemplateFieldsDao().markComponentTemplateFieldsAsConflict(errorIds)
+                        Log.w(TAG, "Помечено как конфликт полей шаблонов компонентов: ${errorIds.size}, IDs=${errorIds.take(5)}")
+                    }
                 }
-                Log.w(TAG, "Помечено как конфликт: $entityType = ${errorIds.size}")
+                if (entityType != "component_templates" && entityType != "component_template_fields") {
+                    Log.w(TAG, "Помечено как конфликт: $entityType = ${errorIds.size}")
+                }
             }
+        }
+        
+        // Обрабатываем удаления: помечаем как синхронизированные после успешного push
+        if (deletedRecordIds.isNotEmpty()) {
+            database.deletedRecordsDao().markAsSynced(deletedRecordIds)
+            Log.d(TAG, "Помечено как синхронизировано удалений: ${deletedRecordIds.size}")
+            
+            // Удаляем синхронизированные записи об удалениях
+            database.deletedRecordsDao().deleteAllSynced()
+            Log.d(TAG, "Удалены синхронизированные записи об удалениях")
         }
         
         if (response.errors.isNotEmpty()) {
@@ -398,21 +594,88 @@ class SyncEngine(private val context: Context) {
             applyMaintenanceValueToRoom(dto)
         }
         
-        response.checklist_templates.forEach { dto ->
-            applyChecklistTemplateToRoom(dto)
+        // Обрабатываем поля шаблонов компонентов
+        if (response.component_template_fields.isNotEmpty()) {
+            Log.d(TAG, "Получено полей шаблонов компонентов с сервера: ${response.component_template_fields.size}")
+            var appliedCount = 0
+            var skippedCount = 0
+            response.component_template_fields.forEach { dto ->
+                val before = database.componentTemplateFieldsDao().getFieldById(dto.id)
+                applyChecklistFieldToComponentTemplateField(dto)
+                val after = database.componentTemplateFieldsDao().getFieldById(dto.id)
+                if (after != null) {
+                    appliedCount++
+                    if (before == null) {
+                        Log.d(TAG, "  - Создано поле: id=${dto.id}, templateId=${dto.templateId}, label=${dto.label}")
+                    } else {
+                        Log.d(TAG, "  - Обновлено поле: id=${dto.id}, templateId=${dto.templateId}, label=${dto.label}")
+                    }
+                } else {
+                    skippedCount++
+                }
+            }
+            Log.d(TAG, "Обработано полей шаблонов компонентов: применено=$appliedCount, пропущено=$skippedCount")
         }
         
-        response.checklist_fields.forEach { dto ->
-            applyChecklistFieldToRoom(dto)
-        }
-        
-        response.component_templates.forEach { dto ->
-            applyComponentTemplateToRoom(dto)
+        // Обрабатываем шаблоны компонентов
+        if (response.component_templates.isNotEmpty()) {
+            Log.d(TAG, "Получено шаблонов компонентов с сервера: ${response.component_templates.size}")
+            var appliedCount = 0
+            var skippedCount = 0
+            response.component_templates.forEach { dto ->
+                val before = database.componentTemplatesDao().getById(dto.id)
+                applyComponentTemplateToRoom(dto)
+                val after = database.componentTemplatesDao().getById(dto.id)
+                if (after != null) {
+                    appliedCount++
+                    if (before == null) {
+                        Log.d(TAG, "  - Создан шаблон: id=${dto.id}, name=${dto.name}")
+                    } else {
+                        Log.d(TAG, "  - Обновлён шаблон: id=${dto.id}, name=${dto.name}")
+                    }
+                } else {
+                    skippedCount++
+                }
+            }
+            Log.d(TAG, "Обработано шаблонов компонентов: применено=$appliedCount, пропущено=$skippedCount")
         }
         
         // Обрабатываем удаления
-        response.deleted.forEach { deleted ->
-            handleDeletedRecord(deleted)
+        // ВАЖНО: обрабатываем удаления ПОСЛЕ обработки основных списков,
+        // чтобы не удалить записи, которые просто архивированы (сервер может отправлять их в deleted)
+        if (response.deleted.isNotEmpty()) {
+            val deletedByEntity = response.deleted.groupBy { it.getEntityName() ?: "unknown" }
+            Log.d(TAG, "Получено удалений с сервера: всего=${response.deleted.size}, по сущностям=${deletedByEntity.mapValues { it.value.size }}")
+            
+            // Собираем ID всех записей, которые присутствуют в основных списках
+            val existingIds = mutableSetOf<String>()
+            response.clients.forEach { existingIds.add(it.id) }
+            response.sites.forEach { existingIds.add(it.id) }
+            response.installations.forEach { existingIds.add(it.id) }
+            response.components.forEach { existingIds.add(it.id) }
+            response.maintenance_sessions.forEach { existingIds.add(it.id) }
+            response.maintenance_values.forEach { value ->
+                value.id?.let { id -> existingIds.add(id) }
+            }
+            response.component_templates.forEach { existingIds.add(it.id) }
+            response.component_template_fields.forEach { existingIds.add(it.id) }
+            
+            var deletedCount = 0
+            var skippedCount = 0
+            response.deleted.forEach { deleted ->
+                // Проверяем, не присутствует ли запись в основных списках
+                // Если присутствует - это не удаление, а архивирование (сервер отправляет неправильно)
+                if (existingIds.contains(deleted.recordId)) {
+                    Log.w(TAG, "Пропущено удаление ${deleted.getEntityName()}/${deleted.recordId}: запись присутствует в основном списке (вероятно, архивирована, а не удалена). Сервер не должен отправлять архивные записи в секции deleted.")
+                    skippedCount++
+                } else {
+                    // Запись действительно удалена на сервере - удаляем локально
+                    Log.d(TAG, "Обработка удаления ${deleted.getEntityName()}/${deleted.recordId}: запись отсутствует в основном списке, удаляем локально")
+                    handleDeletedRecord(deleted)
+                    deletedCount++
+                }
+            }
+            Log.d(TAG, "Обработано удалений локально: $deletedCount, пропущено (присутствуют в основном списке): $skippedCount")
         }
     }
     
@@ -657,31 +920,37 @@ class SyncEngine(private val context: Context) {
         }
     }
     
-    private suspend fun applyChecklistTemplateToRoom(dto: SyncChecklistTemplateDto) {
-        val existing = database.templatesDao().getTemplateById(dto.id)
-        val entity = dto.toEntity()
-        val dtoUpdatedAt = dto.updatedAtEpoch
-        if (existing == null) {
-            database.templatesDao().insertTemplate(entity)
-        } else {
-            val existingUpdatedAt = existing.updatedAtEpoch ?: 0
-            if (dtoUpdatedAt > existingUpdatedAt) {
-                database.templatesDao().upsertTemplate(entity)
-            }
+    /**
+     * Маппинг checklist_field (старый формат API) в component_template_field (новая модель)
+     */
+    private suspend fun applyChecklistFieldToComponentTemplateField(dto: SyncChecklistFieldDto) {
+        // Маппим templateId: в старом формате это был ID checklist_template,
+        // в новом формате это должен быть ID component_template
+        // Если component_template с таким ID не существует, создаем его
+        var componentTemplateId = dto.templateId
+        
+        // Проверяем, существует ли component_template с таким ID
+        val componentTemplate = database.componentTemplatesDao().getById(componentTemplateId)
+        if (componentTemplate == null) {
+            // Создаем component_template на основе checklist_template (если он был отправлен)
+            // Или используем templateId как есть (миграция уже создала component_template с таким ID)
+            // В этом случае просто используем templateId
+            Log.d(TAG, "Component template не найден для checklist_field templateId=${dto.templateId}, используем как есть")
         }
-    }
-    
-    private suspend fun applyChecklistFieldToRoom(dto: SyncChecklistFieldDto) {
-        val existing = database.templatesDao().getFieldsForTemplate(dto.templateId)
+        
+        // Маппим поле в новую модель
+        val existing = database.componentTemplateFieldsDao().getFieldsForTemplate(componentTemplateId)
             .find { it.id == dto.id }
-        val entity = dto.toEntity()
-        val dtoUpdatedAt = dto.updatedAtEpoch
+        
+        val entity = dto.toComponentTemplateFieldEntity(componentTemplateId)
+        val dtoUpdatedAt = dto.updatedAtEpoch ?: 0
+        
         if (existing == null) {
-            database.templatesDao().insertField(entity)
-        } else if (dtoUpdatedAt != null) {
-            val existingUpdatedAt = existing.updatedAtEpoch ?: 0
+            database.componentTemplateFieldsDao().upsertField(entity)
+        } else {
+            val existingUpdatedAt = existing.updatedAtEpoch
             if (dtoUpdatedAt > existingUpdatedAt) {
-                database.templatesDao().upsertField(entity)
+                database.componentTemplateFieldsDao().upsertField(entity)
             }
         }
     }
@@ -701,22 +970,56 @@ class SyncEngine(private val context: Context) {
     }
     
     private suspend fun handleDeletedRecord(deleted: DeletedRecordDto) {
-        when (deleted.tableName) {
-            "clients" -> database.clientDao().deleteClient(deleted.recordId)
-            "sites" -> database.hierarchyDao().deleteSite(deleted.recordId)
-            "installations" -> database.hierarchyDao().deleteInstallation(deleted.recordId)
-            "components" -> database.hierarchyDao().deleteComponent(deleted.recordId)
-            "maintenance_sessions" -> database.sessionsDao().deleteSession(deleted.recordId)
-            "maintenance_values" -> database.sessionsDao().deleteValue(deleted.recordId)
-            "checklist_templates" -> database.templatesDao().deleteTemplate(deleted.recordId)
-            "checklist_fields" -> database.templatesDao().deleteField(deleted.recordId)
+        val entityName = deleted.getEntityName()
+        if (entityName == null) {
+            Log.w(TAG, "Не удалось определить тип сущности для удаления: recordId=${deleted.recordId}")
+            return
+        }
+        
+        when (entityName) {
+            "clients" -> {
+                database.clientDao().deleteClient(deleted.recordId)
+                Log.d(TAG, "Удалён клиент: ${deleted.recordId}")
+            }
+            "sites" -> {
+                database.hierarchyDao().deleteSite(deleted.recordId)
+                Log.d(TAG, "Удалён объект: ${deleted.recordId}")
+            }
+            "installations" -> {
+                database.hierarchyDao().deleteInstallation(deleted.recordId)
+                Log.d(TAG, "Удалена установка: ${deleted.recordId}")
+            }
+            "components" -> {
+                database.hierarchyDao().deleteComponent(deleted.recordId)
+                Log.d(TAG, "Удалён компонент: ${deleted.recordId}")
+            }
+            "maintenance_sessions" -> {
+                database.sessionsDao().deleteSession(deleted.recordId)
+                Log.d(TAG, "Удалена сессия ТО: ${deleted.recordId}")
+            }
+            "maintenance_values" -> {
+                database.sessionsDao().deleteValue(deleted.recordId)
+                Log.d(TAG, "Удалено значение ТО: ${deleted.recordId}")
+            }
+            "component_template_fields" -> {
+                val field = database.componentTemplateFieldsDao().getFieldById(deleted.recordId)
+                if (field != null) {
+                    database.componentTemplateFieldsDao().deleteField(deleted.recordId)
+                    Log.d(TAG, "Удалено поле шаблона компонента: id=${deleted.recordId}, templateId=${field.templateId}, label=${field.label}")
+                } else {
+                    Log.w(TAG, "Попытка удалить несуществующее поле шаблона: id=${deleted.recordId}")
+                }
+            }
             "component_templates" -> {
                 val template = database.componentTemplatesDao().getById(deleted.recordId)
                 if (template != null) {
                     database.componentTemplatesDao().delete(template)
+                    Log.d(TAG, "Удалён шаблон компонента: id=${deleted.recordId}, name=${template.name}")
+                } else {
+                    Log.w(TAG, "Попытка удалить несуществующий шаблон компонента: id=${deleted.recordId}")
                 }
             }
-            else -> Log.w(TAG, "Неизвестная таблица для удаления: ${deleted.tableName}")
+            else -> Log.w(TAG, "Неизвестная сущность для удаления: ${deleted.entity}")
         }
     }
     
@@ -887,6 +1190,52 @@ class SyncEngine(private val context: Context) {
         syncStatus = SyncStatus.SYNCED.value
     )
     
+    /**
+     * Маппинг ComponentTemplateFieldEntity → SyncChecklistFieldDto (для обратной совместимости с API)
+     */
+    private fun ComponentTemplateFieldEntity.toChecklistFieldDto() = SyncChecklistFieldDto(
+        id = id,
+        templateId = templateId,
+        key = key,
+        label = label,
+        type = type.name,
+        unit = unit,
+        minValue = min,
+        maxValue = max,
+        isForMaintenance = !isCharacteristic, // Маппинг: isCharacteristic = true → isForMaintenance = false
+        required = isRequired,
+        sortOrder = sortOrder,
+        createdAtEpoch = createdAtEpoch.takeIf { it > 0 },
+        updatedAtEpoch = updatedAtEpoch.takeIf { it > 0 }
+    )
+    
+    /**
+     * Маппинг SyncChecklistFieldDto → ComponentTemplateFieldEntity (при получении с сервера)
+     */
+    private fun SyncChecklistFieldDto.toComponentTemplateFieldEntity(componentTemplateId: String) = ComponentTemplateFieldEntity(
+        id = id,
+        templateId = componentTemplateId,
+        key = key,
+        label = label ?: "",
+        type = FieldType.valueOf(type),
+        unit = unit,
+        isCharacteristic = !isForMaintenance, // Маппинг обратный: isForMaintenance = false → isCharacteristic = true
+        isRequired = required,
+        defaultValueText = null,
+        defaultValueNumber = null,
+        defaultValueBool = null,
+        min = minValue,
+        max = maxValue,
+        sortOrder = sortOrder,
+        createdAtEpoch = createdAtEpoch ?: 0,
+        updatedAtEpoch = updatedAtEpoch ?: 0,
+        isArchived = false,
+        archivedAtEpoch = null,
+        deletedAtEpoch = null,
+        dirtyFlag = false,
+        syncStatus = SyncStatus.SYNCED.value
+    )
+    
     private fun calculatePushStats(response: SyncPushResponse): SyncPushStats {
         val processed = response.processed
         if (processed == null) {
@@ -896,7 +1245,7 @@ class SyncEngine(private val context: Context) {
         // Упрощенная логика: считаем, что все processed - это inserted+updated
         val total = processed.clients + processed.sites + processed.installations +
             processed.components + processed.maintenance_sessions + processed.maintenance_values +
-            processed.checklist_templates + processed.checklist_fields + processed.component_templates
+            processed.component_templates + processed.component_template_fields
         
         val skipped = response.errors.size
         
@@ -908,6 +1257,11 @@ class SyncEngine(private val context: Context) {
     }
     
     private fun calculatePullStats(response: SyncPullResponse): SyncPullStats {
+        val componentTemplatesCount = response.component_templates.size
+        val componentTemplateFieldsCount = response.component_template_fields.size
+        if (componentTemplatesCount > 0 || componentTemplateFieldsCount > 0) {
+            Log.d(TAG, "Получено шаблонов компонентов: component_templates=$componentTemplatesCount, component_template_fields=$componentTemplateFieldsCount")
+        }
         return SyncPullStats(
             clients = response.clients.size,
             sites = response.sites.size,
@@ -915,7 +1269,7 @@ class SyncEngine(private val context: Context) {
             components = response.components.size,
             sessions = response.maintenance_sessions.size,
             values = response.maintenance_values.size,
-            templates = response.checklist_templates.size + response.component_templates.size,
+            templates = componentTemplatesCount,
             deleted = response.deleted.size
         )
     }
@@ -953,4 +1307,5 @@ data class SyncPullStats(
     val templates: Int,
     val deleted: Int
 )
+
 

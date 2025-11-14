@@ -33,7 +33,7 @@ import ru.wassertech.core.ui.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.wassertech.viewmodel.HierarchyViewModel
 import ru.wassertech.viewmodel.TemplatesViewModel
-import ru.wassertech.data.entities.ChecklistTemplateEntity
+import ru.wassertech.data.entities.ComponentTemplateEntity
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.AppDatabase
 import ru.wassertech.ui.common.EditDoneBottomBar
@@ -63,10 +63,10 @@ fun ComponentsScreen(
     // --- Templates из БД без VM ---
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
-    val allTemplatesFlow: Flow<List<ChecklistTemplateEntity>> =
+    val allTemplatesFlow: Flow<List<ComponentTemplateEntity>> =
         remember { db.templatesDao().observeAllTemplates() }
     val allTemplates by allTemplatesFlow.collectAsState(initial = emptyList())
-    val templateTitleById = remember(allTemplates) { allTemplates.associate { it.id to it.title } }
+    val templateTitleById = remember(allTemplates) { allTemplates.associate { it.id to it.name } }
 
     // --- Второй VM: клиенты (чтобы получить имя клиента без observeClient()) ---
     val clientsVm: ClientsViewModel = viewModel(factory = ClientsViewModelFactory(db.clientDao(), db))
@@ -187,7 +187,7 @@ fun ComponentsScreen(
 
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(TextFieldValue("")) }
-    var selectedTemplate by remember { mutableStateOf<ChecklistTemplateEntity?>(null) }
+    var selectedTemplate by remember { mutableStateOf<ComponentTemplateEntity?>(null) }
     var templateMenu by remember { mutableStateOf(false) }
 
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
@@ -492,7 +492,7 @@ fun ComponentsScreen(
                         expanded = templateMenu,
                         onExpandedChange = { templateMenu = it }
                     ) {
-                        val selectedTitle = selectedTemplate?.title
+                        val selectedTitle = selectedTemplate?.name
                             ?: if (allTemplates.isEmpty()) "Нет шаблонов" else "Выберите шаблон"
                         OutlinedTextField(
                             value = selectedTitle,
@@ -520,7 +520,7 @@ fun ComponentsScreen(
                             } else {
                                 allTemplates.forEach { tmpl ->
                                     DropdownMenuItem(
-                                        text = { Text(tmpl.title) },
+                                        text = { Text(tmpl.name) },
                                         onClick = {
                                             selectedTemplate = tmpl
                                             templateMenu = false
@@ -539,7 +539,7 @@ fun ComponentsScreen(
             onConfirm = {
                 val tmpl = selectedTemplate
                 val compName = if (newName.text.isNotBlank()) newName.text.trim()
-                else tmpl?.title ?: "Компонент"
+                else tmpl?.name ?: "Компонент"
                 vm.addComponentFromTemplate(
                     installationId = installationId,
                     name = compName,

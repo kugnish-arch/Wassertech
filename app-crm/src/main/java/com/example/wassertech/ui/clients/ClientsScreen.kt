@@ -113,15 +113,24 @@ fun ClientsScreen(
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<DeleteDialogState?>(null) }
 
-    // Исходные данные
-    val clientsByGroup = remember(clients) { clients.groupBy { it.clientGroupId } }
+    // Фильтруем клиентов: архивные показываются только в режиме редактирования
+    val filteredClients = remember(clients, isEditMode, includeArchived) {
+        if (isEditMode && includeArchived) {
+            clients // Показываем всех клиентов в режиме редактирования с включенным includeArchived
+        } else {
+            clients.filter { it.isArchived != true } // В обычном режиме скрываем архивных
+        }
+    }
+    
+    // Исходные данные (используем отфильтрованный список)
+    val clientsByGroup = remember(filteredClients) { filteredClients.groupBy { it.clientGroupId } }
     val generalClients = clientsByGroup[null].orEmpty()
 
     // --- словари для быстрого доступа по id (в композиционном контексте) ---
-    val generalById = remember(clients, generalClients) {
+    val generalById = remember(filteredClients, generalClients) {
         generalClients.associateBy { it.id }
     }
-    val byGroupIdMap = remember(clients, groups) {
+    val byGroupIdMap = remember(filteredClients, groups) {
         groups.associate { g ->
             g.id to (clientsByGroup[g.id] ?: emptyList()).associateBy { it.id }
         }
@@ -129,16 +138,39 @@ fun ClientsScreen(
 
     // ===== ЛОКАЛЬНЫЙ ПОРЯДОК ДЛЯ LIVE-ПЕРЕСТАНОВКИ =====
     // null → «Общая»
-    var localOrderGeneral by remember(clients) {
-        mutableStateOf(generalClients.map { it.id })
-    }
+    // Важно: обновляем localOrderGeneral при изменении clients, но сохраняем существующие ID
+    var localOrderGeneral by remember { mutableStateOf<List<String>>(emptyList()) }
+    
     // Для каждой группы — список id в текущем порядке
-    var localOrderByGroup by remember(clients, groups) {
-        mutableStateOf(
-            groups.associate { g ->
-                g.id to (clientsByGroup[g.id]?.map { it.id } ?: emptyList())
-            }.toMutableMap()
-        )
+    var localOrderByGroup by remember { mutableStateOf<MutableMap<String, List<String>>>(mutableMapOf()) }
+    
+    // Обновляем локальные порядки при изменении отфильтрованных клиентов
+    LaunchedEffect(filteredClients, groups) {
+        // Пересчитываем группировку клиентов внутри LaunchedEffect для гарантированной синхронизации
+        val currentClientsByGroup = filteredClients.groupBy { it.clientGroupId }
+        val currentGeneralClients = currentClientsByGroup[null].orEmpty()
+        
+        // Подсчитываем архивных клиентов для отладки
+        val archivedCount = filteredClients.count { it.isArchived == true }
+        android.util.Log.d("ClientsScreen", "Обновление локальных порядков: всего клиентов=${filteredClients.size}, архивных=$archivedCount, includeArchived=$includeArchived, isEditMode=$isEditMode")
+        
+        val newGeneralIds = currentGeneralClients.map { it.id }
+        val newOrderByGroup = groups.associate { g ->
+            g.id to (currentClientsByGroup[g.id]?.map { it.id } ?: emptyList())
+        }
+        
+        // Полностью обновляем localOrderGeneral на основе отфильтрованного списка clients
+        if (localOrderGeneral != newGeneralIds) {
+            android.util.Log.d("ClientsScreen", "Обновление localOrderGeneral: было=${localOrderGeneral.size}, стало=${newGeneralIds.size}")
+            localOrderGeneral = newGeneralIds
+        }
+        
+        // Полностью обновляем localOrderByGroup на основе отфильтрованного списка clients
+        val updatedOrderByGroup = newOrderByGroup.toMutableMap()
+        if (updatedOrderByGroup != localOrderByGroup) {
+            android.util.Log.d("ClientsScreen", "Обновление localOrderByGroup: групп=${updatedOrderByGroup.size}")
+            localOrderByGroup = updatedOrderByGroup
+        }
     }
 
     // Сохраняем исходные значения для отмены
@@ -242,9 +274,12 @@ fun ClientsScreen(
                 crossGroupMoves = savedCrossGroupMoves.toMutableMap()
             }
 
-            if (includeArchivedBeforeEdit == false && includeArchived) {
-                onToggleIncludeArchived()
-            }
+            // НЕ сбрасываем includeArchived автоматически при выходе из режима редактирования
+            // Пользователь может сам управлять этим через переключатель в AppBar
+            // Это позволяет видеть архивные клиенты даже после синхронизации
+            // if (includeArchivedBeforeEdit == false && includeArchived) {
+            //     onToggleIncludeArchived()
+            // }
             includeArchivedBeforeEdit = null
             shouldSave = true // Сбрасываем флаг
             previousIsEditing = false
@@ -396,8 +431,13 @@ fun ClientsScreen(
                 }
 
                 // ===== Группы =====
+                // Фильтруем группы: архивные показываются только в режиме редактирования
                 items(
-                    items = groups,
+                    items = if (isEditMode && includeArchived) {
+                        groups // Показываем все группы в режиме редактирования с включенным includeArchived
+                    } else {
+                        groups.filter { it.isArchived != true } // В обычном режиме скрываем архивные
+                    },
                     key = { "header_${it.id}" }
                 ) { group ->
                     val groupId = group.id
@@ -846,6 +886,13 @@ private fun GroupHeader(
                             Icon(
                                 Icons.Filled.Edit,
                                 contentDescription = "Переименовать группу",
+                                tint = contentColor
+                            )
+                        }
+                        IconButton(onClick = onArchive) {
+                            Icon(
+                                Icons.Filled.Archive,
+                                contentDescription = "Архивировать группу",
                                 tint = contentColor
                             )
                         }

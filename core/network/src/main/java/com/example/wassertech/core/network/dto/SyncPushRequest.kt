@@ -10,8 +10,7 @@ data class SyncPushRequest(
     val components: List<SyncComponentDto> = emptyList(),
     val maintenance_sessions: List<SyncMaintenanceSessionDto> = emptyList(),
     val maintenance_values: List<SyncMaintenanceValueDto> = emptyList(),
-    val checklist_templates: List<SyncChecklistTemplateDto> = emptyList(),
-    val checklist_fields: List<SyncChecklistFieldDto> = emptyList(),
-    val component_templates: List<SyncComponentTemplateDto> = emptyList()
+    val component_templates: List<SyncComponentTemplateDto> = emptyList(),
+    val component_template_fields: List<SyncChecklistFieldDto> = emptyList(),
+    val deleted: List<DeletedRecordDto> = emptyList()
 )
-

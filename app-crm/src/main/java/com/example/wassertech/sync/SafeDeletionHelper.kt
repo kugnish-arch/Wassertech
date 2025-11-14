@@ -55,18 +55,31 @@ object SafeDeletionHelper {
     }
     
     /**
-     * Удаляет шаблон и помечает его для синхронизации
+     * Удаляет шаблон компонента и помечает его для синхронизации
      */
-    suspend fun deleteTemplate(db: AppDatabase, templateId: String) {
-        db.templatesDao().deleteTemplate(templateId)
-        DeletionTracker.markTemplateDeleted(db, templateId)
-        
-        // Также удаляем все поля шаблона
-        val fields = db.templatesDao().getFieldsForTemplate(templateId)
-        fields.forEach { field ->
-            db.templatesDao().deleteField(field.id)
-            DeletionTracker.markFieldDeleted(db, field.id)
+    suspend fun deleteComponentTemplate(db: AppDatabase, templateId: String) {
+        val template = db.componentTemplatesDao().getById(templateId)
+        if (template != null) {
+            // Удаляем все поля шаблона
+            val fields = db.componentTemplateFieldsDao().getFieldsForTemplate(templateId)
+            fields.forEach { field ->
+                db.componentTemplateFieldsDao().deleteField(field.id)
+                DeletionTracker.markComponentTemplateFieldDeleted(db, field.id)
+            }
+            
+            // Удаляем сам шаблон
+            db.componentTemplatesDao().delete(template)
+            DeletionTracker.markComponentTemplateDeleted(db, templateId)
         }
+    }
+    
+    /**
+     * Удаляет шаблон и помечает его для синхронизации
+     * @deprecated Используйте deleteComponentTemplate
+     */
+    @Deprecated("Используйте deleteComponentTemplate")
+    suspend fun deleteTemplate(db: AppDatabase, templateId: String) {
+        deleteComponentTemplate(db, templateId)
     }
     
     /**
@@ -84,5 +97,6 @@ object SafeDeletionHelper {
         db.sessionsDao().deleteSession(sessionId)
         DeletionTracker.markSessionDeleted(db, sessionId)
     }
+    
 }
 

@@ -1,5 +1,6 @@
 ﻿package ru.wassertech.ui.templates
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -28,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.wassertech.data.AppDatabase
-import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.util.Translit
 import ru.wassertech.viewmodel.TemplatesViewModel
@@ -40,6 +40,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.wassertech.core.ui.theme.SegmentedButtonStyle
+
+private const val TAG = "TemplateEditorScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +55,7 @@ fun TemplateEditorScreen(
     val ctx = LocalContext.current
     val db = remember { AppDatabase.getInstance(ctx) }
 
-    var templateTitle by remember { mutableStateOf<String>("Шаблон") }
-    var isHeadTemplate by remember { mutableStateOf(false) }
+    var templateName by remember { mutableStateOf<String>("Шаблон") }
 
     // Локальный порядок полей для drag-and-drop
     var localFieldOrder by remember(fields.size) {
@@ -73,13 +74,12 @@ fun TemplateEditorScreen(
 
     LaunchedEffect(templateId) {
         vm.load(templateId)
-        // заголовок шаблона и componentType
+        // заголовок шаблона
         withContext(Dispatchers.IO) {
             try {
-                val template = db.templatesDao().getTemplateById(templateId)
+                val template = db.componentTemplatesDao().getById(templateId)
                 if (template != null) {
-                    templateTitle = template.title
-                    isHeadTemplate = template.componentType == ComponentType.HEAD
+                    templateName = template.name
                 }
             } catch (_: Throwable) {
             }
@@ -91,18 +91,24 @@ fun TemplateEditorScreen(
             FloatingActionButton(
                 onClick = {
                     scope.launch {
+                        Log.d(TAG, "Сохранение шаблона: templateId=$templateId")
                         vm.saveAll(localFieldOrder)
-                        // Сохраняем componentType шаблона
+                        // Сохраняем имя шаблона, если оно изменилось
                         withContext(Dispatchers.IO) {
                             try {
-                                val template = db.templatesDao().getTemplateById(templateId)
-                                if (template != null) {
+                                val template = db.componentTemplatesDao().getById(templateId)
+                                if (template != null && template.name != templateName) {
                                     val updatedTemplate = template.copy(
-                                        componentType = if (isHeadTemplate) ComponentType.HEAD else ComponentType.COMMON
+                                        name = templateName
                                     ).markUpdatedForSync()
-                                    db.templatesDao().upsertTemplate(updatedTemplate)
+                                    Log.d(TAG, "Обновление имени шаблона: templateId=$templateId, " +
+                                            "oldName=${template.name}, newName=$templateName, " +
+                                            "dirtyFlag=${updatedTemplate.dirtyFlag}, syncStatus=${updatedTemplate.syncStatus}, " +
+                                            "updatedAtEpoch=${updatedTemplate.updatedAtEpoch}")
+                                    db.componentTemplatesDao().upsert(updatedTemplate)
                                 }
-                            } catch (_: Throwable) {
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "Ошибка при сохранении имени шаблона", e)
                             }
                         }
                         Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
@@ -132,67 +138,24 @@ fun TemplateEditorScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Переключатель "Заглавный элемент" перед всеми полями
+            // Поле для редактирования имени шаблона
             item {
-                var showHeadInfo by remember { mutableStateOf(false) }
-                Box {
-                    // Переменная для позиции иконки Info (вынесена на уровень карточки)
-                    var headInfoIconPosition by remember { mutableStateOf<Offset?>(null) }
-
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек полей
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
-                    ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    "Заглавный элемент",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                IconButton(
-                                    onClick = { showHeadInfo = true },
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .onGloballyPositioned { coordinates ->
-                                            val position = coordinates.localToWindow(Offset.Zero)
-                                            headInfoIconPosition = position
-                                        }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Info,
-                                        contentDescription = "Информация",
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = isHeadTemplate,
-                                onCheckedChange = { isHeadTemplate = it }
-                            )
-                        }
-                    }
-
-                    // Подсказка для "Заглавный элемент"
-                    if (showHeadInfo && headInfoIconPosition != null) {
-                        InfoTooltip(
-                            text = "Заглавное поле в готовом отчёте будет занимать всю ширину листа, а не 1/3 как обычные компоненты. Если заглавный элемент окажется в самом начале или конце компонента, то под него будет выделен отдельный визуальный раздел.",
-                            anchorPosition = headInfoIconPosition,
-                            onDismiss = { showHeadInfo = false }
-                        )
-                    }
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = Color(0xFFFFFFFF)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    OutlinedTextField(
+                        value = templateName,
+                        onValueChange = { templateName = it },
+                        label = { Text("Название шаблона") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        singleLine = true
+                    )
                 }
             }
 
@@ -316,9 +279,9 @@ fun TemplateEditorScreen(
                                         }
                                     }
                                     Switch(
-                                        checked = !f.isForMaintenance, // характеристика = не параметр ТО
+                                        checked = f.isCharacteristic, // true = характеристика, false = чек-лист ТО
                                         onCheckedChange = { checked ->
-                                            vm.update(f.id) { it.copy(isForMaintenance = !checked) }
+                                            vm.update(f.id) { it.copy(isCharacteristic = checked) }
                                         }
                                     )
                                 }
@@ -450,7 +413,7 @@ fun TemplateEditorScreen(
                         // Подсказка для "Характеристика"
                         if (showCharacteristicInfo && infoIconPosition != null) {
                             InfoTooltip(
-                                text = "Характеристика - постоянное свойство компонента. Оно будет сохраняться и выводиться в некоторых документах, но его значение не меняется при проведении обслуживания.",
+                                text = "Характеристика - постоянное свойство компонента (паспортные данные железа). Оно будет сохраняться и выводиться в некоторых документах, но его значение не меняется при проведении обслуживания. Если переключатель выключен, поле относится к чек-листу ТО (параметры обслуживания).",
                                 anchorPosition = infoIconPosition,
                                 onDismiss = { showCharacteristicInfo = false }
                             )

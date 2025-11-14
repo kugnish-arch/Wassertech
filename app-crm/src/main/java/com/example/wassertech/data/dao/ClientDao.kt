@@ -119,8 +119,8 @@ interface ClientDao {
     suspend fun updateClientName(clientId: String, newName: String, ts: Long = System.currentTimeMillis()): Int
 
     // Перенести клиента в другую группу (или убрать из группы, если null)
-    @Query("UPDATE clients SET clientGroupId = :groupId WHERE id = :clientId")
-    suspend fun assignClientToGroup(clientId: String, groupId: String?): Int
+    @Query("UPDATE clients SET clientGroupId = :groupId, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1 WHERE id = :clientId")
+    suspend fun assignClientToGroup(clientId: String, groupId: String?, ts: Long = System.currentTimeMillis()): Int
 
     // Переименовать группу
     @Query("UPDATE client_groups SET title = :newTitle, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1 WHERE id = :groupId")

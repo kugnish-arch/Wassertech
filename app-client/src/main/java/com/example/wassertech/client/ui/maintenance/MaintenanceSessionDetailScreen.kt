@@ -39,6 +39,7 @@ fun MaintenanceSessionDetailScreen(
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
+    // Используем один экземпляр БД для всех операций
 
     var session by remember { mutableStateOf<MaintenanceSessionEntity?>(null) }
     var header by remember { mutableStateOf("") }
@@ -145,8 +146,8 @@ fun MaintenanceSessionDetailScreen(
                 // Подготовка DTO на IO потоке
                 Log.d("PDF", "Assembling report DTO...")
                 val dto = withContext(Dispatchers.IO) {
-                    val appDb = AppDatabase.getInstance(context)
-                    ReportAssembler.assemble(appDb, context, sessionId)
+                    // ReportAssembler требует AppDatabase, используем существующий экземпляр
+                    ReportAssembler.assemble(db, context, sessionId)
                 }
                 Log.d("PDF", "Report DTO assembled successfully, reportNumber: ${dto.reportNumber}")
 
@@ -173,7 +174,7 @@ fun MaintenanceSessionDetailScreen(
                 // Проверяем настройку сохранения HTML
                 Log.d("PDF", "Checking save_html setting...")
                 val shouldSaveHtml = withContext(Dispatchers.IO) {
-                    val setting = AppDatabase.getInstance(context).settingsDao().getValueSync("save_html")
+                    val setting = db.settingsDao().getValueSync("save_html")
                     setting?.toBoolean() ?: false
                 }
                 Log.d("PDF", "save_html setting: $shouldSaveHtml")

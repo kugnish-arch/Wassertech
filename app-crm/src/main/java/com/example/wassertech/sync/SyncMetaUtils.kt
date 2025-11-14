@@ -124,6 +124,19 @@ fun ComponentTemplateEntity.markCreatedForSync(): ComponentTemplateEntity {
     )
 }
 
+fun ComponentTemplateFieldEntity.markCreatedForSync(): ComponentTemplateFieldEntity {
+    val now = nowEpoch()
+    return copy(
+        createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
+        updatedAtEpoch = now,
+        isArchived = false,
+        archivedAtEpoch = null,
+        deletedAtEpoch = deletedAtEpoch,
+        dirtyFlag = true,
+        syncStatus = SyncStatus.QUEUED.value
+    )
+}
+
 fun MaintenanceSessionEntity.markCreatedForSync(): MaintenanceSessionEntity {
     val now = nowEpoch()
     return copy(
@@ -224,6 +237,16 @@ fun ChecklistFieldEntity.markUpdatedForSync(): ChecklistFieldEntity {
 }
 
 fun ComponentTemplateEntity.markUpdatedForSync(): ComponentTemplateEntity {
+    val now = nowEpoch()
+    return copy(
+        createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
+        updatedAtEpoch = now,
+        dirtyFlag = true,
+        syncStatus = SyncStatus.QUEUED.value
+    )
+}
+
+fun ComponentTemplateFieldEntity.markUpdatedForSync(): ComponentTemplateFieldEntity {
     val now = nowEpoch()
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
@@ -340,6 +363,18 @@ fun ComponentTemplateEntity.markArchivedForSync(): ComponentTemplateEntity {
     )
 }
 
+fun ComponentTemplateFieldEntity.markArchivedForSync(): ComponentTemplateFieldEntity {
+    val now = nowEpoch()
+    return copy(
+        isArchived = true,
+        archivedAtEpoch = archivedAtEpoch ?: now,
+        createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
+        updatedAtEpoch = now,
+        dirtyFlag = true,
+        syncStatus = SyncStatus.QUEUED.value
+    )
+}
+
 /**
  * Пометка сущности как разархивированной.
  */
@@ -416,6 +451,18 @@ fun ChecklistTemplateEntity.markUnarchivedForSync(): ChecklistTemplateEntity {
 }
 
 fun ComponentTemplateEntity.markUnarchivedForSync(): ComponentTemplateEntity {
+    val now = nowEpoch()
+    return copy(
+        isArchived = false,
+        archivedAtEpoch = null,
+        createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
+        updatedAtEpoch = now,
+        dirtyFlag = true,
+        syncStatus = SyncStatus.QUEUED.value
+    )
+}
+
+fun ComponentTemplateFieldEntity.markUnarchivedForSync(): ComponentTemplateFieldEntity {
     val now = nowEpoch()
     return copy(
         isArchived = false,

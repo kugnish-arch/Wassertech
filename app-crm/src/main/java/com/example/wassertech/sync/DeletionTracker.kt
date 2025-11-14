@@ -2,6 +2,7 @@ package ru.wassertech.sync
 
 import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.entities.DeletedRecordEntity
+import java.util.UUID
 
 /**
  * Утилита для отслеживания удалений объектов для синхронизации с удаленной БД
@@ -11,11 +12,15 @@ object DeletionTracker {
     /**
      * Записывает факт удаления объекта для последующей синхронизации
      */
-    suspend fun markAsDeleted(db: AppDatabase, tableName: String, recordId: String) {
-        db.deletedRecordsDao().addDeletedRecord(
+    suspend fun markAsDeleted(db: AppDatabase, entity: String, recordId: String) {
+        db.deletedRecordsDao().insert(
             DeletedRecordEntity(
-                tableName = tableName,
-                recordId = recordId
+                id = UUID.randomUUID().toString(),
+                entity = entity,
+                recordId = recordId,
+                deletedAtEpoch = System.currentTimeMillis(),
+                dirtyFlag = true,
+                syncStatus = 1 // SyncStatus.QUEUED.value
             )
         )
     }
@@ -56,17 +61,28 @@ object DeletionTracker {
     }
     
     /**
-     * Помечает шаблон как удаленный
+     * Помечает шаблон компонента как удаленный
+     * @deprecated Используйте markComponentTemplateDeleted
      */
+    @Deprecated("Используйте markComponentTemplateDeleted")
     suspend fun markTemplateDeleted(db: AppDatabase, templateId: String) {
-        markAsDeleted(db, "checklist_templates", templateId)
+        markComponentTemplateDeleted(db, templateId)
     }
     
     /**
-     * Помечает поле шаблона как удаленное
+     * Помечает поле шаблона компонента как удаленное
+     * @deprecated Используйте markComponentTemplateFieldDeleted
      */
+    @Deprecated("Используйте markComponentTemplateFieldDeleted")
     suspend fun markFieldDeleted(db: AppDatabase, fieldId: String) {
-        markAsDeleted(db, "checklist_fields", fieldId)
+        markComponentTemplateFieldDeleted(db, fieldId)
+    }
+    
+    /**
+     * Помечает поле шаблона компонента как удаленное
+     */
+    suspend fun markComponentTemplateFieldDeleted(db: AppDatabase, fieldId: String) {
+        markAsDeleted(db, "component_template_fields", fieldId)
     }
     
     /**
@@ -74,6 +90,13 @@ object DeletionTracker {
      */
     suspend fun markSessionDeleted(db: AppDatabase, sessionId: String) {
         markAsDeleted(db, "maintenance_sessions", sessionId)
+    }
+    
+    /**
+     * Помечает шаблон компонента как удаленный
+     */
+    suspend fun markComponentTemplateDeleted(db: AppDatabase, templateId: String) {
+        markAsDeleted(db, "component_templates", templateId)
     }
 }
 

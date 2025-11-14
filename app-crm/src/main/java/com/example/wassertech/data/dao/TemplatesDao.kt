@@ -4,153 +4,150 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import ru.wassertech.data.entities.ChecklistFieldEntity
-import ru.wassertech.data.entities.ChecklistTemplateEntity
+import ru.wassertech.data.entities.ComponentTemplateEntity
+import ru.wassertech.data.entities.ComponentTemplateFieldEntity
 import ru.wassertech.data.types.ComponentType
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * DAO для работы с шаблонами компонентов.
+ * Обновлено для работы с новой моделью component_templates и component_template_fields.
+ * 
+ * @deprecated Рекомендуется использовать ComponentTemplatesDao и ComponentTemplateFieldsDao напрямую
+ */
 @Dao
 interface TemplatesDao {
 
     // ---------- OBSERVE / GET ----------
+    // Методы для работы с component_templates (новая модель)
 
     @Query(
         """
-        SELECT * FROM checklist_templates
-        WHERE componentType = :type
-        ORDER BY title COLLATE NOCASE
+        SELECT * FROM component_templates
+        ORDER BY name COLLATE NOCASE
         """
     )
-    fun observeTemplatesByType(type: ComponentType): Flow<List<ChecklistTemplateEntity>>
+    fun observeAllTemplates(): Flow<List<ComponentTemplateEntity>>
 
     @Query(
         """
-        SELECT * FROM checklist_templates
-        ORDER BY title COLLATE NOCASE
-        """
-    )
-    fun observeAllTemplates(): Flow<List<ChecklistTemplateEntity>>
-
-    @Query(
-        """
-        SELECT * FROM checklist_templates
-        WHERE componentType = :type
-        LIMIT 1
-        """
-    )
-    suspend fun getTemplateByType(type: ComponentType): ChecklistTemplateEntity?
-
-    @Query(
-        """
-        SELECT * FROM checklist_templates
+        SELECT * FROM component_templates
         WHERE id = :id
         LIMIT 1
         """
     )
-    suspend fun getTemplateById(id: String): ChecklistTemplateEntity?
+    suspend fun getTemplateById(id: String): ComponentTemplateEntity?
 
-    // Поля шаблона
+    // Поля шаблона (новая модель)
     @Query(
         """
-        SELECT * FROM checklist_fields
+        SELECT * FROM component_template_fields
         WHERE templateId = :templateId
-        ORDER BY rowid
+        ORDER BY sortOrder, rowid
         """
     )
-    fun observeFields(templateId: String): Flow<List<ChecklistFieldEntity>>
+    fun observeFields(templateId: String): Flow<List<ComponentTemplateFieldEntity>>
 
     @Query(
         """
-        SELECT * FROM checklist_fields
+        SELECT * FROM component_template_fields
         WHERE templateId = :templateId
-        ORDER BY rowid
+        ORDER BY sortOrder, rowid
         """
     )
-    suspend fun getFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
+    suspend fun getFieldsForTemplate(templateId: String): List<ComponentTemplateFieldEntity>
 
-    // Только поля для ТО
+    // Только поля для ТО (isCharacteristic = false)
     @Query(
         """
-        SELECT * FROM checklist_fields
-        WHERE templateId = :templateId AND isForMaintenance = 1
-        ORDER BY rowid
+        SELECT * FROM component_template_fields
+        WHERE templateId = :templateId AND isCharacteristic = 0
+        ORDER BY sortOrder, rowid
         """
     )
-    fun observeMaintenanceFields(templateId: String): Flow<List<ChecklistFieldEntity>>
+    fun observeMaintenanceFields(templateId: String): Flow<List<ComponentTemplateFieldEntity>>
 
     @Query(
         """
-        SELECT * FROM checklist_fields
-        WHERE templateId = :templateId AND isForMaintenance = 1
-        ORDER BY rowid
+        SELECT * FROM component_template_fields
+        WHERE templateId = :templateId AND isCharacteristic = 0
+        ORDER BY sortOrder, rowid
         """
     )
-    suspend fun getMaintenanceFieldsForTemplate(templateId: String): List<ChecklistFieldEntity>
+    suspend fun getMaintenanceFieldsForTemplate(templateId: String): List<ComponentTemplateFieldEntity>
 
     // ---------- UPSERT / UPDATE ----------
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertTemplate(template: ChecklistTemplateEntity)
+    suspend fun upsertTemplate(template: ComponentTemplateEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertField(field: ChecklistFieldEntity)
+    suspend fun upsertField(field: ComponentTemplateFieldEntity)
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTemplate(template: ComponentTemplateEntity)
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertField(field: ComponentTemplateFieldEntity)
 
     @Query(
         """
-        UPDATE checklist_templates
-        SET title = :newTitle
+        UPDATE component_templates
+        SET name = :newTitle, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1
         WHERE id = :id
         """
     )
-    suspend fun renameTemplate(id: String, newTitle: String)
+    suspend fun renameTemplate(id: String, newTitle: String, ts: Long = System.currentTimeMillis())
 
     // Массовое удаление полей шаблона (иногда удобно перед пересохранением структуры)
-    @Query("DELETE FROM checklist_fields WHERE templateId = :templateId")
+    @Query("DELETE FROM component_template_fields WHERE templateId = :templateId")
     suspend fun deleteFieldsByTemplate(templateId: String)
 
     // ---------- DELETE ----------
 
-    @Query("DELETE FROM checklist_fields WHERE id = :id")
+    @Query("DELETE FROM component_template_fields WHERE id = :id")
     suspend fun deleteField(id: String)
 
-    @Query("DELETE FROM checklist_templates WHERE id = :id")
+    @Query("DELETE FROM component_templates WHERE id = :id")
     suspend fun deleteTemplate(id: String)
 
     // ---------- MISC ----------
 
-    @Query("SELECT title FROM checklist_templates WHERE id = :id LIMIT 1")
+    @Query("SELECT name FROM component_templates WHERE id = :id LIMIT 1")
     suspend fun getTemplateTitleById(id: String): String?
 
     // (Это выглядело лишним в этом DAO, но оставляю как было у тебя)
     @Query("SELECT DISTINCT ClientGroupID FROM clients ORDER BY ClientGroupID COLLATE NOCASE")
     fun observeClientGroups(): Flow<List<String>>
 
-    // ---------- vNext: сортировка/архив (после миграции и добавления полей в Entity) ----------
+    // ---------- Сортировка/архив ----------
 
     @Query(
         """
-        SELECT * FROM checklist_templates
+        SELECT * FROM component_templates
         WHERE isArchived = 0
-        ORDER BY COALESCE(sortOrder, 2147483647), title COLLATE NOCASE
+        ORDER BY sortOrder, name COLLATE NOCASE
         """
     )
-    fun observeAllTemplatesOrderedActive(): Flow<List<ChecklistTemplateEntity>>
+    fun observeAllTemplatesOrderedActive(): Flow<List<ComponentTemplateEntity>>
 
     @Query(
         """
-        UPDATE checklist_templates
-        SET sortOrder = :order, updatedAtEpoch = :ts
+        UPDATE component_templates
+        SET sortOrder = :order, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1
         WHERE id = :id
         """
     )
-    suspend fun updateTemplateOrder(id: String, order: Int, ts: Long)
+    suspend fun updateTemplateOrder(id: String, order: Int, ts: Long = System.currentTimeMillis())
 
     @Query(
         """
-        UPDATE checklist_templates
+        UPDATE component_templates
         SET isArchived = :archived,
-            archivedAtEpoch = :archivedTs,
-            updatedAtEpoch = :updatedTs
+            archivedAtEpoch = CASE WHEN :archived = 1 THEN COALESCE(archivedAtEpoch, :archivedTs, :updatedTs) ELSE NULL END,
+            updatedAtEpoch = :updatedTs,
+            dirtyFlag = 1,
+            syncStatus = 1
         WHERE id = :id
         """
     )
@@ -162,34 +159,26 @@ interface TemplatesDao {
     )
 
     /** Получить все шаблоны для синхронизации */
-    @Query("SELECT * FROM checklist_templates")
-    fun getAllTemplatesNow(): List<ChecklistTemplateEntity>
+    @Query("SELECT * FROM component_templates")
+    fun getAllTemplatesNow(): List<ComponentTemplateEntity>
 
     /** Получить все поля для синхронизации */
-    @Query("SELECT * FROM checklist_fields")
-    fun getAllFieldsNow(): List<ChecklistFieldEntity>
-
-    /** Вставка шаблона (для синхронизации) */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertTemplate(template: ChecklistTemplateEntity)
-
-    /** Вставка поля (для синхронизации) */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertField(field: ChecklistFieldEntity)
+    @Query("SELECT * FROM component_template_fields")
+    fun getAllFieldsNow(): List<ComponentTemplateFieldEntity>
     
     // ========== Методы синхронизации ==========
     
     /** Получить все "грязные" шаблоны */
-    @Query("SELECT * FROM checklist_templates WHERE dirtyFlag = 1")
-    fun getDirtyTemplatesNow(): List<ChecklistTemplateEntity>
+    @Query("SELECT * FROM component_templates WHERE dirtyFlag = 1")
+    fun getDirtyTemplatesNow(): List<ComponentTemplateEntity>
     
     /** Получить все "грязные" поля шаблонов */
-    @Query("SELECT * FROM checklist_fields WHERE dirtyFlag = 1")
-    fun getDirtyFieldsNow(): List<ChecklistFieldEntity>
+    @Query("SELECT * FROM component_template_fields WHERE dirtyFlag = 1")
+    fun getDirtyFieldsNow(): List<ComponentTemplateFieldEntity>
     
     /** Пометить шаблоны как синхронизированные */
     @Query("""
-        UPDATE checklist_templates 
+        UPDATE component_templates 
         SET dirtyFlag = 0, syncStatus = 0 
         WHERE id IN (:ids)
     """)
@@ -197,7 +186,7 @@ interface TemplatesDao {
     
     /** Пометить поля как синхронизированные */
     @Query("""
-        UPDATE checklist_fields 
+        UPDATE component_template_fields 
         SET dirtyFlag = 0, syncStatus = 0 
         WHERE id IN (:ids)
     """)
@@ -205,7 +194,7 @@ interface TemplatesDao {
     
     /** Пометить шаблоны как конфликтные */
     @Query("""
-        UPDATE checklist_templates 
+        UPDATE component_templates 
         SET dirtyFlag = 0, syncStatus = 2 
         WHERE id IN (:ids)
     """)
@@ -213,7 +202,7 @@ interface TemplatesDao {
     
     /** Пометить поля как конфликтные */
     @Query("""
-        UPDATE checklist_fields 
+        UPDATE component_template_fields 
         SET dirtyFlag = 0, syncStatus = 2 
         WHERE id IN (:ids)
     """)
@@ -221,7 +210,7 @@ interface TemplatesDao {
     
     /** Снять флаг "грязный" у шаблонов */
     @Query("""
-        UPDATE checklist_templates 
+        UPDATE component_templates 
         SET dirtyFlag = 0 
         WHERE id IN (:ids)
     """)
@@ -229,7 +218,7 @@ interface TemplatesDao {
     
     /** Снять флаг "грязный" у полей */
     @Query("""
-        UPDATE checklist_fields 
+        UPDATE component_template_fields 
         SET dirtyFlag = 0 
         WHERE id IN (:ids)
     """)

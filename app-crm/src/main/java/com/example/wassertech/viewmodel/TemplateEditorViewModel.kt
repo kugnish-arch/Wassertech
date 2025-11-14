@@ -6,7 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.dao.ChecklistDao
-import ru.wassertech.data.entities.ChecklistFieldEntity
+import ru.wassertech.data.entities.ComponentTemplateFieldEntity
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.sync.markCreatedForSync
 import ru.wassertech.sync.markUpdatedForSync
@@ -21,27 +21,34 @@ data class FieldDraft(
     val type: FieldType = FieldType.TEXT,
     val unit: String? = null,
     val min: String = "",
-    val max: String = ""
+    val max: String = "",
+    val isCharacteristic: Boolean = false
 )
 
 class TemplateEditorViewModel(app: Application, private val templateId: String) : AndroidViewModel(app) {
 
     private val dao: ChecklistDao = AppDatabase.getInstance(app).checklistDao()
 
-    val fields: StateFlow<List<ChecklistFieldEntity>> =
+    val fields: StateFlow<List<ComponentTemplateFieldEntity>> =
         dao.observeFields(templateId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun addOrUpdate(d: FieldDraft) {
         val isNew = d.id == null
-        val entity = ChecklistFieldEntity(
+        val entity = ComponentTemplateFieldEntity(
             id = d.id ?: UUID.randomUUID().toString(),
             templateId = templateId,
             key = d.key.ifBlank { (d.label.ifBlank { "field" } + "_" + System.currentTimeMillis()) },
             label = d.label.ifBlank { d.key.ifBlank { "Поле" } },
             type = d.type,
             unit = d.unit?.ifBlank { null },
+            isCharacteristic = d.isCharacteristic,
+            isRequired = false,
+            defaultValueText = null,
+            defaultValueNumber = null,
+            defaultValueBool = null,
             min = d.min.toDoubleOrNull(),
-            max = d.max.toDoubleOrNull()
+            max = d.max.toDoubleOrNull(),
+            sortOrder = 0
         )
         val markedEntity = if (isNew) entity.markCreatedForSync() else entity.markUpdatedForSync()
         viewModelScope.launch { dao.upsertField(markedEntity) }
