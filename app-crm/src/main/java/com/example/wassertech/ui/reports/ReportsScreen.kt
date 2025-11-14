@@ -100,10 +100,10 @@ fun ReportsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.document_pdf),
+                    painter = painterResource(ru.wassertech.core.ui.theme.CustomIcons.UiPdf),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = PdfIconColor
+                    //tint = PdfIconColor
                 )
                 Text(
                     "Отчёты ТО отсутствуют",

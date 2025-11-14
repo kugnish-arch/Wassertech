@@ -1,4 +1,4 @@
-package ru.wassertech.ui.templates
+﻿package ru.wassertech.ui.templates
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -137,7 +137,7 @@ fun TemplateEditorScreen(
                 Box {
                     // Переменная для позиции иконки Info (вынесена на уровень карточки)
                     var headInfoIconPosition by remember { mutableStateOf<Offset?>(null) }
-                    
+
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.elevatedCardColors(
@@ -183,7 +183,7 @@ fun TemplateEditorScreen(
                             )
                         }
                     }
-                    
+
                     // Подсказка для "Заглавный элемент"
                     if (showHeadInfo && headInfoIconPosition != null) {
                         InfoTooltip(
@@ -203,7 +203,7 @@ fun TemplateEditorScreen(
                 var showCharacteristicInfo by remember(f.id) { mutableStateOf(false) }
                 // Переменная для позиции иконки Info (вынесена на уровень карточки)
                 var infoIconPosition by remember(f.id) { mutableStateOf<Offset?>(null) }
-                
+
                 Box {
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -457,7 +457,7 @@ fun TemplateEditorScreen(
                     }
                 }
             }
-            
+
             // Кнопка "Добавить поле" внизу списка
             item {
                 Box(
@@ -493,7 +493,7 @@ private fun InfoTooltip(
     onDismiss: () -> Unit
 ) {
     val density = LocalDensity.current
-    
+
     // Используем Box с fillMaxSize для верхнего слоя
     Box(
         modifier = Modifier

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SettingsApplications
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.*
@@ -25,6 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import ru.wassertech.core.ui.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.wassertech.viewmodel.HierarchyViewModel
 import ru.wassertech.viewmodel.TemplatesViewModel
@@ -227,54 +232,68 @@ fun ComponentsScreen(
                 else -> null
             }
 
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
-                ),
-                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
-            ) {
-                Column(Modifier.padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Иконка убрана по требованию
-                        Text(
-                            text = instName,
-                            style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                            color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (isEditing) {
-                            IconButton(
-                                onClick = {
-                                    editName = TextFieldValue(installation?.name ?: "")
-                                    // Находим индекс текущего объекта в списке всех объектов
-                                    val currentSiteId = installation?.siteId
-                                    editSelectedSiteIndex = allSites.indexOfFirst { it.id == currentSiteId }
-                                        .takeIf { it >= 0 } ?: 0
-                                    showEdit = true
-                                },
-                                enabled = installation != null
-                            ) {
-                                Icon(
-                                    Icons.Filled.Edit,
-                                    contentDescription = "Редактировать установку",
-                                    tint = Color(0xFF1E1E1E) // Иконка на плашке заголовка
-                                )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                    ),
+                    shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
+                ) {
+                    Column(Modifier.padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Иконка установки
+                            Image(
+                                painter = painterResource(id = R.drawable.equipment_filter_triple),
+                                contentDescription = null,
+                                modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = instName,
+                                style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                                color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isEditing) {
+                                IconButton(
+                                    onClick = {
+                                        editName = TextFieldValue(installation?.name ?: "")
+                                        // Находим индекс текущего объекта в списке всех объектов
+                                        val currentSiteId = installation?.siteId
+                                        editSelectedSiteIndex = allSites.indexOfFirst { it.id == currentSiteId }
+                                            .takeIf { it >= 0 } ?: 0
+                                        showEdit = true
+                                    },
+                                    enabled = installation != null
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        contentDescription = "Редактировать установку",
+                                        tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                                    )
+                                }
                             }
                         }
-                    }
-                    metaText?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant // Серый цвет для подзаголовка (адрес/объект)
-                        )
+                        metaText?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant // Серый цвет для подзаголовка (адрес/объект)
+                            )
+                        }
                     }
                 }
+                // Бордер снизу как у групп клиентов
+                HorizontalDivider(
+                    color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
+                    thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
+                )
             }
 
             // ===== Кнопки действий под заголовком (SegmentedButtons) =====
@@ -343,9 +362,11 @@ fun ComponentsScreen(
                         ) {
                             ListItem(
                                 leadingContent = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Settings,
-                                        contentDescription = null
+                                    Image(
+                                        painter = painterResource(id = R.drawable.ui_gear),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp),
+                                        contentScale = ContentScale.Fit
                                     )
                                 },
                                 headlineContent = { Text(comp.name) },

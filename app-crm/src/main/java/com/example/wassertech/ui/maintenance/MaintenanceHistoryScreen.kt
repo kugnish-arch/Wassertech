@@ -1,4 +1,4 @@
-package ru.wassertech.ui.maintenance
+﻿package ru.wassertech.ui.maintenance
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Business
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -26,6 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import ru.wassertech.crm.R
+import ru.wassertech.core.ui.R as CoreR
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import ru.wassertech.data.AppDatabase
@@ -37,7 +39,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-
+// Структура данных для отображения сессии с информацией о клиенте и объекте
+private data class SessionDisplayInfo(
+    val clientName: String,
+    val siteName: String,
+    val instName: String,
+    val dateText: String,
+    val isCorporate: Boolean,
+    val isSiteArchived: Boolean
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceHistoryScreen(
@@ -52,37 +62,41 @@ fun MaintenanceHistoryScreen(
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
     val sdf = remember { SimpleDateFormat("d MMMM yyyy (HH:mm)", Locale.forLanguageTag("ru")) }
-
     val sessionsFlow: Flow<List<MaintenanceSessionEntity>> = remember(installationId) {
         if (installationId == null) db.sessionsDao().observeAllSessions()
         else db.sessionsDao().observeSessionsByInstallation(installationId)
     }
     val sessions by sessionsFlow.collectAsState(initial = emptyList())
-
-    var sessionDisplay by remember { mutableStateOf<List<Triple<String, String, String>>>(emptyList()) }
+    var sessionDisplay by remember { mutableStateOf<List<SessionDisplayInfo>>(emptyList()) }
     var selectedSessions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-
     LaunchedEffect(sessions) {
         withContext(Dispatchers.IO) {
             val result = sessions.map { s ->
                 val site = s.siteId?.let { db.hierarchyDao().getSite(it) }
                 val inst = s.installationId?.let { db.hierarchyDao().getInstallation(it) }
                 val client = site?.let { db.clientDao().getClient(it.clientId) }
-
                 val clientName = client?.name ?: "Без клиента"
                 val siteName = site?.name ?: "Без объекта"
                 val instName = inst?.name ?: "Без установки"
                 val dateText =
                     s.startedAtEpoch?.let { epoch -> sdf.format(Date(epoch)) } ?: "Неизвестно"
-                Triple(clientName, "$siteName — $instName", dateText)
+                val isCorporate = client?.isCorporate ?: false
+                val isSiteArchived = site?.isArchived == true
+                SessionDisplayInfo(
+                    clientName = clientName,
+                    siteName = siteName,
+                    instName = instName,
+                    dateText = dateText,
+                    isCorporate = isCorporate,
+                    isSiteArchived = isSiteArchived
+                )
             }
             sessionDisplay = result
         }
     }
-
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0), // Убираем белое поле внизу
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -103,10 +117,10 @@ fun MaintenanceHistoryScreen(
                     )
                 }
             } else if (!isEditing && selectedSessions.isEmpty()) {
-                // Черный FAB для отчётов (только вне режима редактирования)
+                // Чёрный FAB для отчётов (только вне режима редактирования)
                 FloatingActionButton(
                     onClick = onOpenReports,
-                    containerColor = Color(0xFF1E1E1E), // Черный цвет
+                    containerColor = Color(0xFF1E1E1E), // Чёрный цвет
                     contentColor = Color.White,
                     shape = CircleShape,
                     modifier = Modifier.size(56.dp)
@@ -208,46 +222,54 @@ fun MaintenanceHistoryScreen(
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Outlined.Business,
+                                            // Выбираем иконку клиента в зависимости от типа
+                                            val clientIconRes = if (display.isCorporate) CoreR.drawable.person_client_corporate_blue else CoreR.drawable.person_client_blue
+                                            Image(
+                                                painter = painterResource(id = clientIconRes),
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(20.dp)
+                                                modifier = Modifier.size(20.dp),
+                                                contentScale = ContentScale.Fit
                                             )
                                             Spacer(Modifier.width(6.dp))
                                             Text(
-                                                display.first,
+                                                display.clientName,
                                                 style = MaterialTheme.typography.titleMedium
                                             )
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Outlined.HomeWork,
+                                            // Выбираем иконку объекта в зависимости от типа клиента и архивации
+                                            val siteIconRes = when {
+                                                display.isSiteArchived && display.isCorporate -> CoreR.drawable.object_factory_red
+                                                display.isSiteArchived && !display.isCorporate -> CoreR.drawable.object_house_red
+                                                display.isCorporate -> CoreR.drawable.object_factory_blue
+                                                else -> CoreR.drawable.object_house_blue
+                                            }
+                                            Image(
+                                                painter = painterResource(id = siteIconRes),
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp)
+                                                modifier = Modifier.size(20.dp),
+                                                contentScale = ContentScale.Fit
                                             )
                                             Spacer(Modifier.width(6.dp))
                                             Text(
-                                                display.second,
+                                                "${display.siteName} - ${display.instName}",
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Outlined.History,
+                                            Image(
+                                                painter = painterResource(ru.wassertech.core.ui.theme.CustomIcons.UiTime),
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                //tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                             Spacer(Modifier.width(6.dp))
                                             Text(
-                                                display.third,
+                                                display.dateText,
                                                 style = MaterialTheme.typography.bodySmall
                                             )
                                         }
                                     }
-                                    // Иконка навигации - только вне режима редактирования
                                     if (!isEditing) {
                                         Spacer(Modifier.width(8.dp))
                                         Icon(
@@ -271,7 +293,7 @@ fun MaintenanceHistoryScreen(
                             contentAlignment = Alignment.Center // Выравнивание по центру
                         ) {
                             Text(
-                                text = "Конец записей...",
+                                text = "Больше записей нет...",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -280,7 +302,6 @@ fun MaintenanceHistoryScreen(
                 }
             }
         }
-
         // Диалог подтверждения удаления выбранных сессий
         if (showDeleteDialog && selectedSessions.isNotEmpty()) {
             AlertDialog(

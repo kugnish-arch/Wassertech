@@ -23,8 +23,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import ru.wassertech.data.entities.ClientEntity
 import ru.wassertech.data.entities.ClientGroupEntity
+import ru.wassertech.core.ui.R
 import ru.wassertech.ui.common.EditDoneBottomBar
 import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
@@ -1001,11 +1005,18 @@ private fun ClientRowWithEdit(
         } else if (!isEditMode) {
             // В не-редактирующем режиме можно кликать по всей строке
         }
-        val icon =
-            if (client.isCorporate == true) Icons.Filled.Business else Icons.Filled.Person
-        Icon(
-            icon,
-            contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент"
+        // Выбираем иконку в зависимости от типа клиента и архивации
+        val iconRes = when {
+            client.isArchived == true && client.isCorporate == true -> R.drawable.person_client_corporate_red
+            client.isArchived == true && client.isCorporate != true -> R.drawable.person_client_red
+            client.isCorporate == true -> R.drawable.person_client_corporate_blue
+            else -> R.drawable.person_client_blue
+        }
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент",
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Fit
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

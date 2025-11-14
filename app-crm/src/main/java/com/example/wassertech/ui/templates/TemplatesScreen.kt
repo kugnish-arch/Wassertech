@@ -19,6 +19,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import ru.wassertech.core.ui.R
 import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.entities.ChecklistTemplateEntity
 import ru.wassertech.data.types.ComponentType
@@ -326,9 +330,11 @@ private fun TemplateRowWithDrag(
                         modifier = Modifier.size(24.dp)
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Outlined.Description,
-                        contentDescription = null
+                    Image(
+                        painter = painterResource(id = R.drawable.ui_template_component),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        contentScale = ContentScale.Fit
                     )
                 }
             },

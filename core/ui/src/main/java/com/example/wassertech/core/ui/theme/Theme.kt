@@ -1,6 +1,20 @@
 package ru.wassertech.core.ui.theme
 
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.core.view.WindowCompat
+import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -11,25 +25,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.core.view.WindowCompat
-import android.app.Activity
-import android.os.Build
+import ru.wassertech.core.ui.R
 
 /* ================== БАЗОВЫЕ ЦВЕТА ================== */
 // Графитово-серо-белая палитра с красным акцентом
@@ -48,33 +48,33 @@ private val LightColors = lightColorScheme(
     onPrimary = Color.White,
     primaryContainer = BrandRed.copy(alpha = 0.1f),
     onPrimaryContainer = BrandRed,
-    
+
     secondary = IconSecondary, // Второстепенные элементы
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE8E8E8), // Средне-серый фон для плашек заголовков (без фиолетового оттенка)
     onSecondaryContainer = Color(0xFF1E1E1E), // Текст на плашке заголовка
-    
+
     tertiary = IconSecondary.copy(alpha = 0.6f),
     onTertiary = Color.White,
     tertiaryContainer = IconSecondary.copy(alpha = 0.1f),
     onTertiaryContainer = IconSecondary,
-    
+
     error = Color(0xFFBA1A1A),
     onError = Color.White,
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
-    
+
     background = AppBackground, // Фон приложения
     onBackground = TextPrimary, // Текст на фоне
-    
+
     surface = CardSurface, // Карточки / поля
     onSurface = TextPrimary, // Текст на карточках
     surfaceVariant = CardSurface,
     onSurfaceVariant = IconSecondary, // Второстепенные иконки и текст
-    
+
     outline = ButtonSecondaryBorder, // Контур вторичных кнопок
     outlineVariant = ButtonSecondaryBorder.copy(alpha = 0.5f),
-    
+
     scrim = Color.Black,
     inverseSurface = TextPrimary,
     inverseOnSurface = CardSurface,
@@ -89,33 +89,33 @@ private val DarkColors = darkColorScheme(
     onPrimary = Color.White,
     primaryContainer = BrandRed.copy(alpha = 0.2f),
     onPrimaryContainer = BrandRed.copy(alpha = 0.9f),
-    
+
     secondary = IconSecondary,
     onSecondary = Color.White,
     secondaryContainer = IconSecondary.copy(alpha = 0.2f),
     onSecondaryContainer = IconSecondary,
-    
+
     tertiary = IconSecondary.copy(alpha = 0.7f),
     onTertiary = Color.White,
     tertiaryContainer = IconSecondary.copy(alpha = 0.2f),
     onTertiaryContainer = IconSecondary,
-    
+
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
-    
+
     background = Color(0xFF1E1E1E),
     onBackground = Color(0xFFFAFAFA),
-    
+
     surface = Color(0xFF2C2C2C),
     onSurface = Color(0xFFFAFAFA),
     surfaceVariant = Color(0xFF3A3A3A),
     onSurfaceVariant = Color(0xFFB0B0B0),
-    
+
     outline = Color(0xFF808080),
     outlineVariant = Color(0xFF606060),
-    
+
     scrim = Color.Black,
     inverseSurface = Color(0xFFFAFAFA),
     inverseOnSurface = Color(0xFF1E1E1E),
@@ -261,25 +261,29 @@ val ExpandableMenuCardBackground = Color(0xFFFFFFFF) // Белый фон для
 val DropdownMenuBackground = Color(0xFFFFFFFF) // Практически белый фон для выпадающих меню
 
 /* ================== СТИЛЬ ПОДЗАГОЛОВКОВ ================== */
-// Стиль для подзаголовков (серые карточки с именами клиентов, установок, объектов)
+// Стиль для подзаголовков (графитовые карточки с именами клиентов, установок, объектов)
 // Используется на экранах: Клиент, Объект, Установка, Редактирование ТО, Детали обслуживания
 object HeaderCardStyle {
-    val backgroundColor = Color(0xFFE8E8E8) // Средне-серый фон
-    val textColor = Color(0xFF1E1E1E) // Текст на плашке заголовка
-    val titleTextStyle = AppTypography.titleMedium // Шрифт для заголовка
+    val backgroundColor = ClientsGroupExpandedBackground // Графитовый фон (0xFF2E2E2E)
+    val textColor = ClientsGroupExpandedText // Белый текст (0xFFFFFFFF)
+    val titleTextStyle = TextStyle(
+        fontFamily = MontserratSemiBoldFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.15.sp
+    ) // Полужирный шрифт для заголовка
     val subtitleTextStyle = AppTypography.bodyMedium // Шрифт для подзаголовка (если нужен)
-    val shape = RoundedCornerShape(
-        topStart = 0.dp, // Без скругления верхних углов
-        topEnd = 0.dp,
-        bottomStart = 12.dp, // Скругление нижних углов
-        bottomEnd = 12.dp
-    )
+    val shape = RoundedCornerShape(0.dp) // Без скругления углов
     val padding = androidx.compose.foundation.layout.PaddingValues(
         top = 12.dp,
-        start = 12.dp,
-        end = 12.dp,
+        start = 16.dp,
+        end = 16.dp,
         bottom = 12.dp
     )
+    val iconSize = 32.dp // Увеличенный размер иконки
+    val borderColor = ClientsGroupBorder // Цвет бордера снизу (0xFFDADADA)
+    val borderThickness = 1.dp // Толщина бордера снизу
 }
 
 /* ================== ИКОНКИ НАВИГАЦИИ ================== */
@@ -289,6 +293,27 @@ object NavigationIcons {
     val ExpandMenuIcon: ImageVector = Icons.Filled.ExpandMore // Иконка для разворачивания меню
     val CollapseMenuIcon: ImageVector = Icons.Filled.ExpandLess // Иконка для сворачивания меню
     val NavigateIcon: ImageVector = Icons.Filled.ChevronRight // Иконка для навигации в карточках
+}
+
+/* ================== ИКОНКИ СУЩНОСТЕЙ ================== */
+// Иконки для сущностей приложения (клиенты, объекты, установки, компоненты)
+// Используются в списках и карточках для визуального обозначения типов сущностей
+object EntityIcons {
+    val InstallationIcon: ImageVector = Icons.Outlined.Science // Иконка установки
+}
+
+/* ================== КАСТОМНЫЕ ИКОНКИ (DRAWABLE) ================== */
+// Кастомные иконки из /res/drawable в core:ui
+// Используются через painterResource(CustomIcons.xxx)
+object CustomIcons {
+    val UiPdf = R.drawable.ui_pdf // Иконка PDF для карточек отчетов
+    val UiTime = R.drawable.ui_time // Иконка времени/истории
+    val UiWrench = R.drawable.ui_wrench // Иконка гаечного ключа (ТО)
+    val UiHistory = R.drawable.ui_history // Иконка истории
+    val UiTrash = R.drawable.ui_trash // Иконка корзины для архива
+    val UiFromArchive = R.drawable.ui_from_archive // Иконка "Достать из архива"
+    val UiToArchive = R.drawable.ui_to_archive // Иконка "Убрать в архив"
+    val UiHeader = R.drawable.ui_header // Иконка для заглавных элементов
 }
 
 /* ================== ЦВЕТА ДЛЯ ИКОНОК ================== */
@@ -314,11 +339,11 @@ val FABScrimElevation = 8.dp // Тень для scrim FAB группы
 object EditButtonStyle {
     // Иконка для входа в режим редактирования
     val EditIcon: ImageVector = Icons.Filled.EditNote
-    
+
     // Иконка для сохранения изменений (зеленый кружок с галочкой)
     val SaveIcon: ImageVector = Icons.Filled.CheckCircle
     val SaveIconColor = Color(0xFF4CAF50) // Зеленый цвет для иконки сохранения
-    
+
     // Иконка для отмены изменений (красный кружок с крестом)
     val CancelIcon: ImageVector = Icons.Filled.Close
     val CancelIconColor = Color(0xFFE53935) // Красный цвет для иконки отмены (совпадает с BrandRed)
@@ -337,7 +362,7 @@ val ClientsRowDivider = Color(0xFFDADADA) // Разделительная лин
 object SegmentedButtonStyle {
     // Размер скругления углов для сегментированных кнопок
     val cornerRadius = 8.dp
-    
+
     /**
      * Возвращает форму для сегментированной кнопки в зависимости от её позиции
      * @param index Индекс кнопки (0 - первая, последняя - count - 1)
@@ -380,13 +405,12 @@ object DialogStyle {
 object SystemBarsStyle {
     /**
      * Определяет, должны ли системные кнопки навигации быть темными (light navigation bars)
-     * @param isDarkTheme true для темной темы, false для светлой (параметр игнорируется, всегда темные)
      * @return false = темные иконки (всегда)
      */
-    fun isLightNavigationBars(isDarkTheme: Boolean): Boolean {
+    fun isLightNavigationBars(): Boolean {
         return false // Всегда темные иконки системных кнопок
     }
-    
+
     /**
      * Определяет, должен ли статус-бар быть светлым (light status bar)
      * @param isDarkTheme true для темной темы, false для светлой
@@ -420,25 +444,25 @@ object AccentButtonStyle {
 object NavigationBarStyle {
     // Фон нижнего меню - полупрозрачный белый
     val backgroundColor = Color.White.copy(alpha = 0.95f)
-    
+
     // Красный цвет для активной иконки и индикатора
     val activeIconColor = BrandRed
-    
+
     // Серый цвет для неактивных иконок
     val inactiveIconColor = IconSecondary
-    
+
     // Красная линия-индикатор для активной вкладки
     val activeIndicatorColor = BrandRed
-    
+
     // Высота нижнего меню
     val height = 90.dp
-    
+
     // Высота красной линии-индикатора
     val indicatorHeight = 3.dp
-    
+
     // Ширина красной линии-индикатора
     val indicatorWidth = 32.dp
-    
+
     /**
      * Возвращает цвета для NavigationBarItem
      * Должен вызываться из @Composable контекста
@@ -457,7 +481,7 @@ fun WassertechTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors
-    
+
     // Настройка системных баров (статус-бар и навигационные кнопки)
     // Всегда темные иконки на белом фоне для видимости
     val view = LocalView.current
@@ -466,33 +490,34 @@ fun WassertechTheme(
             val window = (view.context as? Activity)?.window
             if (window != null) {
                 val windowInsetsController = WindowCompat.getInsetsController(window, view)
-                
+
                 // Всегда темные иконки для системных кнопок навигации (false = темные иконки)
                 windowInsetsController.isAppearanceLightNavigationBars = false
-                
+
                 // Всегда темные иконки для статус-бара (false = темные иконки)
                 windowInsetsController.isAppearanceLightStatusBars = false
-                
+
                 // Установка белого цвета для системных баров (чтобы темные иконки были видны)
                 val whiteColor = Color(0xFFFFFFFF).toArgb()
-                
+
                 // Установка белого цвета статус-бара
+                @Suppress("DEPRECATION")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     window.statusBarColor = whiteColor
                 }
-                
+
                 // Установка белого цвета навигационной панели
+                @Suppress("DEPRECATION")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     window.navigationBarColor = whiteColor
                 }
             }
         }
     }
-    
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = AppTypography,
         content = content
     )
 }
-

@@ -49,7 +49,7 @@ import ru.wassertech.ui.hierarchy.SiteDetailScreen
 import ru.wassertech.ui.maintenance.MaintenanceHistoryScreen
 import ru.wassertech.ui.maintenance.MaintenanceScreen
 import ru.wassertech.ui.maintenance.MaintenanceSessionDetailScreen
-import ru.wassertech.feature.reports.ReportsScreen
+import ru.wassertech.ui.reports.ReportsScreen
 import ru.wassertech.ui.about.AboutScreen
 import ru.wassertech.ui.settings.SettingsScreen
 import ru.wassertech.ui.templates.TemplateEditorScreen

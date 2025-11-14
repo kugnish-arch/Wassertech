@@ -10,11 +10,15 @@ import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.ui.res.painterResource
 import ru.wassertech.crm.R
+import ru.wassertech.core.ui.R as CoreR
 import androidx.compose.material.icons.outlined.SettingsApplications
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -292,37 +296,51 @@ fun MaintenanceSessionDetailScreen(
                 ) {
                     // Header card (используем стиль из темы)
                     item {
-                        ElevatedCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
-                            ),
-                            shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
-                        ) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.elevatedCardColors(
+                                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                                ),
+                                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    val icon =
-                                        if (isCorporate) Icons.Outlined.Business else Icons.Outlined.Person
-                                    Icon(icon, contentDescription = null, tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(clientName, style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle, color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor)
+                                Column(
+                                    Modifier.fillMaxWidth().padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // Выбираем иконку клиента в зависимости от типа
+                                        val clientIconRes = if (isCorporate) CoreR.drawable.person_client_corporate_blue else CoreR.drawable.person_client_blue
+                                        Image(
+                                            painter = painterResource(id = clientIconRes),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(clientName, style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle, color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Image(
+                                            painter = painterResource(id = CoreR.drawable.equipment_filter_triple),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            installationName,
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
+                                    Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
                                 }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Outlined.SettingsApplications,
-                                        contentDescription = null
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        installationName,
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
-                                }
-                                Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
                             }
+                            // Бордер снизу как у групп клиентов
+                            HorizontalDivider(
+                                color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
+                                thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
+                            )
                         }
                     }
 

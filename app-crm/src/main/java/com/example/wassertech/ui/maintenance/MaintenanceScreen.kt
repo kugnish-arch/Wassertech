@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,29 +71,37 @@ fun MaintenanceScreen(
                 .verticalScroll(scroll)
         ) {
             // плашка заголовка (подтянута к апбару, без подзаголовка)
-            ElevatedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
-                ),
-                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
-            ) {
-                Row(
+            Column(modifier = Modifier.fillMaxWidth()) {
+                ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        .padding(horizontal = 12.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                    ),
+                    shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
                 ) {
-                    // Иконка шестеренки убрана по требованию
-                    Text(
-                        text = "Обслуживание установки $installationName",
-                        style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                        color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        // Иконка шестеренки убрана по требованию
+                        Text(
+                            text = "Обслуживание установки $installationName",
+                            style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                            color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
+                // Бордер снизу как у групп клиентов
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
+                    thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
+                )
             }
 
             Spacer(Modifier.height(12.dp))
