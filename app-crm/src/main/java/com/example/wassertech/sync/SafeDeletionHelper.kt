@@ -56,8 +56,15 @@ object SafeDeletionHelper {
     
     /**
      * Удаляет шаблон компонента и помечает его для синхронизации
+     * @throws IllegalStateException если шаблон используется в компонентах установок
      */
     suspend fun deleteComponentTemplate(db: AppDatabase, templateId: String) {
+        // Проверяем, используется ли шаблон в компонентах
+        val components = db.hierarchyDao().getComponentsByTemplate(templateId)
+        if (components.isNotEmpty()) {
+            throw IllegalStateException("Шаблон используется в ${components.size} компонентах")
+        }
+        
         val template = db.componentTemplatesDao().getById(templateId)
         if (template != null) {
             // Удаляем все поля шаблона

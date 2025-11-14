@@ -281,11 +281,14 @@ fun ComponentsScreen(
                         }
                         metaText?.let {
                             Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White // Белый цвет для подзаголовка (адрес/объект)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Spacer(Modifier.width(8.dp)) // Сдвигаем подпись правее
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White // Белый цвет для подзаголовка (адрес/объект)
+                                )
+                            }
                         }
                     }
                 }
@@ -365,7 +368,7 @@ fun ComponentsScreen(
                                     Image(
                                         painter = painterResource(id = R.drawable.ui_gear),
                                         contentDescription = null,
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(48.dp),
                                         contentScale = ContentScale.Fit
                                     )
                                 },

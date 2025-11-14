@@ -19,10 +19,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -820,6 +823,9 @@ private fun GroupHeader(
     val bg = if (isExpanded) ClientsGroupExpandedBackground else ClientsGroupCollapsedBackground
     val contentColor = if (isExpanded) ClientsGroupExpandedText else MaterialTheme.colorScheme.onBackground
     var lastMoveThreshold by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(0.dp) }
+    var isDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
 
     Column(
         modifier = modifier.fillMaxWidth()
@@ -829,6 +835,8 @@ private fun GroupHeader(
                 .fillMaxWidth()
                 .background(bg)
                 .clickable { onToggle() }
+                .offset(y = dragOffset)
+                .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемая группа поверх всех
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .animateContentSize(),
             verticalAlignment = Alignment.CenterVertically
@@ -841,22 +849,29 @@ private fun GroupHeader(
                     tint = contentColor.copy(alpha = 0.6f),
                     modifier = Modifier
                         .size(20.dp)
-                        .pointerInput("group_$title") {
+                        .pointerInput("group_$title", density) {
                             detectDragGestures(
                                 onDragStart = {
                                     lastMoveThreshold = 0f
+                                    dragOffset = 0.dp
+                                    isDragging = true
                                     onDragStart?.invoke()
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
+                                    // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
+                                    dragOffset += with(density) { dragAmount.y.toDp() }
+                                    
                                     // Уменьшаем порог для лучшей работы на физических устройствах
                                     val threshold = 10f
                                     if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                         onMoveUp()
                                         lastMoveThreshold = -threshold
+                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                     } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                         onMoveDown()
                                         lastMoveThreshold = threshold
+                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                     }
                                     if (dragAmount.y in -threshold..threshold) {
                                         lastMoveThreshold = dragAmount.y
@@ -864,6 +879,8 @@ private fun GroupHeader(
                                 },
                                 onDragEnd = {
                                     lastMoveThreshold = 0f
+                                    dragOffset = 0.dp
+                                    isDragging = false
                                 }
                             )
                         }
@@ -997,6 +1014,9 @@ private fun ClientRowWithEdit(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var lastMoveThreshold by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(0.dp) }
+    var isDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
 
     Row(
         modifier = modifier
@@ -1009,6 +1029,8 @@ private fun ClientRowWithEdit(
                     Modifier
                 }
             )
+            .offset(y = dragOffset)
+            .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемая карточка поверх всех
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .animateContentSize(),
         verticalAlignment = Alignment.CenterVertically
@@ -1021,22 +1043,29 @@ private fun ClientRowWithEdit(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
                     .size(24.dp)
-                    .pointerInput(client.id) {
+                    .pointerInput(client.id, density) {
                         detectDragGestures(
                             onDragStart = {
                                 lastMoveThreshold = 0f
+                                isDragging = true
+                                dragOffset = 0.dp
                                 onDragStart?.invoke()
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
+                                // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
+                                dragOffset += with(density) { dragAmount.y.toDp() }
+                                
                                 // Уменьшаем порог для лучшей работы на физических устройствах
                                 val threshold = 10f
                                 if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                     onMoveUp()
                                     lastMoveThreshold = -threshold
+                                    dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                 } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                     onMoveDown()
                                     lastMoveThreshold = threshold
+                                    dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                 }
                                 if (dragAmount.y in -threshold..threshold) {
                                     lastMoveThreshold = dragAmount.y
@@ -1044,6 +1073,8 @@ private fun ClientRowWithEdit(
                             },
                             onDragEnd = {
                                 lastMoveThreshold = 0f
+                                isDragging = false
+                                dragOffset = 0.dp
                             }
                         )
                     }

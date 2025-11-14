@@ -15,11 +15,15 @@ import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -30,6 +34,8 @@ import ru.wassertech.sync.SafeDeletionHelper
 import ru.wassertech.sync.markCreatedForSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
@@ -238,35 +244,107 @@ fun TemplatesScreen(
 
     // Диалог подтверждения удаления
     deleteDialogState?.let { template ->
-        AlertDialog(
-            onDismissRequest = { deleteDialogState = null },
-            title = { Text("Подтверждение удаления") },
-            text = {
-                Text(
-                    "Вы уверены, что хотите удалить шаблон \"${template.name}\"?\n\nЭто действие нельзя отменить."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            SafeDeletionHelper.deleteComponentTemplate(db, template.id)
-                            deleteDialogState = null
-                        }
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Удалить")
+        var installationsUsingTemplate by remember { mutableStateOf<List<String>>(emptyList()) }
+        var isLoading by remember { mutableStateOf(true) }
+        
+        LaunchedEffect(template.id) {
+            withContext(Dispatchers.IO) {
+                val components = db.hierarchyDao().getComponentsByTemplate(template.id)
+                val installationIds = components.map { it.installationId }.distinct()
+                val installations = installationIds.mapNotNull { id ->
+                    db.hierarchyDao().getInstallationNow(id)
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteDialogState = null }) {
-                    Text("Отмена")
-                }
+                installationsUsingTemplate = installations.map { "${it.name} (ID: ${it.id})" }
+                isLoading = false
             }
-        )
+        }
+        
+        if (isLoading) {
+            AlertDialog(
+                onDismissRequest = { deleteDialogState = null },
+                title = { Text("Проверка использования") },
+                text = {
+                    Column {
+                        Text("Проверяем использование шаблона...")
+                        CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { deleteDialogState = null }) {
+                        Text("Отмена")
+                    }
+                }
+            )
+        } else if (installationsUsingTemplate.isNotEmpty()) {
+            AlertDialog(
+                onDismissRequest = { deleteDialogState = null },
+                title = { Text("Невозможно удалить шаблон") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Шаблон \"${template.name}\" используется в следующих установках:",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        installationsUsingTemplate.forEach { installationName ->
+                            Text(
+                                "• $installationName",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Сначала удалите компоненты из этих установок, затем можно будет удалить шаблон.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { deleteDialogState = null }) {
+                        Text("Понятно")
+                    }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { deleteDialogState = null },
+                title = { Text("Подтверждение удаления") },
+                text = {
+                    Text(
+                        "Вы уверены, что хотите удалить шаблон \"${template.name}\"?\n\nЭто действие нельзя отменить."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    SafeDeletionHelper.deleteComponentTemplate(db, template.id)
+                                    deleteDialogState = null
+                                } catch (e: IllegalStateException) {
+                                    // Ошибка уже обработана выше
+                                    Log.e(TAG, "Ошибка удаления шаблона", e)
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Удалить")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deleteDialogState = null }) {
+                        Text("Отмена")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -284,7 +362,10 @@ private fun TemplateRowWithDrag(
     onClick: () -> Unit
 ) {
     var lastMoveThreshold by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(0.dp) }
+    var isDragging by remember { mutableStateOf(false) }
     val isArchived = template.isArchived == true
+    val density = LocalDensity.current
 
     ElevatedCard(
         modifier = Modifier
@@ -292,31 +373,43 @@ private fun TemplateRowWithDrag(
             .padding(bottom = 4.dp)
             .then(
                 if (isEditing && !isArchived) {
-                    Modifier.pointerInput(template.id, index) {
-                        detectDragGestures(
-                            onDragStart = {
-                                lastMoveThreshold = 0f
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                // Еще больше уменьшаем порог для физических устройств
-                                val threshold = 10f
-                                if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                    onMoveUp()
-                                    lastMoveThreshold = -threshold
-                                } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                    onMoveDown()
-                                    lastMoveThreshold = threshold
+                    Modifier
+                        .offset(y = dragOffset)
+                        .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемый шаблон поверх всех
+                        .pointerInput(template.id, index, density) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    lastMoveThreshold = 0f
+                                    dragOffset = 0.dp
+                                    isDragging = true
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
+                                    dragOffset += with(density) { dragAmount.y.toDp() }
+                                    
+                                    // Еще больше уменьшаем порог для физических устройств
+                                    val threshold = 10f
+                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
+                                        onMoveUp()
+                                        lastMoveThreshold = -threshold
+                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
+                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
+                                        onMoveDown()
+                                        lastMoveThreshold = threshold
+                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
+                                    }
+                                    if (dragAmount.y in -threshold..threshold) {
+                                        lastMoveThreshold = dragAmount.y
+                                    }
+                                },
+                                onDragEnd = {
+                                    lastMoveThreshold = 0f
+                                    dragOffset = 0.dp
+                                    isDragging = false
                                 }
-                                if (dragAmount.y in -threshold..threshold) {
-                                    lastMoveThreshold = dragAmount.y
-                                }
-                            },
-                            onDragEnd = {
-                                lastMoveThreshold = 0f
-                            }
-                        )
-                    }
+                            )
+                        }
                 } else {
                     Modifier
                 }
@@ -325,14 +418,20 @@ private fun TemplateRowWithDrag(
     ) {
         ListItem(
             leadingContent = {
-                if (isEditing && !isArchived) {
-                    Icon(
-                        imageVector = Icons.Filled.Menu,
-                        contentDescription = "Перетащить",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Ручка для перетаскивания (показываем вместе с иконкой в режиме редактирования)
+                    if (isEditing && !isArchived) {
+                        Icon(
+                            imageVector = Icons.Filled.Menu,
+                            contentDescription = "Перетащить",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    // Иконка шаблона (всегда показываем)
                     Image(
                         painter = painterResource(id = R.drawable.ui_template_component),
                         contentDescription = null,

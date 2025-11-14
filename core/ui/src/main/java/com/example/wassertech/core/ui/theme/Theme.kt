@@ -309,6 +309,7 @@ object CustomIcons {
     val UiPdf = R.drawable.ui_pdf // Иконка PDF для карточек отчетов
     val UiTime = R.drawable.ui_time // Иконка времени/истории
     val UiWrench = R.drawable.ui_wrench // Иконка гаечного ключа (ТО)
+    val UiGear = R.drawable.ui_gear // Иконка шестеренки (компоненты)
     val UiHistory = R.drawable.ui_history // Иконка истории
     val UiTrash = R.drawable.ui_trash // Иконка корзины для архива
     val UiFromArchive = R.drawable.ui_from_archive // Иконка "Достать из архива"

@@ -94,6 +94,10 @@ interface HierarchyDao {
 
     @Query("SELECT * FROM components WHERE id = :id LIMIT 1")
     suspend fun getComponent(id: String): ComponentEntity?
+    
+    /** Получить все компоненты, использующие указанный шаблон */
+    @Query("SELECT * FROM components WHERE templateId = :templateId")
+    suspend fun getComponentsByTemplate(templateId: String): List<ComponentEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertComponent(component: ComponentEntity)

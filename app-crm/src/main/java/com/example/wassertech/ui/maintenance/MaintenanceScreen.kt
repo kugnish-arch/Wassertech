@@ -19,6 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.viewmodel.ChecklistUiField
@@ -87,7 +90,14 @@ fun MaintenanceScreen(
                             .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
-                        // Иконка шестеренки убрана по требованию
+                        // Иконка гаечного ключа (ui_wrench.png)
+                        Image(
+                            painter = painterResource(id = ru.wassertech.core.ui.theme.CustomIcons.UiWrench),
+                            contentDescription = null,
+                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             text = "Обслуживание установки $installationName",
                             style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
@@ -133,15 +143,14 @@ fun MaintenanceScreen(
                                     // заголовок секции - для заглавных компонентов такой же фон как у COMMON, но с жирным текстом и иконкой
                                     val expanded = expandedMap[sec.componentId] == true
                                     ListItem(
-                                        leadingContent = if (sec.isHeadComponent) {
-                                            {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Category,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
-                                        } else null,
+                                        leadingContent = {
+                                            Image(
+                                                painter = painterResource(id = ru.wassertech.core.ui.theme.CustomIcons.UiGear),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        },
                                         headlineContent = { 
                                             Text(
                                                 sec.componentName,

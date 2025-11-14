@@ -92,6 +92,10 @@ fun TemplateEditorScreen(
     var globalShowHeadComponentInfo by remember { mutableStateOf(false) }
     var globalHeadComponentInfoPosition by remember { mutableStateOf<Offset?>(null) }
     var globalShowCharacteristicInfo by remember { mutableStateOf<Pair<String, Offset?>?>(null) }
+    
+    // Референсы для получения позиций иконок
+    var headComponentInfoIconRef by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var characteristicInfoIconRefs by remember { mutableStateOf<Map<String, androidx.compose.ui.geometry.Rect>>(emptyMap()) }
 
     Scaffold(
         floatingActionButton = {
@@ -186,21 +190,36 @@ fun TemplateEditorScreen(
                                     "Заглавный компонент",
                                     style = MaterialTheme.typography.labelMedium
                                 )
+                                var infoIconBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
                                 IconButton(
                                     onClick = { 
-                                        globalShowHeadComponentInfo = true
-                                    },
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .onGloballyPositioned { coordinates ->
-                                            val position = coordinates.localToWindow(Offset.Zero)
+                                        infoIconBounds?.let { rect ->
+                                            // Преобразуем координаты из корня в окно
+                                            val position = Offset(rect.center.x, rect.top)
                                             globalHeadComponentInfoPosition = position
+                                            globalShowHeadComponentInfo = true
                                         }
+                                    },
+                                    modifier = Modifier.size(20.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Info,
                                         contentDescription = "Информация",
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .onGloballyPositioned { coordinates ->
+                                                // Сохраняем позицию иконки для использования при клике
+                                                val position = coordinates.localToWindow(Offset.Zero)
+                                                val size = coordinates.size
+                                                val bounds = androidx.compose.ui.geometry.Rect(
+                                                    position.x,
+                                                    position.y,
+                                                    position.x + size.width,
+                                                    position.y + size.height
+                                                )
+                                                infoIconBounds = bounds
+                                                headComponentInfoIconRef = bounds
+                                            },
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -221,11 +240,16 @@ fun TemplateEditorScreen(
                 val f = fields.find { it.id == fieldId } ?: return@items
                 val index = localFieldOrder.indexOf(fieldId)
                 var lastMoveThreshold by remember { mutableStateOf(0f) }
-
+                var dragOffset by remember { mutableStateOf(0.dp) }
+                var isDragging by remember { mutableStateOf(false) }
+                val fieldDensity = LocalDensity.current
 
                 Box {
                     ElevatedCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset(y = dragOffset)
+                            .zIndex(if (isDragging) 1f else 0f), // Перетаскиваемое поле поверх всех
                         colors = CardDefaults.elevatedCardColors(
                             containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек полей
                         ),
@@ -253,13 +277,18 @@ fun TemplateEditorScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                         modifier = Modifier
                                             .size(24.dp)
-                                            .pointerInput(f.id, index) {
+                                            .pointerInput(f.id, index, fieldDensity) {
                                                 detectDragGestures(
                                                     onDragStart = {
                                                         lastMoveThreshold = 0f
+                                                        dragOffset = 0.dp
+                                                        isDragging = true
                                                     },
                                                     onDrag = { change, dragAmount ->
                                                         change.consume()
+                                                        // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
+                                                        dragOffset += with(fieldDensity) { dragAmount.y.toDp() }
+                                                        
                                                         if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
                                                             val pos =
                                                                 localFieldOrder.indexOf(fieldId)
@@ -272,6 +301,7 @@ fun TemplateEditorScreen(
                                                                 localFieldOrder = list
                                                             }
                                                             lastMoveThreshold = -60f
+                                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                                         } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
                                                             val pos =
                                                                 localFieldOrder.indexOf(fieldId)
@@ -284,6 +314,7 @@ fun TemplateEditorScreen(
                                                                 localFieldOrder = list
                                                             }
                                                             lastMoveThreshold = 60f
+                                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                                         }
                                                         if (dragAmount.y in -60f..60f) {
                                                             lastMoveThreshold = dragAmount.y
@@ -291,6 +322,8 @@ fun TemplateEditorScreen(
                                                     },
                                                     onDragEnd = {
                                                         lastMoveThreshold = 0f
+                                                        dragOffset = 0.dp
+                                                        isDragging = false
                                                     }
                                                 )
                                             }
@@ -316,21 +349,35 @@ fun TemplateEditorScreen(
                                             "Характеристика",
                                             style = MaterialTheme.typography.labelMedium
                                         )
+                                        var characteristicInfoIconBounds by remember(f.id) { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
                                         IconButton(
                                             onClick = { 
-                                                globalShowCharacteristicInfo = Pair(f.id, null)
-                                            },
-                                            modifier = Modifier
-                                                .size(20.dp)
-                                                .onGloballyPositioned { coordinates ->
-                                                    val position = coordinates.localToWindow(Offset.Zero)
+                                                characteristicInfoIconBounds?.let { rect ->
+                                                    // Преобразуем координаты из корня в окно
+                                                    val position = Offset(rect.center.x, rect.top)
                                                     globalShowCharacteristicInfo = Pair(f.id, position)
                                                 }
+                                            },
+                                            modifier = Modifier.size(20.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Filled.Info,
                                                 contentDescription = "Информация",
-                                                modifier = Modifier.size(16.dp),
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .onGloballyPositioned { coordinates ->
+                                                        // Сохраняем позицию иконки для использования при клике
+                                                        val position = coordinates.localToWindow(Offset.Zero)
+                                                        val size = coordinates.size
+                                                        val bounds = androidx.compose.ui.geometry.Rect(
+                                                            position.x,
+                                                            position.y,
+                                                            position.x + size.width,
+                                                            position.y + size.height
+                                                        )
+                                                        characteristicInfoIconBounds = bounds
+                                                        characteristicInfoIconRefs = characteristicInfoIconRefs + (f.id to bounds)
+                                                    },
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -500,7 +547,10 @@ fun TemplateEditorScreen(
             InfoTooltip(
                 text = "Заглавный компонент - в готовом отчёте будет занимать всю ширину листа, а не 1/3 как обычные компоненты. Если заглавный элемент окажется в самом начале или конце компонента, то под него будет выделен отдельный визуальный раздел.",
                 anchorPosition = globalHeadComponentInfoPosition,
-                onDismiss = { globalShowHeadComponentInfo = false }
+                onDismiss = { 
+                    globalShowHeadComponentInfo = false
+                    globalHeadComponentInfoPosition = null
+                }
             )
         }
         
@@ -509,7 +559,9 @@ fun TemplateEditorScreen(
                 InfoTooltip(
                     text = "Характеристика - постоянное свойство компонента (паспортные данные железа). Оно будет сохраняться и выводиться в некоторых документах, но его значение не меняется при проведении обслуживания. Если переключатель выключен, поле относится к чек-листу ТО (параметры обслуживания).",
                     anchorPosition = position,
-                    onDismiss = { globalShowCharacteristicInfo = null }
+                    onDismiss = { 
+                        globalShowCharacteristicInfo = null
+                    }
                 )
             }
         }
@@ -532,14 +584,15 @@ private fun InfoTooltip(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable { onDismiss() }
             .zIndex(1000f), // Верхний слой
         contentAlignment = Alignment.Center
     ) {
-        // Полупрозрачный фон
+        // Полупрозрачный фон - кликабельный для закрытия
         Surface(
             color = Color.Black.copy(alpha = 0.3f),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onDismiss() }
         ) {}
 
         // Карточка с подсказкой - позиционируется относительно иконки
@@ -551,7 +604,7 @@ private fun InfoTooltip(
                         y = with(density) { anchorPosition.y.toDp() - 50.dp } // Позиционируем на уровне иконки (чуть выше)
                     )
                     .widthIn(max = 300.dp)
-                    .clickable(enabled = false) {},
+                    .clickable(enabled = false) {}, // Предотвращаем закрытие при клике на карточку
                 colors = CardDefaults.cardColors(
                     containerColor = Color(0xFFFFEB3B).copy(alpha = 0.85f) // Жёлтый фон с прозрачностью 85%
                 ),
@@ -586,7 +639,9 @@ private fun InfoTooltip(
                             )
                         }
                         IconButton(
-                            onClick = onDismiss,
+                            onClick = {
+                                onDismiss()
+                            },
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(

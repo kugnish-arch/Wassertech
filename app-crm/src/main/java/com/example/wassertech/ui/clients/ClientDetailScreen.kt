@@ -25,6 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -68,6 +71,9 @@ fun SiteRowWithDrag(
     onDelete: () -> Unit
 ) {
     var lastMoveThreshold by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(0.dp) }
+    var isDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
 
     Row(
         modifier = Modifier
@@ -75,21 +81,30 @@ fun SiteRowWithDrag(
             .then(
                 if (!isArchived) {
                     Modifier
-                        .pointerInput(site.id, index) {
+                        .offset(y = dragOffset)
+                        .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемый объект поверх всех
+                        .pointerInput(site.id, index, density) {
                             detectDragGestures(
                                 onDragStart = {
                                     lastMoveThreshold = 0f
+                                    dragOffset = 0.dp
+                                    isDragging = true
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
+                                    // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
+                                    dragOffset += with(density) { dragAmount.y.toDp() }
+                                    
                                     // Еще больше уменьшаем порог для физических устройств
                                     val threshold = 10f
                                     if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                         onMoveUp()
                                         lastMoveThreshold = -threshold
+                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                     } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                         onMoveDown()
                                         lastMoveThreshold = threshold
+                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                     }
                                     if (dragAmount.y in -threshold..threshold) {
                                         lastMoveThreshold = dragAmount.y
@@ -97,6 +112,8 @@ fun SiteRowWithDrag(
                                 },
                                 onDragEnd = {
                                     lastMoveThreshold = 0f
+                                    dragOffset = 0.dp
+                                    isDragging = false
                                 }
                             )
                         }
@@ -117,10 +134,16 @@ fun SiteRowWithDrag(
             )
             Spacer(Modifier.width(8.dp))
         }
-        Icon(
-            imageVector = AppIcons.Site,
+        // Иконка объекта - используем Image вместо Icon для консистентности
+        val siteIconRes = when {
+            isArchived -> R.drawable.object_house_red // По умолчанию дом, если архив
+            else -> R.drawable.object_house_blue // По умолчанию дом
+        }
+        Image(
+            painter = painterResource(id = siteIconRes),
             contentDescription = null,
-            tint = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+            modifier = Modifier.size(48.dp),
+            contentScale = ContentScale.Fit
         )
         Spacer(Modifier.width(12.dp))
         Text(
@@ -175,9 +198,15 @@ fun InstallationRowWithDrag(
     onDelete: () -> Unit
 ) {
     var lastMoveThreshold by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(0.dp) }
+    var isDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
 
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset(y = dragOffset)
+            .zIndex(if (isDragging) 1f else 0f), // Перетаскиваемая установка поверх всех
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (isArchived)
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -191,21 +220,28 @@ fun InstallationRowWithDrag(
                 .then(
                     if (!isArchived) {
                         Modifier
-                            .pointerInput(installation.id, index) {
+                            .pointerInput(installation.id, index, density) {
                                 detectDragGestures(
                                     onDragStart = {
                                         lastMoveThreshold = 0f
+                                        dragOffset = 0.dp
+                                        isDragging = true
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
+                                        // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
+                                        dragOffset += with(density) { dragAmount.y.toDp() }
+                                        
                                         // Еще больше уменьшаем порог для физических устройств
                                         val threshold = 15f // Еще более чувствительный порог
                                         if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
                                             onMoveUp()
                                             lastMoveThreshold = -threshold
+                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                         } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
                                             onMoveDown()
                                             lastMoveThreshold = threshold
+                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
                                         }
                                         if (dragAmount.y in -threshold..threshold) {
                                             lastMoveThreshold = dragAmount.y
@@ -213,6 +249,8 @@ fun InstallationRowWithDrag(
                                     },
                                     onDragEnd = {
                                         lastMoveThreshold = 0f
+                                        dragOffset = 0.dp
+                                        isDragging = false
                                     }
                                 )
                             }
@@ -233,12 +271,12 @@ fun InstallationRowWithDrag(
                 )
                 Spacer(Modifier.width(8.dp))
             }
-            // Иконка установки из темы
-            Icon(
-                imageVector = ru.wassertech.core.ui.theme.EntityIcons.InstallationIcon,
+            // Иконка установки - используем Image вместо Icon для консистентности
+            Image(
+                painter = painterResource(id = R.drawable.equipment_filter_triple),
                 contentDescription = null,
-                tint = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(48.dp),
+                contentScale = ContentScale.Fit
             )
             Spacer(Modifier.width(8.dp))
             Text(
