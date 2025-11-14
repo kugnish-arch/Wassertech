@@ -32,6 +32,7 @@ import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.util.Translit
 import ru.wassertech.viewmodel.TemplatesViewModel
+import ru.wassertech.sync.markUpdatedForSync
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.rememberCoroutineScope
@@ -98,7 +99,7 @@ fun TemplateEditorScreen(
                                 if (template != null) {
                                     val updatedTemplate = template.copy(
                                         componentType = if (isHeadTemplate) ComponentType.HEAD else ComponentType.COMMON
-                                    )
+                                    ).markUpdatedForSync()
                                     db.templatesDao().upsertTemplate(updatedTemplate)
                                 }
                             } catch (_: Throwable) {

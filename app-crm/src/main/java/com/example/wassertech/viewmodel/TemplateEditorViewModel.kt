@@ -8,6 +8,8 @@ import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.dao.ChecklistDao
 import ru.wassertech.data.entities.ChecklistFieldEntity
 import ru.wassertech.data.types.FieldType
+import ru.wassertech.sync.markCreatedForSync
+import ru.wassertech.sync.markUpdatedForSync
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -30,6 +32,7 @@ class TemplateEditorViewModel(app: Application, private val templateId: String) 
         dao.observeFields(templateId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun addOrUpdate(d: FieldDraft) {
+        val isNew = d.id == null
         val entity = ChecklistFieldEntity(
             id = d.id ?: UUID.randomUUID().toString(),
             templateId = templateId,
@@ -40,7 +43,8 @@ class TemplateEditorViewModel(app: Application, private val templateId: String) 
             min = d.min.toDoubleOrNull(),
             max = d.max.toDoubleOrNull()
         )
-        viewModelScope.launch { dao.upsertField(entity) }
+        val markedEntity = if (isNew) entity.markCreatedForSync() else entity.markUpdatedForSync()
+        viewModelScope.launch { dao.upsertField(markedEntity) }
     }
 
     fun delete(id: String) {

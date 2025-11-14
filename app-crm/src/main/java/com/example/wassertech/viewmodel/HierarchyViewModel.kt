@@ -8,6 +8,10 @@ import ru.wassertech.data.entities.*
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.sync.DeletionTracker
 import ru.wassertech.sync.SafeDeletionHelper
+import ru.wassertech.sync.markCreatedForSync
+import ru.wassertech.sync.markUpdatedForSync
+import ru.wassertech.sync.markArchivedForSync
+import ru.wassertech.sync.markUnarchivedForSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -50,7 +54,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     phone = null,
                     notes = notes,
                     isCorporate = isCorporate
-                )
+                ).markCreatedForSync()
             )
         }
     }
@@ -73,7 +77,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         withContext(Dispatchers.IO) { hierarchyDao.getSite(id) }
 
     fun editSite(site: SiteEntity) {
-        viewModelScope.launch(Dispatchers.IO) { hierarchyDao.upsertSite(site) }
+        viewModelScope.launch(Dispatchers.IO) { 
+            hierarchyDao.upsertSite(site.markUpdatedForSync()) 
+        }
     }
 
     fun addSite(clientId: String, name: String, address: String?) {
@@ -86,7 +92,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     name = name,
                     address = address,
                     orderIndex = 0
-                )
+                ).markCreatedForSync()
             )
         }
     }
@@ -132,7 +138,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     siteId = siteId,
                     name = name,
                     orderIndex = 0
-                )
+                ).markCreatedForSync()
             )
         }
     }
@@ -152,7 +158,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                         name = "Основной",
                         address = null,
                         orderIndex = 0
-                    )
+                    ).markCreatedForSync()
                     hierarchyDao.upsertSite(site)
                     site
                 }
@@ -165,7 +171,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             val inst = hierarchyDao.getInstallation(installationId)
             if (inst != null) {
-                hierarchyDao.updateInstallation(inst.copy(name = newName))
+                hierarchyDao.updateInstallation(inst.copy(name = newName).markUpdatedForSync())
             }
         }
     }
@@ -175,7 +181,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             val inst = hierarchyDao.getInstallation(installationId)
             if (inst != null) {
-                hierarchyDao.updateInstallation(inst.copy(siteId = newSiteId))
+                hierarchyDao.updateInstallation(inst.copy(siteId = newSiteId).markUpdatedForSync())
             }
         }
     }
@@ -185,7 +191,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             val inst = hierarchyDao.getInstallation(installationId)
             if (inst != null) {
-                hierarchyDao.updateInstallation(inst.copy(name = newName, siteId = newSiteId))
+                hierarchyDao.updateInstallation(inst.copy(name = newName, siteId = newSiteId).markUpdatedForSync())
             }
         }
     }
@@ -227,7 +233,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     type = type,            // тип в логике сейчас не критичен, оставлен для совместимости
                     orderIndex = 0,
                     templateId = templateId
-                )
+                ).markCreatedForSync()
             )
         }
     }
@@ -266,11 +272,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun archiveSite(siteId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val site = hierarchyDao.getSite(siteId) ?: return@launch
-            val updated = site.copy(
-                isArchived = true,
-                archivedAtEpoch = System.currentTimeMillis()
-            )
-            hierarchyDao.upsertSite(updated)
+            hierarchyDao.upsertSite(site.markArchivedForSync())
         }
     }
     
@@ -278,11 +280,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun restoreSite(siteId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val site = hierarchyDao.getSite(siteId) ?: return@launch
-            val updated = site.copy(
-                isArchived = false,
-                archivedAtEpoch = null
-            )
-            hierarchyDao.upsertSite(updated)
+            hierarchyDao.upsertSite(site.markUnarchivedForSync())
         }
     }
     
@@ -290,11 +288,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun archiveInstallation(installationId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val installation = hierarchyDao.getInstallation(installationId) ?: return@launch
-            val updated = installation.copy(
-                isArchived = true,
-                archivedAtEpoch = System.currentTimeMillis()
-            )
-            hierarchyDao.updateInstallation(updated)
+            hierarchyDao.updateInstallation(installation.markArchivedForSync())
         }
     }
     
@@ -302,11 +296,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun restoreInstallation(installationId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val installation = hierarchyDao.getInstallation(installationId) ?: return@launch
-            val updated = installation.copy(
-                isArchived = false,
-                archivedAtEpoch = null
-            )
-            hierarchyDao.updateInstallation(updated)
+            hierarchyDao.updateInstallation(installation.markUnarchivedForSync())
         }
     }
     

@@ -8,6 +8,10 @@ import ru.wassertech.data.dao.ClientDao
 import ru.wassertech.data.entities.ClientEntity
 import ru.wassertech.data.entities.ClientGroupEntity
 import ru.wassertech.sync.SafeDeletionHelper
+import ru.wassertech.sync.markCreatedForSync
+import ru.wassertech.sync.markUpdatedForSync
+import ru.wassertech.sync.markArchivedForSync
+import ru.wassertech.sync.markUnarchivedForSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,17 +79,12 @@ class ClientsViewModel(
         val nextOrder = (clientDao.getAllGroupsNow()
             .maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
 
-        val now = System.currentTimeMillis()
         val group = ClientGroupEntity(
             id = UUID.randomUUID().toString(),
             title = title,
             notes = null,
-            sortOrder = nextOrder,
-            isArchived = false,
-            archivedAtEpoch = null,
-            createdAtEpoch = now,
-            updatedAtEpoch = now
-        )
+            sortOrder = nextOrder
+        ).markCreatedForSync()
         clientDao.upsertGroup(group)
         reloadGroups()
     }
@@ -95,19 +94,13 @@ class ClientsViewModel(
             val nextOrder = (clientDao.getClientsNow(groupId)
                 .maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
 
-            val now = System.currentTimeMillis()
             val client = ClientEntity(
                 id = UUID.randomUUID().toString(),
                 name = name,
                 isCorporate = corporate,
                 clientGroupId = groupId,
-                sortOrder = nextOrder,
-                isArchived = false,
-                archivedAtEpoch = null,
-                createdAtEpoch = now,
-                updatedAtEpoch = now,
-                // остальные nullable поля по умолчанию из data-класса
-            )
+                sortOrder = nextOrder
+            ).markCreatedForSync()
             clientDao.upsertClient(client)
             reloadClients()
         }
@@ -121,21 +114,22 @@ class ClientsViewModel(
     // --- Архив / Восстановление (клиенты) ---
     fun archiveClient(clientId: String) = viewModelScope.launch(Dispatchers.IO) {
         val c = clientDao.getClientByIdNow(clientId) ?: return@launch
-        val updated = c.copy(isArchived = true, archivedAtEpoch = System.currentTimeMillis())
+        val updated = c.markArchivedForSync()
         clientDao.upsertClient(updated)
         reloadClients()
     }
 
     fun restoreClient(clientId: String) = viewModelScope.launch(Dispatchers.IO) {
         val c = clientDao.getClientByIdNow(clientId) ?: return@launch
-        val updated = c.copy(isArchived = false, archivedAtEpoch = null)
+        val updated = c.markUnarchivedForSync()
         clientDao.upsertClient(updated)
         reloadClients()
     }
 
     fun editClient(client: ClientEntity) {
         viewModelScope.launch(Dispatchers.IO) {
-            clientDao.upsertClient(client)
+            val updated = client.markUpdatedForSync()
+            clientDao.upsertClient(updated)
             reloadClients() // чтобы обновился список
         }
     }
@@ -145,18 +139,14 @@ class ClientsViewModel(
     fun archiveGroup(groupId: String) = viewModelScope.launch(Dispatchers.IO) {
         val groupsNow = clientDao.getAllGroupsNow()
         val g = groupsNow.firstOrNull { it.id == groupId } ?: return@launch
-        val ts = System.currentTimeMillis()
 
         // архивируем группу
-        clientDao.upsertGroup(
-            g.copy(isArchived = true, archivedAtEpoch = ts, updatedAtEpoch = ts)
-        )
+        clientDao.upsertGroup(g.markArchivedForSync())
 
         // каскадно архивируем клиентов этой группы
         val clientsInGroup = clientDao.getClientsNow(groupId)
         clientsInGroup.forEach { c ->
-            val u = c.copy(isArchived = true, archivedAtEpoch = ts, updatedAtEpoch = ts)
-            clientDao.upsertClient(u)
+            clientDao.upsertClient(c.markArchivedForSync())
         }
 
         reloadAll()
@@ -165,11 +155,8 @@ class ClientsViewModel(
     fun restoreGroup(groupId: String) = viewModelScope.launch(Dispatchers.IO) {
         val groupsNow = clientDao.getAllGroupsNow()
         val g = groupsNow.firstOrNull { it.id == groupId } ?: return@launch
-        val ts = System.currentTimeMillis()
 
-        clientDao.upsertGroup(
-            g.copy(isArchived = false, archivedAtEpoch = null, updatedAtEpoch = ts)
-        )
+        clientDao.upsertGroup(g.markUnarchivedForSync())
         // клиентов НЕ разворачиваем автоматически (обычно группы восстанавливают пустыми)
         reloadAll()
     }

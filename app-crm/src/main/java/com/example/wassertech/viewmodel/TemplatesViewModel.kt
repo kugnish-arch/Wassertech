@@ -7,6 +7,8 @@ import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.entities.ChecklistFieldEntity
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.sync.DeletionTracker
+import ru.wassertech.sync.markCreatedForSync
+import ru.wassertech.sync.markUpdatedForSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,8 +104,18 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 _fields.value
             }
+            // Получаем существующие поля для определения новых
+            val existingFields = templatesDao.getFieldsForTemplate(templateId)
+            val existingIds = existingFields.map { it.id }.toSet()
+            
             orderedFields.forEachIndexed { index, ui ->
-                templatesDao.upsertField(ui.toEntity(indexHint = index))
+                val entity = ui.toEntity(indexHint = index)
+                val markedEntity = if (existingIds.contains(ui.id)) {
+                    entity.markUpdatedForSync()
+                } else {
+                    entity.markCreatedForSync()
+                }
+                templatesDao.upsertField(markedEntity)
             }
         }
     }

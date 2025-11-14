@@ -7,6 +7,8 @@ import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.entities.MaintenanceSessionEntity
 import ru.wassertech.data.entities.MaintenanceValueEntity
 import ru.wassertech.data.types.FieldType
+import ru.wassertech.sync.markCreatedForSync
+import ru.wassertech.sync.markUpdatedForSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -240,7 +242,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 technician = technician,
                 notes = notes,
                 synced = false
-            )
+            ).markCreatedForSync()
 
             val values = mutableListOf<MaintenanceValueEntity>()
             _sections.value.forEach { sec ->
@@ -260,7 +262,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                             fieldKey = f.key,
                             valueText = textValue,
                             valueBool = boolValue
-                        )
+                        ).markCreatedForSync()
                     }
                 }
             }
@@ -293,7 +295,11 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 technician = technician,
                 notes = notes,
                 synced = false // Помечаем как не синхронизированную после редактирования
-            )
+            ).markUpdatedForSync()
+
+            // Получаем существующие значения для определения новых
+            val existingValues = sessionsDao.getValuesForSession(sessionId)
+            val existingValueIds = existingValues.map { it.id }.toSet()
 
             val values = mutableListOf<MaintenanceValueEntity>()
             _sections.value.forEach { sec ->
@@ -304,8 +310,13 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                         FieldType.TEXT     -> f.textValue.takeIf { it.isNotBlank() } to null
                     }
                     if (textValue != null || boolValue != null) {
-                        values += MaintenanceValueEntity(
-                            id = UUID.randomUUID().toString(),
+                        // Используем существующий ID, если значение уже есть, иначе создаем новый
+                        val existingValue = existingValues.find { 
+                            it.componentId == sec.componentId && it.fieldKey == f.key 
+                        }
+                        val valueId = existingValue?.id ?: UUID.randomUUID().toString()
+                        val valueEntity = MaintenanceValueEntity(
+                            id = valueId,
                             sessionId = sessionId,
                             siteId = siteId,
                             installationId = installationId,
@@ -314,6 +325,12 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                             valueText = textValue,
                             valueBool = boolValue
                         )
+                        val markedValue = if (existingValueIds.contains(valueId)) {
+                            valueEntity.markUpdatedForSync()
+                        } else {
+                            valueEntity.markCreatedForSync()
+                        }
+                        values += markedValue
                     }
                 }
             }

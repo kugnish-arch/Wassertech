@@ -35,11 +35,11 @@ interface ClientDao {
     @Query(
         """
         UPDATE client_groups 
-        SET sortOrder = :order
+        SET sortOrder = :order, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1
         WHERE id = :id
         """
     )
-    fun updateGroupOrder(id: String, order: Int)
+    fun updateGroupOrder(id: String, order: Int, ts: Long = System.currentTimeMillis())
 
     // ---------- Clients ----------
 
@@ -92,7 +92,7 @@ interface ClientDao {
     @Query(
         """
         UPDATE clients 
-        SET clientGroupId = :groupId, updatedAtEpoch = :ts
+        SET clientGroupId = :groupId, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1
         WHERE id = :clientId
         """
     )
@@ -102,11 +102,11 @@ interface ClientDao {
     @Query(
         """
         UPDATE clients 
-        SET sortOrder = :order
+        SET sortOrder = :order, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1
         WHERE id = :id
         """
     )
-    fun updateClientOrder(id: String, order: Int)
+    fun updateClientOrder(id: String, order: Int, ts: Long = System.currentTimeMillis())
 
     @Query("SELECT * FROM clients WHERE id = :id")
     fun observeClientRaw(id: String): kotlinx.coroutines.flow.Flow<List<ClientEntity>>
@@ -115,16 +115,16 @@ interface ClientDao {
     fun observeAllClients(): Flow<List<ClientEntity>>
 
     // Переименовать имя клиента
-    @Query("UPDATE clients SET name = :newName WHERE id = :clientId")
-    suspend fun updateClientName(clientId: String, newName: String): Int
+    @Query("UPDATE clients SET name = :newName, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1 WHERE id = :clientId")
+    suspend fun updateClientName(clientId: String, newName: String, ts: Long = System.currentTimeMillis()): Int
 
     // Перенести клиента в другую группу (или убрать из группы, если null)
     @Query("UPDATE clients SET clientGroupId = :groupId WHERE id = :clientId")
     suspend fun assignClientToGroup(clientId: String, groupId: String?): Int
 
     // Переименовать группу
-    @Query("UPDATE client_groups SET title = :newTitle WHERE id = :groupId")
-    suspend fun updateGroupTitle(groupId: String, newTitle: String): Int
+    @Query("UPDATE client_groups SET title = :newTitle, updatedAtEpoch = :ts, dirtyFlag = 1, syncStatus = 1 WHERE id = :groupId")
+    suspend fun updateGroupTitle(groupId: String, newTitle: String, ts: Long = System.currentTimeMillis()): Int
 
     @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
     suspend fun getClientNow(id: String): ClientEntity

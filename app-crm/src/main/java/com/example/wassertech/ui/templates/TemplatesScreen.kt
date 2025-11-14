@@ -27,6 +27,7 @@ import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.entities.ChecklistTemplateEntity
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.sync.SafeDeletionHelper
+import ru.wassertech.sync.markCreatedForSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -211,18 +212,14 @@ fun TemplatesScreen(
                 if (title.isNotEmpty()) {
                     scope.launch {
                         val id = UUID.randomUUID().toString()
-                        val now = System.currentTimeMillis()
                         val nextOrder =
                             (templates.maxOfOrNull { it.sortOrder ?: -1 } ?: -1) + 1
                         val entity = ChecklistTemplateEntity(
                             id = id,
                             title = title,
                             componentType = ComponentType.COMMON, // дефолт
-                            sortOrder = nextOrder,
-                            isArchived = false,
-                            archivedAtEpoch = null,
-                            updatedAtEpoch = now
-                        )
+                            sortOrder = nextOrder
+                        ).markCreatedForSync()
                         dao.upsertTemplate(entity)
                         onOpenTemplate(id)
                     }
