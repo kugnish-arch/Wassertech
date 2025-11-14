@@ -249,7 +249,7 @@ fun ComponentsScreen(
                             Image(
                                 painter = painterResource(id = R.drawable.equipment_filter_triple),
                                 contentDescription = null,
-                                modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                                modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2),
                                 contentScale = ContentScale.Fit
                             )
                             Spacer(Modifier.width(8.dp))
@@ -284,7 +284,7 @@ fun ComponentsScreen(
                             Text(
                                 text = it,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant // Серый цвет для подзаголовка (адрес/объект)
+                                color = Color.White // Белый цвет для подзаголовка (адрес/объект)
                             )
                         }
                     }

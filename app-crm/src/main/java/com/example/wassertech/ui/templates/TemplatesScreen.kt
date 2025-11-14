@@ -336,7 +336,7 @@ private fun TemplateRowWithDrag(
                     Image(
                         painter = painterResource(id = R.drawable.ui_template_component),
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(48.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -383,6 +383,14 @@ private fun TemplateRowWithDrag(
                             }
                         }
                     }
+                } else {
+                    // Иконка шеврона справа в обычном режиме
+                    Icon(
+                        imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                        contentDescription = "Открыть",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             },
             modifier = Modifier.clickable(enabled = !isEditing) { onClick() }

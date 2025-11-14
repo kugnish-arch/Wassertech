@@ -330,10 +330,24 @@ fun MaintenanceSessionDetailScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             installationName,
-                                            style = MaterialTheme.typography.bodyLarge
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.White
                                         )
                                     }
-                                    Text(dateTimeText, style = MaterialTheme.typography.bodyMedium)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Image(
+                                            painter = painterResource(id = CoreR.drawable.ui_time),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            dateTimeText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
                             }
                             // Бордер снизу как у групп клиентов

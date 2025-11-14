@@ -11,6 +11,6 @@ data class SyncPushRequest(
     val maintenance_sessions: List<SyncMaintenanceSessionDto> = emptyList(),
     val maintenance_values: List<SyncMaintenanceValueDto> = emptyList(),
     val component_templates: List<SyncComponentTemplateDto> = emptyList(),
-    val component_template_fields: List<SyncChecklistFieldDto> = emptyList(),
+    val component_template_fields: List<SyncChecklistFieldDto> = emptyList(), // Используем SyncChecklistFieldDto для совместимости структуры
     val deleted: List<DeletedRecordDto> = emptyList()
 )

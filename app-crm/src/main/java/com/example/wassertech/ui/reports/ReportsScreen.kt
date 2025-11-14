@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.ui.res.painterResource
 import ru.wassertech.crm.R
 import androidx.compose.material3.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -206,17 +208,22 @@ fun ReportsScreen(
                                         )
                                     }
                                 }
-                                Icon(
-                                    painter = if (isPdf) {
-                                        painterResource(R.drawable.document_pdf)
-                                    } else {
-                                        // HTML файл - используем кастомную иконку html.xml
-                                        painterResource(R.drawable.html)
-                                    },
-                                    contentDescription = null,
-                                    tint = if (isPdf) PdfIconColor else MaterialTheme.colorScheme.onSurface, // Красный для PDF, черный для HTML
-                                    modifier = Modifier.size(32.dp)
-                                )
+                                if (isPdf) {
+                                    Image(
+                                        painter = painterResource(ru.wassertech.core.ui.theme.CustomIcons.UiPdf),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(32.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    // HTML файл - используем кастомную иконку html.xml
+                                    Icon(
+                                        painter = painterResource(R.drawable.html),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         file.nameWithoutExtension,

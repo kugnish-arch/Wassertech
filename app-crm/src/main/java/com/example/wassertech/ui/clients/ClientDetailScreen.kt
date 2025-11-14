@@ -496,7 +496,7 @@ fun ClientDetailScreen(
                         Image(
                             painter = painterResource(id = clientIconRes),
                             contentDescription = null,
-                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize),
+                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2),
                             contentScale = ContentScale.Fit
                         )
                         Spacer(Modifier.width(8.dp))
@@ -710,7 +710,7 @@ fun ClientDetailScreen(
                                             Image(
                                                 painter = painterResource(id = siteIconRes),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(24.dp),
+                                                modifier = Modifier.size(48.dp),
                                                 contentScale = ContentScale.Fit
                                             )
                                         },
@@ -777,7 +777,7 @@ fun ClientDetailScreen(
                                                             Image(
                                                                 painter = painterResource(id = R.drawable.equipment_filter_triple),
                                                                 contentDescription = null,
-                                                                modifier = Modifier.size(24.dp),
+                                                                modifier = Modifier.size(48.dp),
                                                                 contentScale = ContentScale.Fit
                                                             )
                                                             Spacer(Modifier.width(12.dp))

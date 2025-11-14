@@ -56,6 +56,7 @@ fun TemplateEditorScreen(
     val db = remember { AppDatabase.getInstance(ctx) }
 
     var templateName by remember { mutableStateOf<String>("Шаблон") }
+    var isHeadComponent by remember { mutableStateOf<Boolean>(false) }
 
     // Локальный порядок полей для drag-and-drop
     var localFieldOrder by remember(fields.size) {
@@ -78,13 +79,19 @@ fun TemplateEditorScreen(
         withContext(Dispatchers.IO) {
             try {
                 val template = db.componentTemplatesDao().getById(templateId)
-                if (template != null) {
-                    templateName = template.name
+                template?.let {
+                    templateName = it.name
+                    isHeadComponent = it.isHeadComponent
                 }
             } catch (_: Throwable) {
             }
         }
     }
+
+    // Состояния для тултипов (вынесены на уровень Scaffold)
+    var globalShowHeadComponentInfo by remember { mutableStateOf(false) }
+    var globalHeadComponentInfoPosition by remember { mutableStateOf<Offset?>(null) }
+    var globalShowCharacteristicInfo by remember { mutableStateOf<Pair<String, Offset?>?>(null) }
 
     Scaffold(
         floatingActionButton = {
@@ -93,22 +100,26 @@ fun TemplateEditorScreen(
                     scope.launch {
                         Log.d(TAG, "Сохранение шаблона: templateId=$templateId")
                         vm.saveAll(localFieldOrder)
-                        // Сохраняем имя шаблона, если оно изменилось
+                        // Сохраняем имя шаблона и флаг isHeadComponent, если они изменились
                         withContext(Dispatchers.IO) {
                             try {
                                 val template = db.componentTemplatesDao().getById(templateId)
-                                if (template != null && template.name != templateName) {
-                                    val updatedTemplate = template.copy(
-                                        name = templateName
-                                    ).markUpdatedForSync()
-                                    Log.d(TAG, "Обновление имени шаблона: templateId=$templateId, " +
-                                            "oldName=${template.name}, newName=$templateName, " +
-                                            "dirtyFlag=${updatedTemplate.dirtyFlag}, syncStatus=${updatedTemplate.syncStatus}, " +
-                                            "updatedAtEpoch=${updatedTemplate.updatedAtEpoch}")
-                                    db.componentTemplatesDao().upsert(updatedTemplate)
+                                template?.let { currentTemplate ->
+                                    if (currentTemplate.name != templateName || currentTemplate.isHeadComponent != isHeadComponent) {
+                                        val updatedTemplate = currentTemplate.copy(
+                                            name = templateName,
+                                            isHeadComponent = isHeadComponent
+                                        ).markUpdatedForSync()
+                                        Log.d(TAG, "Обновление шаблона: templateId=$templateId, " +
+                                                "oldName=${currentTemplate.name}, newName=$templateName, " +
+                                                "oldIsHeadComponent=${currentTemplate.isHeadComponent}, newIsHeadComponent=$isHeadComponent, " +
+                                                "dirtyFlag=${updatedTemplate.dirtyFlag}, syncStatus=${updatedTemplate.syncStatus}, " +
+                                                "updatedAtEpoch=${updatedTemplate.updatedAtEpoch}")
+                                        db.componentTemplatesDao().upsert(updatedTemplate)
+                                    }
                                 }
                             } catch (e: Throwable) {
-                                Log.e(TAG, "Ошибка при сохранении имени шаблона", e)
+                                Log.e(TAG, "Ошибка при сохранении шаблона", e)
                             }
                         }
                         Toast.makeText(ctx, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
@@ -138,7 +149,7 @@ fun TemplateEditorScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Поле для редактирования имени шаблона
+            // Поле для редактирования имени шаблона и переключатель "Заглавный компонент"
             item {
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -147,16 +158,63 @@ fun TemplateEditorScreen(
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    OutlinedTextField(
-                        value = templateName,
-                        onValueChange = { templateName = it },
-                        label = { Text("Название шаблона") },
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        singleLine = true
-                    )
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = templateName,
+                            onValueChange = { templateName = it },
+                            label = { Text("Название шаблона") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        
+                        // Переключатель "Заглавный компонент"
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    "Заглавный компонент",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                IconButton(
+                                    onClick = { 
+                                        globalShowHeadComponentInfo = true
+                                    },
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .onGloballyPositioned { coordinates ->
+                                            val position = coordinates.localToWindow(Offset.Zero)
+                                            globalHeadComponentInfoPosition = position
+                                        }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Info,
+                                        contentDescription = "Информация",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isHeadComponent,
+                                onCheckedChange = { checked ->
+                                    isHeadComponent = checked
+                                }
+                            )
+                        }
+                    }
                 }
+                
             }
 
             items(localFieldOrder, key = { it }) { fieldId ->
@@ -164,9 +222,6 @@ fun TemplateEditorScreen(
                 val index = localFieldOrder.indexOf(fieldId)
                 var lastMoveThreshold by remember { mutableStateOf(0f) }
 
-                var showCharacteristicInfo by remember(f.id) { mutableStateOf(false) }
-                // Переменная для позиции иконки Info (вынесена на уровень карточки)
-                var infoIconPosition by remember(f.id) { mutableStateOf<Offset?>(null) }
 
                 Box {
                     ElevatedCard(
@@ -262,12 +317,14 @@ fun TemplateEditorScreen(
                                             style = MaterialTheme.typography.labelMedium
                                         )
                                         IconButton(
-                                            onClick = { showCharacteristicInfo = true },
+                                            onClick = { 
+                                                globalShowCharacteristicInfo = Pair(f.id, null)
+                                            },
                                             modifier = Modifier
                                                 .size(20.dp)
                                                 .onGloballyPositioned { coordinates ->
                                                     val position = coordinates.localToWindow(Offset.Zero)
-                                                    infoIconPosition = position
+                                                    globalShowCharacteristicInfo = Pair(f.id, position)
                                                 }
                                         ) {
                                             Icon(
@@ -406,18 +463,12 @@ fun TemplateEditorScreen(
                                         singleLine = true
                                     )
                                 }
+                            } else {
+                                // Не NUMBER тип, ничего не показываем
                             }
 
                         }
 
-                        // Подсказка для "Характеристика"
-                        if (showCharacteristicInfo && infoIconPosition != null) {
-                            InfoTooltip(
-                                text = "Характеристика - постоянное свойство компонента (паспортные данные железа). Оно будет сохраняться и выводиться в некоторых документах, но его значение не меняется при проведении обслуживания. Если переключатель выключен, поле относится к чек-листу ТО (параметры обслуживания).",
-                                anchorPosition = infoIconPosition,
-                                onDismiss = { showCharacteristicInfo = false }
-                            )
-                        }
                     }
                 }
             }
@@ -441,6 +492,25 @@ fun TemplateEditorScreen(
                         Text("Добавить поле")
                     }
                 }
+            }
+        }
+        
+        // Тултипы поверх всего контента
+        if (globalShowHeadComponentInfo && globalHeadComponentInfoPosition != null) {
+            InfoTooltip(
+                text = "Заглавный компонент - в готовом отчёте будет занимать всю ширину листа, а не 1/3 как обычные компоненты. Если заглавный элемент окажется в самом начале или конце компонента, то под него будет выделен отдельный визуальный раздел.",
+                anchorPosition = globalHeadComponentInfoPosition,
+                onDismiss = { globalShowHeadComponentInfo = false }
+            )
+        }
+        
+        globalShowCharacteristicInfo?.let { (fieldId, position) ->
+            if (position != null) {
+                InfoTooltip(
+                    text = "Характеристика - постоянное свойство компонента (паспортные данные железа). Оно будет сохраняться и выводиться в некоторых документах, но его значение не меняется при проведении обслуживания. Если переключатель выключен, поле относится к чек-листу ТО (параметры обслуживания).",
+                    anchorPosition = position,
+                    onDismiss = { globalShowCharacteristicInfo = null }
+                )
             }
         }
     }
@@ -536,6 +606,8 @@ private fun InfoTooltip(
                     )
                 }
             }
+        } else {
+            // anchorPosition == null, карточка не показывается
         }
     }
 }

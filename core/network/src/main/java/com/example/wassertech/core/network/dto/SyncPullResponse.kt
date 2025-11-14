@@ -1,5 +1,7 @@
 package ru.wassertech.core.network.dto
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * Ответ на запрос получения изменений с сервера
  */
@@ -23,7 +25,7 @@ data class SyncPullResponse(
 data class DeletedRecordDto(
     val entity: String? = null,        // Имя сущности (clients, sites, installations, etc.) - новый формат
     val tableName: String? = null,     // Имя таблицы (для обратной совместимости с сервером)
-    val recordId: String,
+    @SerializedName("id") val recordId: String,  // В JSON поле называется "id", но в коде используем recordId для ясности
     val deletedAtEpoch: Long
 ) {
     /**

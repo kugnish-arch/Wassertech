@@ -20,9 +20,10 @@ import ru.wassertech.data.migrations.MIGRATION_7_8   // ← Добавление
 import ru.wassertech.data.migrations.MIGRATION_8_9   // ← Добавление полей синхронизации
 import ru.wassertech.data.migrations.MIGRATION_9_10  // ← Обновление deleted_records
 import ru.wassertech.data.migrations.MIGRATION_10_11  // ← Объединение шаблонов
+import ru.wassertech.data.migrations.MIGRATION_11_12  // ← Добавление isHeadComponent
 
 @Database(
-    version = 11, // ← Обновлено: объединение шаблонов (component_templates + component_template_fields)
+    version = 12, // ← Обновлено: добавление поля isHeadComponent в component_templates
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -75,7 +76,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,   // ← Добавление таблицы settings
                         MIGRATION_8_9,   // ← Добавление полей синхронизации
                         MIGRATION_9_10,  // ← Обновление deleted_records
-                        MIGRATION_10_11  // ← Объединение шаблонов (component_templates + component_template_fields)
+                        MIGRATION_10_11,  // ← Объединение шаблонов (component_templates + component_template_fields)
+                        MIGRATION_11_12  // ← Добавление isHeadComponent
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

@@ -196,11 +196,18 @@ class SyncEngine(private val context: Context) {
                 }
                 
                 // Логируем ответ от сервера
+                // ВАЖНО: сохраняем в локальную переменную, чтобы избежать smart cast проблем
+                // Никаких повторных обращений pushResponse.processed.xxx — только через локальный processed
+                val processed = pushResponse.processed
                 Log.d(TAG, "Ответ sync/push: success=${pushResponse.success}, " +
-                        "processed=${pushResponse.processed}, errors=${pushResponse.errors.size}")
-                if (pushResponse.processed != null) {
-                    Log.d(TAG, "Обработано сервером: component_templates=${pushResponse.processed.component_templates}, " +
-                            "component_template_fields=${pushResponse.processed.component_template_fields}")
+                        "processed=$processed, errors=${pushResponse.errors.size}")
+                if (processed != null) {
+                    val templatesCount = processed.component_templates
+                    val fieldsCount = processed.component_template_fields
+                    Log.d(TAG, "Обработано сервером: component_templates=$templatesCount, " +
+                            "component_template_fields=$fieldsCount")
+                } else {
+                    Log.w(TAG, "pushResponse.processed is null, nothing to mark as synced")
                 }
                 if (pushResponse.errors.isNotEmpty()) {
                     pushResponse.errors.forEach { error ->
@@ -442,125 +449,121 @@ class SyncEngine(private val context: Context) {
         // Для записей с ошибками - помечаем как CONFLICT
         
         if (!response.success) {
-            Log.w(TAG, "Push не успешен (success=false), не обновляем статусы")
+            Log.e(TAG, "Push failed: success=false")
             return
         }
         
-        // Проверяем, что сервер действительно обработал записи
-        val processed = response.processed
-        if (processed == null) {
-            Log.w(TAG, "Push успешен, но processed=null, не обновляем статусы")
-            return
+        val errors = response.errors.orEmpty()
+        
+        // Собираем ID записей с ошибками по типам сущностей
+        val errorIdsByType = errors.groupBy { it.entityType }
+            .mapValues { (_, errorList) -> errorList.map { it.entityId }.toSet() }
+        
+        // Обрабатываем каждую сущность
+        // Clients
+        val clientIds = request.clients.map { it.id }
+        val clientErrorIds = errorIdsByType["clients"] ?: emptySet()
+        val clientSuccessIds = clientIds.filter { it !in clientErrorIds }
+        if (clientSuccessIds.isNotEmpty()) {
+            database.clientDao().markClientsAsSynced(clientSuccessIds)
+        }
+        if (clientErrorIds.isNotEmpty()) {
+            database.clientDao().markClientsAsConflict(clientErrorIds.toList())
         }
         
-        Log.d(TAG, "Обработка ответа push: processed.component_templates=${processed.component_templates}, " +
-                "processed.component_template_fields=${processed.component_template_fields}")
+        // Sites
+        val siteIds = request.sites.map { it.id }
+        val siteErrorIds = errorIdsByType["sites"] ?: emptySet()
+        val siteSuccessIds = siteIds.filter { it !in siteErrorIds }
+        if (siteSuccessIds.isNotEmpty()) {
+            database.hierarchyDao().markSitesAsSynced(siteSuccessIds)
+        }
+        if (siteErrorIds.isNotEmpty()) {
+            database.hierarchyDao().markSitesAsConflict(siteErrorIds.toList())
+        }
         
-        // Собираем ID всех отправленных записей из переданного request
-        val allSentIds = mutableMapOf<String, List<String>>()
-        allSentIds["clients"] = request.clients.map { it.id }
-        allSentIds["sites"] = request.sites.map { it.id }
-        allSentIds["installations"] = request.installations.map { it.id }
-        allSentIds["components"] = request.components.map { it.id }
-        allSentIds["maintenance_sessions"] = request.maintenance_sessions.map { it.id }
-        allSentIds["maintenance_values"] = request.maintenance_values.mapNotNull { it.id }
-        allSentIds["component_templates"] = request.component_templates.map { it.id }
-        allSentIds["component_template_fields"] = request.component_template_fields.map { it.id }
+        // Installations
+        val installationIds = request.installations.map { it.id }
+        val installationErrorIds = errorIdsByType["installations"] ?: emptySet()
+        val installationSuccessIds = installationIds.filter { it !in installationErrorIds }
+        if (installationSuccessIds.isNotEmpty()) {
+            database.hierarchyDao().markInstallationsAsSynced(installationSuccessIds)
+        }
+        if (installationErrorIds.isNotEmpty()) {
+            database.hierarchyDao().markInstallationsAsConflict(installationErrorIds.toList())
+        }
         
-        // Обрабатываем удаления отдельно
-        val deletedRecords = database.deletedRecordsDao().getDirtyDeletedRecordsNow()
-        val deletedRecordIds = deletedRecords.map { it.id }
+        // Components
+        val componentIds = request.components.map { it.id }
+        val componentErrorIds = errorIdsByType["components"] ?: emptySet()
+        val componentSuccessIds = componentIds.filter { it !in componentErrorIds }
+        if (componentSuccessIds.isNotEmpty()) {
+            database.hierarchyDao().markComponentsAsSynced(componentSuccessIds)
+        }
+        if (componentErrorIds.isNotEmpty()) {
+            database.hierarchyDao().markComponentsAsConflict(componentErrorIds.toList())
+        }
         
-        // Собираем ID записей с ошибками
-        val errorIdsByType = response.errors.groupBy { it.entityType }
-            .mapValues { (_, errors) -> errors.map { it.entityId } }
+        // Maintenance sessions
+        val sessionIds = request.maintenance_sessions.map { it.id }
+        val sessionErrorIds = errorIdsByType["maintenance_sessions"] ?: emptySet()
+        val sessionSuccessIds = sessionIds.filter { it !in sessionErrorIds }
+        if (sessionSuccessIds.isNotEmpty()) {
+            database.sessionsDao().markSessionsAsSynced(sessionSuccessIds)
+        }
+        if (sessionErrorIds.isNotEmpty()) {
+            database.sessionsDao().markSessionsAsConflict(sessionErrorIds.toList())
+        }
         
-        // Помечаем успешно обработанные записи как синхронизированные
-        // Используем processed для проверки, что сервер действительно обработал записи
-        allSentIds.forEach { (entityType, ids) ->
-            val errorIds = errorIdsByType[entityType] ?: emptyList()
-            
-            // Проверяем, сколько записей сервер обработал для этого типа сущности
-            val processedCount = when (entityType) {
-                "clients" -> processed.clients
-                "sites" -> processed.sites
-                "installations" -> processed.installations
-                "components" -> processed.components
-                "maintenance_sessions" -> processed.maintenance_sessions
-                "maintenance_values" -> processed.maintenance_values
-                "component_templates" -> processed.component_templates
-                "component_template_fields" -> processed.component_template_fields
-                else -> 0
-            }
-            
-            Log.d(TAG, "Обработка $entityType: отправлено=${ids.size}, обработано сервером=$processedCount, ошибок=${errorIds.size}")
-            
-            // Помечаем как синхронизированные только те записи, которые сервер обработал и которые не имеют ошибок
-            // Берем первые processedCount записей без ошибок
-            val successIds = (ids - errorIds.toSet()).take(processedCount)
-            
-            if (successIds.isNotEmpty()) {
-                when (entityType) {
-                    "clients" -> database.clientDao().markClientsAsSynced(successIds)
-                    "sites" -> database.hierarchyDao().markSitesAsSynced(successIds)
-                    "installations" -> database.hierarchyDao().markInstallationsAsSynced(successIds)
-                    "components" -> database.hierarchyDao().markComponentsAsSynced(successIds)
-                    "maintenance_sessions" -> database.sessionsDao().markSessionsAsSynced(successIds)
-                    "maintenance_values" -> database.sessionsDao().markValuesAsSynced(successIds)
-                    "component_templates" -> {
-                        database.componentTemplatesDao().markComponentTemplatesAsSynced(successIds)
-                        Log.d(TAG, "Помечено как синхронизировано шаблонов компонентов: ${successIds.size}, IDs=${successIds.take(5)}")
-                    }
-                    "component_template_fields" -> {
-                        database.componentTemplateFieldsDao().markComponentTemplateFieldsAsSynced(successIds)
-                        Log.d(TAG, "Помечено как синхронизировано полей шаблонов компонентов: ${successIds.size}, IDs=${successIds.take(5)}")
-                    }
-                }
-                if (entityType != "component_templates" && entityType != "component_template_fields") {
-                    Log.d(TAG, "Помечено как синхронизировано: $entityType = ${successIds.size}")
-                }
-            } else if (ids.isNotEmpty() && processedCount == 0 && errorIds.isEmpty()) {
-                Log.w(TAG, "ВНИМАНИЕ: $entityType отправлено ${ids.size} записей, но сервер обработал 0 (processed.$entityType=0). " +
-                        "Записи НЕ помечены как синхронизированные.")
-            }
-            
-            // Помечаем записи с ошибками как конфликтные
-            if (errorIds.isNotEmpty()) {
-                when (entityType) {
-                    "clients" -> database.clientDao().markClientsAsConflict(errorIds)
-                    "sites" -> database.hierarchyDao().markSitesAsConflict(errorIds)
-                    "installations" -> database.hierarchyDao().markInstallationsAsConflict(errorIds)
-                    "components" -> database.hierarchyDao().markComponentsAsConflict(errorIds)
-                    "maintenance_sessions" -> database.sessionsDao().markSessionsAsConflict(errorIds)
-                    "maintenance_values" -> database.sessionsDao().markValuesAsConflict(errorIds)
-                    "component_templates" -> {
-                        database.componentTemplatesDao().markComponentTemplatesAsConflict(errorIds)
-                        Log.w(TAG, "Помечено как конфликт шаблонов компонентов: ${errorIds.size}, IDs=${errorIds.take(5)}")
-                    }
-                    "component_template_fields" -> {
-                        database.componentTemplateFieldsDao().markComponentTemplateFieldsAsConflict(errorIds)
-                        Log.w(TAG, "Помечено как конфликт полей шаблонов компонентов: ${errorIds.size}, IDs=${errorIds.take(5)}")
-                    }
-                }
-                if (entityType != "component_templates" && entityType != "component_template_fields") {
-                    Log.w(TAG, "Помечено как конфликт: $entityType = ${errorIds.size}")
-                }
-            }
+        // Maintenance values
+        val valueIds = request.maintenance_values.mapNotNull { it.id }
+        val valueErrorIds = errorIdsByType["maintenance_values"] ?: emptySet()
+        val valueSuccessIds = valueIds.filter { it !in valueErrorIds }
+        if (valueSuccessIds.isNotEmpty()) {
+            database.sessionsDao().markValuesAsSynced(valueSuccessIds)
+        }
+        if (valueErrorIds.isNotEmpty()) {
+            database.sessionsDao().markValuesAsConflict(valueErrorIds.toList())
+        }
+        
+        // Component templates
+        val templateIds = request.component_templates.map { it.id }
+        val templateErrorIds = errorIdsByType["component_templates"] ?: emptySet()
+        val templateSuccessIds = templateIds.filter { it !in templateErrorIds }
+        if (templateSuccessIds.isNotEmpty()) {
+            database.componentTemplatesDao().markComponentTemplatesAsSynced(templateSuccessIds)
+            Log.d(TAG, "Помечено как синхронизировано шаблонов компонентов: ${templateSuccessIds.size}")
+        }
+        if (templateErrorIds.isNotEmpty()) {
+            database.componentTemplatesDao().markComponentTemplatesAsConflict(templateErrorIds.toList())
+            Log.w(TAG, "Помечено как конфликт шаблонов компонентов: ${templateErrorIds.size}")
+        }
+        
+        // Component template fields
+        val fieldIds = request.component_template_fields.map { it.id }
+        val fieldErrorIds = errorIdsByType["component_template_fields"] ?: emptySet()
+        val fieldSuccessIds = fieldIds.filter { it !in fieldErrorIds }
+        if (fieldSuccessIds.isNotEmpty()) {
+            database.componentTemplateFieldsDao().markComponentTemplateFieldsAsSynced(fieldSuccessIds)
+            Log.d(TAG, "Помечено как синхронизировано полей шаблонов компонентов: ${fieldSuccessIds.size}")
+        }
+        if (fieldErrorIds.isNotEmpty()) {
+            database.componentTemplateFieldsDao().markComponentTemplateFieldsAsConflict(fieldErrorIds.toList())
+            Log.w(TAG, "Помечено как конфликт полей шаблонов компонентов: ${fieldErrorIds.size}")
         }
         
         // Обрабатываем удаления: помечаем как синхронизированные после успешного push
+        val deletedRecords = database.deletedRecordsDao().getDirtyDeletedRecordsNow()
+        val deletedRecordIds = deletedRecords.map { it.id }
         if (deletedRecordIds.isNotEmpty()) {
             database.deletedRecordsDao().markAsSynced(deletedRecordIds)
-            Log.d(TAG, "Помечено как синхронизировано удалений: ${deletedRecordIds.size}")
-            
-            // Удаляем синхронизированные записи об удалениях
             database.deletedRecordsDao().deleteAllSynced()
-            Log.d(TAG, "Удалены синхронизированные записи об удалениях")
+            Log.d(TAG, "Помечено как синхронизировано удалений: ${deletedRecordIds.size}")
         }
         
-        if (response.errors.isNotEmpty()) {
-            Log.w(TAG, "Ошибки при синхронизации: ${response.errors.size}")
-            response.errors.forEach { error ->
+        if (errors.isNotEmpty()) {
+            Log.w(TAG, "Ошибки при синхронизации: ${errors.size}")
+            errors.forEach { error ->
                 Log.w(TAG, "  ${error.entityType}/${error.entityId}: ${error.message}")
             }
         }
@@ -663,15 +666,25 @@ class SyncEngine(private val context: Context) {
             var deletedCount = 0
             var skippedCount = 0
             response.deleted.forEach { deleted ->
+                val entityName = deleted.getEntityName()
+                val recordId = deleted.recordId
+                
+                // Проверяем, что recordId не пустой
+                if (recordId.isNullOrBlank()) {
+                    Log.w(TAG, "Пропускаем удаление $entityName: пустой id")
+                    skippedCount++
+                    return@forEach
+                }
+                
                 // Проверяем, не присутствует ли запись в основных списках
                 // Если присутствует - это не удаление, а архивирование (сервер отправляет неправильно)
-                if (existingIds.contains(deleted.recordId)) {
-                    Log.w(TAG, "Пропущено удаление ${deleted.getEntityName()}/${deleted.recordId}: запись присутствует в основном списке (вероятно, архивирована, а не удалена). Сервер не должен отправлять архивные записи в секции deleted.")
+                if (existingIds.contains(recordId)) {
+                    Log.w(TAG, "Пропущено удаление $entityName/$recordId: запись присутствует в основном списке (вероятно, архивирована, а не удалена). Сервер не должен отправлять архивные записи в секции deleted.")
                     skippedCount++
                 } else {
                     // Запись действительно удалена на сервере - удаляем локально
-                    Log.d(TAG, "Обработка удаления ${deleted.getEntityName()}/${deleted.recordId}: запись отсутствует в основном списке, удаляем локально")
-                    handleDeletedRecord(deleted)
+                    Log.d(TAG, "Обработка удаления $entityName/$recordId: запись отсутствует в основном списке, удаляем локально")
+                    handleDeletedRecord(entityName, recordId)
                     deletedCount++
                 }
             }
@@ -969,57 +982,63 @@ class SyncEngine(private val context: Context) {
         }
     }
     
-    private suspend fun handleDeletedRecord(deleted: DeletedRecordDto) {
-        val entityName = deleted.getEntityName()
-        if (entityName == null) {
-            Log.w(TAG, "Не удалось определить тип сущности для удаления: recordId=${deleted.recordId}")
+    private suspend fun handleDeletedRecord(entity: String?, recordId: String?) {
+        // Защита от null/пустого id
+        if (recordId.isNullOrBlank()) {
+            Log.w(TAG, "Пропускаем удаление $entity: пустой id")
             return
         }
         
-        when (entityName) {
+        // Защита от null entity
+        if (entity == null) {
+            Log.w(TAG, "Пропускаем удаление: не удалось определить тип сущности для recordId=$recordId")
+            return
+        }
+        
+        when (entity) {
             "clients" -> {
-                database.clientDao().deleteClient(deleted.recordId)
-                Log.d(TAG, "Удалён клиент: ${deleted.recordId}")
+                database.clientDao().deleteClient(recordId)
+                Log.d(TAG, "Удалён клиент: $recordId")
             }
             "sites" -> {
-                database.hierarchyDao().deleteSite(deleted.recordId)
-                Log.d(TAG, "Удалён объект: ${deleted.recordId}")
+                database.hierarchyDao().deleteSite(recordId)
+                Log.d(TAG, "Удалён объект: $recordId")
             }
             "installations" -> {
-                database.hierarchyDao().deleteInstallation(deleted.recordId)
-                Log.d(TAG, "Удалена установка: ${deleted.recordId}")
+                database.hierarchyDao().deleteInstallation(recordId)
+                Log.d(TAG, "Удалена установка: $recordId")
             }
             "components" -> {
-                database.hierarchyDao().deleteComponent(deleted.recordId)
-                Log.d(TAG, "Удалён компонент: ${deleted.recordId}")
+                database.hierarchyDao().deleteComponent(recordId)
+                Log.d(TAG, "Удалён компонент: $recordId")
             }
             "maintenance_sessions" -> {
-                database.sessionsDao().deleteSession(deleted.recordId)
-                Log.d(TAG, "Удалена сессия ТО: ${deleted.recordId}")
+                database.sessionsDao().deleteSession(recordId)
+                Log.d(TAG, "Удалена сессия ТО: $recordId")
             }
             "maintenance_values" -> {
-                database.sessionsDao().deleteValue(deleted.recordId)
-                Log.d(TAG, "Удалено значение ТО: ${deleted.recordId}")
+                database.sessionsDao().deleteValue(recordId)
+                Log.d(TAG, "Удалено значение ТО: $recordId")
             }
             "component_template_fields" -> {
-                val field = database.componentTemplateFieldsDao().getFieldById(deleted.recordId)
+                val field = database.componentTemplateFieldsDao().getFieldById(recordId)
                 if (field != null) {
-                    database.componentTemplateFieldsDao().deleteField(deleted.recordId)
-                    Log.d(TAG, "Удалено поле шаблона компонента: id=${deleted.recordId}, templateId=${field.templateId}, label=${field.label}")
+                    database.componentTemplateFieldsDao().deleteField(recordId)
+                    Log.d(TAG, "Удалено поле шаблона компонента: id=$recordId, templateId=${field.templateId}, label=${field.label}")
                 } else {
-                    Log.w(TAG, "Попытка удалить несуществующее поле шаблона: id=${deleted.recordId}")
+                    Log.w(TAG, "Попытка удалить несуществующее поле шаблона: id=$recordId")
                 }
             }
             "component_templates" -> {
-                val template = database.componentTemplatesDao().getById(deleted.recordId)
+                val template = database.componentTemplatesDao().getById(recordId)
                 if (template != null) {
                     database.componentTemplatesDao().delete(template)
-                    Log.d(TAG, "Удалён шаблон компонента: id=${deleted.recordId}, name=${template.name}")
+                    Log.d(TAG, "Удалён шаблон компонента: id=$recordId, name=${template.name}")
                 } else {
-                    Log.w(TAG, "Попытка удалить несуществующий шаблон компонента: id=${deleted.recordId}")
+                    Log.w(TAG, "Попытка удалить несуществующий шаблон компонента: id=$recordId")
                 }
             }
-            else -> Log.w(TAG, "Неизвестная сущность для удаления: ${deleted.entity}")
+            else -> Log.w(TAG, "Неизвестная сущность для удаления: $entity")
         }
     }
     
@@ -1237,21 +1256,12 @@ class SyncEngine(private val context: Context) {
     )
     
     private fun calculatePushStats(response: SyncPushResponse): SyncPushStats {
-        val processed = response.processed
-        if (processed == null) {
-            return SyncPushStats(0, 0, 0)
-        }
-        
-        // Упрощенная логика: считаем, что все processed - это inserted+updated
-        val total = processed.clients + processed.sites + processed.installations +
-            processed.components + processed.maintenance_sessions + processed.maintenance_values +
-            processed.component_templates + processed.component_template_fields
-        
+        // Упрощённая статистика: считаем только ошибки как пропущенные
+        // inserted и updated считаем как 0, так как мы не парсим result
         val skipped = response.errors.size
-        
         return SyncPushStats(
-            inserted = total - skipped,
-            updated = 0, // TODO: различать inserted и updated если сервер возвращает отдельно
+            inserted = 0,
+            updated = 0,
             skipped = skipped
         )
     }

@@ -1062,7 +1062,7 @@ private fun ClientRowWithEdit(
         Image(
             painter = painterResource(id = iconRes),
             contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент",
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(48.dp),
             contentScale = ContentScale.Fit
         )
         Spacer(Modifier.width(12.dp))

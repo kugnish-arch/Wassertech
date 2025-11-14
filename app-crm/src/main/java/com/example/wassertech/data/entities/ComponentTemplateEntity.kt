@@ -31,5 +31,6 @@ data class ComponentTemplateEntity(
     val dirtyFlag: Boolean = false,
     val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
     // Другие поля
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    val isHeadComponent: Boolean = false // Заглавный компонент (отображается в отчете иначе)
 )
