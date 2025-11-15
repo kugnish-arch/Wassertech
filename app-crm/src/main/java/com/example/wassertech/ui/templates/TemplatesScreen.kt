@@ -1,29 +1,22 @@
 package ru.wassertech.ui.templates
 
 import android.util.Log
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -40,10 +33,15 @@ import java.util.UUID
 import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
 import ru.wassertech.ui.common.CommonAddDialog
+import ru.wassertech.core.ui.components.AppEmptyState
+import ru.wassertech.core.ui.components.EntityRowWithMenu
+import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
+import ru.wassertech.core.ui.reorderable.ReorderableState
 
 
 private const val TAG = "TemplatesScreen"
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TemplatesScreen(
     isEditing: Boolean = false,
@@ -94,6 +92,14 @@ fun TemplatesScreen(
             }
         }
     }
+    
+    // Сохранение порядка при изменении localOrder в режиме редактирования
+    fun onReorderTemplates(fromIndex: Int, toIndex: Int) {
+        val mutable = localOrder.toMutableList()
+        val item = mutable.removeAt(fromIndex)
+        mutable.add(toIndex, item)
+        localOrder = mutable
+    }
 
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<ComponentTemplateEntity?>(null) }
@@ -121,6 +127,11 @@ fun TemplatesScreen(
             base
         }
     }
+    
+    // Словарь для быстрого доступа по id
+    val templatesById = remember(visibleTemplates) {
+        visibleTemplates.associateBy { it.id }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
@@ -141,60 +152,107 @@ fun TemplatesScreen(
     ) { padding ->
         val layoutDir = LocalLayoutDirection.current
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 8.dp, // стандартный отступ от заголовка до контента
-                bottom = padding.calculateBottomPadding() + 12.dp
-            )
-        ) {
-            items(visibleTemplates, key = { it.id }) { t ->
-                // Используем индекс из visibleTemplates, если шаблон не найден в localOrder
-                val orderIndex = localOrder.indexOf(t.id)
-                val index = if (orderIndex >= 0) orderIndex else visibleTemplates.indexOf(t)
-                TemplateRowWithDrag(
-                    template = t,
-                    index = index,
-                    isEditing = isEditing,
-                    onMoveUp = {
-                        val i = localOrder.indexOf(t.id)
-                        if (i > 0) {
-                            val m = localOrder.toMutableList()
-                            m[i - 1] = m[i].also { m[i] = m[i - 1] }
-                            localOrder = m
-                        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (visibleTemplates.isEmpty() && !isEditing) {
+                AppEmptyState(
+                    icon = Icons.Filled.Lightbulb,
+                    title = "Начните с шаблонов",
+                    description = "Создайте шаблон компонента, чтобы определить его поля и характеристики. После этого вы сможете использовать этот шаблон при создании компонентов в установках."
+                )
+            } else if (isEditing && localOrder.isNotEmpty()) {
+                // В режиме редактирования используем ReorderableLazyColumn
+                ReorderableLazyColumn(
+                    items = localOrder,
+                    onMove = { fromIndex, toIndex ->
+                        val mutable = localOrder.toMutableList()
+                        val item = mutable.removeAt(fromIndex)
+                        mutable.add(toIndex, item)
+                        localOrder = mutable
                     },
-                    onMoveDown = {
-                        val i = localOrder.indexOf(t.id)
-                        if (i != -1 && i < localOrder.lastIndex) {
-                            val m = localOrder.toMutableList()
-                            m[i + 1] = m[i].also { m[i] = m[i + 1] }
-                            localOrder = m
-                        }
-                    },
-                    onArchive = {
-                        scope.launch {
-                            Log.d(TAG, "Архивирование шаблона: id=${t.id}, name=${t.name}")
-                            dao.setArchived(t.id, true)
-                        }
-                    },
-                    onRestore = {
-                        scope.launch {
-                            Log.d(TAG, "Разархивирование шаблона: id=${t.id}, name=${t.name}")
-                            dao.setArchived(t.id, false)
-                        }
-                    },
-                    onDelete = {
-                        deleteDialogState = t
-                    },
-                    onClick = {
-                        if (!isEditing) {
-                            onOpenTemplate(t.id)
+                    modifier = Modifier.fillMaxSize(),
+                    key = { it },
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 8.dp,
+                        bottom = padding.calculateBottomPadding() + 12.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) { templateId, isDragging, reorderableState ->
+                    val template = templatesById[templateId] ?: return@ReorderableLazyColumn
+                    
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        TemplateRowWrapper(
+                            template = template,
+                            isEditing = isEditing,
+                            onArchive = {
+                                scope.launch {
+                                    Log.d(TAG, "Архивирование шаблона: id=${template.id}, name=${template.name}")
+                                    dao.setArchived(template.id, true)
+                                }
+                            },
+                            onRestore = {
+                                scope.launch {
+                                    Log.d(TAG, "Разархивирование шаблона: id=${template.id}, name=${template.name}")
+                                    dao.setArchived(template.id, false)
+                                }
+                            },
+                            onDelete = {
+                                deleteDialogState = template
+                            },
+                            onClick = {
+                                if (!isEditing) {
+                                    onOpenTemplate(template.id)
+                                }
+                            },
+                            reorderableState = reorderableState,
+                            modifier = Modifier.background(Color.White)
+                        )
+                    }
+                }
+            } else {
+                // В обычном режиме используем обычный LazyColumn
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 8.dp,
+                        bottom = padding.calculateBottomPadding() + 12.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(visibleTemplates, key = { it.id }) { template ->
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            TemplateRowWrapper(
+                                template = template,
+                                isEditing = isEditing,
+                                onArchive = {
+                                    scope.launch {
+                                        Log.d(TAG, "Архивирование шаблона: id=${template.id}, name=${template.name}")
+                                        dao.setArchived(template.id, true)
+                                    }
+                                },
+                                onRestore = {
+                                    scope.launch {
+                                        Log.d(TAG, "Разархивирование шаблона: id=${template.id}, name=${template.name}")
+                                        dao.setArchived(template.id, false)
+                                    }
+                                },
+                                onDelete = {
+                                    deleteDialogState = template
+                                },
+                                onClick = {
+                                    if (!isEditing) {
+                                        onOpenTemplate(template.id)
+                                    }
+                                },
+                                reorderableState = null,
+                                modifier = Modifier.background(Color.White)
+                            )
                         }
                     }
-                )
+                }
             }
         }
     }
@@ -348,142 +406,39 @@ fun TemplatesScreen(
     }
 }
 
-// Компонент для строки шаблона с drag-and-drop
+// Wrapper для строки шаблона, использующий EntityRowWithMenu
 @Composable
-private fun TemplateRowWithDrag(
+private fun TemplateRowWrapper(
     template: ComponentTemplateEntity,
-    index: Int,
     isEditing: Boolean,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
     onDelete: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    reorderableState: ReorderableState?,
+    modifier: Modifier = Modifier
 ) {
-    var lastMoveThreshold by remember { mutableStateOf(0f) }
-    var dragOffset by remember { mutableStateOf(0.dp) }
-    var isDragging by remember { mutableStateOf(false) }
     val isArchived = template.isArchived == true
-    val density = LocalDensity.current
 
     ElevatedCard(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 4.dp)
-            .then(
-                if (isEditing && !isArchived) {
-                    Modifier
-                        .offset(y = dragOffset)
-                        .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемый шаблон поверх всех
-                        .pointerInput(template.id, index, density) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    lastMoveThreshold = 0f
-                                    dragOffset = 0.dp
-                                    isDragging = true
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
-                                    dragOffset += with(density) { dragAmount.y.toDp() }
-                                    
-                                    // Еще больше уменьшаем порог для физических устройств
-                                    val threshold = 10f
-                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                        onMoveUp()
-                                        lastMoveThreshold = -threshold
-                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                        onMoveDown()
-                                        lastMoveThreshold = threshold
-                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                    }
-                                    if (dragAmount.y in -threshold..threshold) {
-                                        lastMoveThreshold = dragAmount.y
-                                    }
-                                },
-                                onDragEnd = {
-                                    lastMoveThreshold = 0f
-                                    dragOffset = 0.dp
-                                    isDragging = false
-                                }
-                            )
-                        }
-                } else {
-                    Modifier
-                }
-            ),
+            .padding(bottom = 4.dp),
         colors = CardDefaults.elevatedCardColors()
     ) {
-        ListItem(
-            leadingContent = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Ручка для перетаскивания (показываем вместе с иконкой в режиме редактирования)
-                    if (isEditing && !isArchived) {
-                        Icon(
-                            imageVector = Icons.Filled.Menu,
-                            contentDescription = "Перетащить",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    // Иконка шаблона (всегда показываем)
-                    Image(
-                        painter = painterResource(id = R.drawable.ui_template_component),
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            },
-            headlineContent = {
-                Text(
-                    template.name,
-                    color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+        EntityRowWithMenu(
+            title = template.name,
+            subtitle = template.category?.takeIf { it.isNotBlank() },
+            leadingIcon = {
+                Image(
+                    painter = painterResource(id = R.drawable.ui_template_component),
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    contentScale = ContentScale.Fit
                 )
             },
-            trailingContent = {
-                if (isEditing) {
-                    Row {
-                        // Архив / Разархивировать
-                        if (isArchived) {
-                            IconButton(
-                                onClick = onRestore
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Unarchive,
-                                    contentDescription = "Восстановить",
-                                    tint = Color(0xFF2E7D32) // зелёный
-                                )
-                            }
-                            // Кнопка удаления для заархивированных
-                            IconButton(
-                                onClick = onDelete
-                            ) {
-                                Icon(
-                                    imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
-                                    contentDescription = "Удалить",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        } else {
-                            IconButton(
-                                onClick = onArchive
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Archive,
-                                    contentDescription = "Архивировать",
-                                    tint = MaterialTheme.colorScheme.error // красный
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // Иконка шеврона справа в обычном режиме
+            trailingIcon = if (!isEditing) {
+                {
                     Icon(
                         imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
                         contentDescription = "Открыть",
@@ -491,8 +446,16 @@ private fun TemplateRowWithDrag(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-            },
-            modifier = Modifier.clickable(enabled = !isEditing) { onClick() }
+            } else null,
+            isEditMode = isEditing,
+            isArchived = isArchived,
+            onClick = onClick,
+            onRestore = onRestore,
+            onArchive = onArchive,
+            onDelete = onDelete,
+            modifier = Modifier.fillMaxWidth(),
+            reorderableState = reorderableState,
+            showDragHandle = isEditing && !isArchived
         )
     }
 }

@@ -6,8 +6,16 @@ package ru.wassertech.navigation
 object AppRoutes {
     const val LOGIN = "login"
     const val HOME = "home"
+    const val SITES = "sites/{clientId}"
+    const val SITE_DETAIL = "site/{siteId}"
+    const val INSTALLATION = "installation/{installationId}"
     const val SESSION_DETAIL = "session_detail/{sessionId}"
+    const val MAINTENANCE_HISTORY = "maintenance_history/{installationId}"
     
+    fun sites(clientId: String) = "sites/$clientId"
+    fun siteDetail(siteId: String) = "site/$siteId"
+    fun installation(installationId: String) = "installation/$installationId"
     fun sessionDetail(sessionId: String) = "session_detail/$sessionId"
+    fun maintenanceHistory(installationId: String) = "maintenance_history/$installationId"
 }
 

@@ -16,5 +16,16 @@ data class ComponentTemplateEntity(
     val sortOrder: Int = 0,
     val defaultParamsJson: String? = null,  // JSON of default key-value params for instances
     val createdAtEpoch: Long = System.currentTimeMillis(),
-    val updatedAtEpoch: Long = System.currentTimeMillis()
-)
+    val updatedAtEpoch: Long = System.currentTimeMillis(),
+    // TODO: Добавить поля ownerClientId и origin после миграции БД
+    val ownerClientId: String? = null, // FK → clients.id
+    val origin: String? = null // "CRM" или "CLIENT"
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     * Переименовано из getOrigin() чтобы избежать конфликта с Room (Room генерирует getOrigin() для поля origin).
+     */
+    fun getOriginType(): ru.wassertech.client.auth.OriginType {
+        return ru.wassertech.client.auth.OriginType.fromString(origin)
+    }
+}

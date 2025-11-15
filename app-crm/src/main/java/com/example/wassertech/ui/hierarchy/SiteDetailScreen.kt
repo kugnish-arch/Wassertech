@@ -2,13 +2,12 @@
 
 package ru.wassertech.ui.hierarchy
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
@@ -24,14 +23,14 @@ import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
 import ru.wassertech.ui.common.CommonAddDialog
 import androidx.compose.ui.graphics.Color
-import ru.wassertech.ui.icons.AppIcons
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import ru.wassertech.core.ui.R
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import ru.wassertech.core.ui.components.EmptyGroupPlaceholder
+import ru.wassertech.core.ui.components.EntityRowWithMenu
+import ru.wassertech.core.ui.theme.ClientsRowDivider
 
 @Composable
 fun SiteDetailScreen(
@@ -143,61 +142,37 @@ fun SiteDetailScreen(
                 )
             }
 
-            Text(
-                text = "Установки",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-            )
-
+            // Содержимое секции установок
             if (installations.isEmpty()) {
-                Text(
+                EmptyGroupPlaceholder(
                     text = "У этого объекта пока нет установок",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    indent = 16.dp
                 )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     items(installations, key = { it.id }) { inst ->
-                        ElevatedCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenInstallation(inst.id) },
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
-                        ) {
-                            Row(
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            InstallationRowWithEdit(
+                                installation = inst,
+                                isEditMode = isEditing,
+                                onClick = { onOpenInstallation(inst.id) },
+                                onArchive = { vm.archiveInstallation(inst.id) },
+                                onRestore = { vm.restoreInstallation(inst.id) },
+                                onDelete = { vm.deleteInstallation(inst.id) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Иконка установки
-                                Image(
-                                    painter = painterResource(id = R.drawable.equipment_filter_triple),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(Modifier.width(12.dp))
-                                Text(
-                                    inst.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                // Стрелочка справа
-                                Icon(
-                                    imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
-                                    contentDescription = "Перейти к установке",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(20.dp)
+                                    .background(Color.White)
+                            )
+                            // Разделительная линия между установками (кроме последней)
+                            val index = installations.indexOf(inst)
+                            if (index >= 0 && index < installations.size - 1) {
+                                HorizontalDivider(
+                                    color = ClientsRowDivider,
+                                    thickness = 1.dp
                                 )
                             }
                         }
@@ -252,4 +227,55 @@ fun SiteDetailScreen(
             confirmEnabled = newInstName.text.trim().isNotEmpty()
         )
     }
+}
+
+/* ---------- Вспомогательные UI-компоненты ---------- */
+
+@Composable
+private fun InstallationRowWithEdit(
+    installation: InstallationEntity,
+    isEditMode: Boolean,
+    onClick: () -> Unit,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Определяем иконку установки
+    val iconRes = R.drawable.equipment_filter_triple
+
+    EntityRowWithMenu(
+        title = installation.name,
+        subtitle = null,
+        leadingIcon = {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = "Установка",
+                modifier = Modifier.size(48.dp),
+                contentScale = ContentScale.Fit
+            )
+        },
+        trailingIcon = if (!isEditMode) {
+            {
+                Icon(
+                    imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                    contentDescription = "Открыть",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        } else null,
+        isEditMode = isEditMode,
+        isArchived = installation.isArchived == true,
+        onClick = onClick,
+        onRestore = onRestore,
+        onArchive = onArchive,
+        onDelete = onDelete,
+        onEdit = null, // Редактирование установки пока не поддерживается на этом экране
+        onMoveToGroup = null,
+        availableGroups = emptyList(),
+        modifier = modifier,
+        reorderableState = null,
+        showDragHandle = false
+    )
 }

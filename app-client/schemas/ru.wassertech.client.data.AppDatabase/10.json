@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 10,
-    "identityHash": "e20e258889cee8c0b57b3e97c437c9a3",
+    "identityHash": "9c9090f5502aa049bd9b664ed3aba5b5",
     "entities": [
       {
         "tableName": "clients",
@@ -357,7 +357,7 @@
       },
       {
         "tableName": "sites",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `clientId` TEXT NOT NULL, `name` TEXT NOT NULL, `address` TEXT, `orderIndex` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `clientId` TEXT NOT NULL, `name` TEXT NOT NULL, `address` TEXT, `orderIndex` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `ownerClientId` TEXT, `origin` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -400,6 +400,18 @@
             "columnName": "archivedAtEpoch",
             "affinity": "INTEGER",
             "notNull": false
+          },
+          {
+            "fieldPath": "ownerClientId",
+            "columnName": "ownerClientId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -423,7 +435,7 @@
       },
       {
         "tableName": "installations",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `siteId` TEXT NOT NULL, `name` TEXT NOT NULL, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `siteId` TEXT NOT NULL, `name` TEXT NOT NULL, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `ownerClientId` TEXT, `origin` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -490,6 +502,18 @@
             "columnName": "orderIndex",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "ownerClientId",
+            "columnName": "ownerClientId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -531,7 +555,7 @@
       },
       {
         "tableName": "components",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `installationId` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `orderIndex` INTEGER NOT NULL, `templateId` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `installationId` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `orderIndex` INTEGER NOT NULL, `templateId` TEXT, `ownerClientId` TEXT, `origin` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -568,6 +592,18 @@
             "columnName": "templateId",
             "affinity": "TEXT",
             "notNull": false
+          },
+          {
+            "fieldPath": "ownerClientId",
+            "columnName": "ownerClientId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -581,7 +617,7 @@
       },
       {
         "tableName": "component_templates",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT, `isArchived` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `defaultParamsJson` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT, `isArchived` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `defaultParamsJson` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `ownerClientId` TEXT, `origin` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -630,6 +666,18 @@
             "columnName": "updatedAtEpoch",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "ownerClientId",
+            "columnName": "ownerClientId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -1122,7 +1170,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e20e258889cee8c0b57b3e97c437c9a3')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9c9090f5502aa049bd9b664ed3aba5b5')"
     ]
   }
 }

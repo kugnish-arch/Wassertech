@@ -8,7 +8,8 @@ import org.json.JSONObject
 enum class UserRole(val displayName: String) {
     ADMIN("Администратор"),
     USER("Пользователь"),
-    VIEWER("Наблюдатель");
+    VIEWER("Наблюдатель"),
+    CLIENT("Клиент");
     
     companion object {
         fun fromString(value: String?): UserRole {

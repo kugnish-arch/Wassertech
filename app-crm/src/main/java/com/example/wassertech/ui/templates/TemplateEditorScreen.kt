@@ -2,16 +2,14 @@
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Close
@@ -19,32 +17,36 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.util.Translit
 import ru.wassertech.viewmodel.TemplatesViewModel
 import ru.wassertech.sync.markUpdatedForSync
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.wassertech.core.ui.components.EmptyGroupPlaceholder
+import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
+import ru.wassertech.core.ui.reorderable.ReorderableState
+import ru.wassertech.core.ui.reorderable.detectReorder
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.text.style.TextOverflow
 import ru.wassertech.core.ui.theme.SegmentedButtonStyle
 
 private const val TAG = "TemplateEditorScreen"
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TemplateEditorScreen(
     templateId: String,
@@ -237,286 +239,44 @@ fun TemplateEditorScreen(
                 
             }
 
-            items(localFieldOrder, key = { it }) { fieldId ->
-                val f = fields.find { it.id == fieldId } ?: return@items
-                val index = localFieldOrder.indexOf(fieldId)
-                var lastMoveThreshold by remember { mutableStateOf(0f) }
-                var dragOffset by remember { mutableStateOf(0.dp) }
-                var isDragging by remember { mutableStateOf(false) }
-                val fieldDensity = LocalDensity.current
-
-                Box {
-                    ElevatedCard(
+            // Список полей с использованием ReorderableLazyColumn
+            item {
+                if (localFieldOrder.isEmpty()) {
+                    EmptyGroupPlaceholder(text = "Поля отсутствуют", indent = 16.dp)
+                } else {
+                    // Используем Column с ограниченной высотой для встраивания ReorderableLazyColumn
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .offset(y = dragOffset)
-                            .zIndex(if (isDragging) 1f else 0f), // Перетаскиваемое поле поверх всех
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек полей
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                            .heightIn(max = 800.dp) // Ограничиваем максимальную высоту
                     ) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Заголовок карточки: ручка для перетаскивания, номер, переключатель "Характеристика" справа
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Левая часть: ручка и номер
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Menu,
-                                        contentDescription = "Перетащить",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .pointerInput(f.id, index, fieldDensity) {
-                                                detectDragGestures(
-                                                    onDragStart = {
-                                                        lastMoveThreshold = 0f
-                                                        dragOffset = 0.dp
-                                                        isDragging = true
-                                                    },
-                                                    onDrag = { change, dragAmount ->
-                                                        change.consume()
-                                                        // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
-                                                        dragOffset += with(fieldDensity) { dragAmount.y.toDp() }
-                                                        
-                                                        if (dragAmount.y < -60 && lastMoveThreshold >= -60) {
-                                                            val pos =
-                                                                localFieldOrder.indexOf(fieldId)
-                                                            if (pos > 0) {
-                                                                val list =
-                                                                    localFieldOrder.toMutableList()
-                                                                val tmp = list[pos - 1]
-                                                                list[pos - 1] = list[pos]
-                                                                list[pos] = tmp
-                                                                localFieldOrder = list
-                                                            }
-                                                            lastMoveThreshold = -60f
-                                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                                        } else if (dragAmount.y > 60 && lastMoveThreshold <= 60) {
-                                                            val pos =
-                                                                localFieldOrder.indexOf(fieldId)
-                                                            if (pos >= 0 && pos < localFieldOrder.lastIndex) {
-                                                                val list =
-                                                                    localFieldOrder.toMutableList()
-                                                                val tmp = list[pos + 1]
-                                                                list[pos + 1] = list[pos]
-                                                                list[pos] = tmp
-                                                                localFieldOrder = list
-                                                            }
-                                                            lastMoveThreshold = 60f
-                                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                                        }
-                                                        if (dragAmount.y in -60f..60f) {
-                                                            lastMoveThreshold = dragAmount.y
-                                                        }
-                                                    },
-                                                    onDragEnd = {
-                                                        lastMoveThreshold = 0f
-                                                        dragOffset = 0.dp
-                                                        isDragging = false
-                                                    }
-                                                )
-                                            }
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        "${index + 1}.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                        ReorderableLazyColumn(
+                            items = localFieldOrder,
+                            onMove = { fromIndex, toIndex ->
+                                val mutable = localFieldOrder.toMutableList()
+                                val item = mutable.removeAt(fromIndex)
+                                mutable.add(toIndex, item)
+                                localFieldOrder = mutable
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            key = { it },
+                            contentPadding = PaddingValues(0.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) { fieldId, isDragging, reorderableState ->
+                            val f = fields.find { it.id == fieldId } ?: return@ReorderableLazyColumn
+                            val index = localFieldOrder.indexOf(fieldId)
+                            
+                            FieldCard(
+                                field = f,
+                                index = index,
+                                vm = vm,
+                                reorderableState = reorderableState,
+                                onInfoClick = { rect ->
+                                    val position = Offset(rect.center.x, rect.top)
+                                    globalShowCharacteristicInfo = Pair(f.id, position)
                                 }
-
-                                // Правая часть: переключатель "Характеристика" с иконкой info
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Text(
-                                            "Характеристика",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                        var characteristicInfoIconBounds by remember(f.id) { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-                                        IconButton(
-                                            onClick = { 
-                                                characteristicInfoIconBounds?.let { rect ->
-                                                    // Преобразуем координаты из корня в окно
-                                                    val position = Offset(rect.center.x, rect.top)
-                                                    globalShowCharacteristicInfo = Pair(f.id, position)
-                                                }
-                                            },
-                                            modifier = Modifier.size(20.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Info,
-                                                contentDescription = "Информация",
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .onGloballyPositioned { coordinates ->
-                                                        // Сохраняем позицию иконки для использования при клике
-                                                        val position = coordinates.localToWindow(Offset.Zero)
-                                                        val size = coordinates.size
-                                                        val bounds = androidx.compose.ui.geometry.Rect(
-                                                            position.x,
-                                                            position.y,
-                                                            position.x + size.width,
-                                                            position.y + size.height
-                                                        )
-                                                        characteristicInfoIconBounds = bounds
-                                                        characteristicInfoIconRefs = characteristicInfoIconRefs + (f.id to bounds)
-                                                    },
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                    Switch(
-                                        checked = f.isCharacteristic, // true = характеристика, false = чек-лист ТО
-                                        onCheckedChange = { checked ->
-                                            vm.update(f.id) { it.copy(isCharacteristic = checked) }
-                                        }
-                                    )
-                                }
-                            }
-
-                            // 1) Имя (label). Key скрыт — генерируется автоматически.
-                            OutlinedTextField(
-                                value = f.label,
-                                onValueChange = { newLabel ->
-                                    val prevAuto = Translit.ruToEnKey(f.label)
-                                    val looksAuto = f.key.isBlank() ||
-                                            f.key == prevAuto ||
-                                            f.key.startsWith("field_") ||
-                                            (f.key.any { it.isDigit() } && f.key.length >= 12)
-                                    val newAuto = Translit.ruToEnKey(newLabel)
-                                    vm.update(f.id) {
-                                        it.copy(
-                                            label = newLabel,
-                                            key = if (looksAuto) newAuto else it.key
-                                        )
-                                    }
-                                },
-                                label = { Text("Имя") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
                             )
-
-                            // 2) Сегменты типа поля (уменьшенная ширина) и корзина справа
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
-                                    var selected by remember(
-                                        f.id,
-                                        f.type
-                                    ) { mutableStateOf(f.type) }
-                                    SegmentedButton(
-                                        selected = selected == FieldType.TEXT,
-                                        onClick = {
-                                            selected = FieldType.TEXT; vm.setType(
-                                            f.id,
-                                            FieldType.TEXT
-                                        )
-                                        },
-                                        shape = SegmentedButtonStyle.getShape(index = 0, count = 3),
-                                        label = {
-                                            Text(
-                                                "TXT",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Clip,
-                                                style = MaterialTheme.typography.labelMedium
-                                            )
-                                        }
-                                    )
-                                    SegmentedButton(
-                                        selected = selected == FieldType.CHECKBOX,
-                                        onClick = {
-                                            selected = FieldType.CHECKBOX; vm.setType(
-                                            f.id,
-                                            FieldType.CHECKBOX
-                                        )
-                                        },
-                                        shape = SegmentedButtonStyle.getShape(index = 1, count = 3),
-                                        label = {
-                                            Text(
-                                                "CHK",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Clip,
-                                                style = MaterialTheme.typography.labelMedium
-                                            )
-                                        }
-                                    )
-                                    SegmentedButton(
-                                        selected = selected == FieldType.NUMBER,
-                                        onClick = {
-                                            selected = FieldType.NUMBER; vm.setType(
-                                            f.id,
-                                            FieldType.NUMBER
-                                        )
-                                        },
-                                        shape = SegmentedButtonStyle.getShape(index = 2, count = 3),
-                                        label = {
-                                            Text(
-                                                "NUM",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Clip,
-                                                style = MaterialTheme.typography.labelMedium
-                                            )
-                                        }
-                                    )
-                                }
-                                // Корзина справа от сегментированных кнопок
-                                IconButton(onClick = { vm.remove(f.id) }) {
-                                    Icon(imageVector = ru.wassertech.core.ui.theme.DeleteIcon, contentDescription = "Удалить")
-                                }
-                            }
-
-                            // 4) Только для NUMBER — ед. изм. + Min/Max
-                            if (f.type == FieldType.NUMBER) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
-                                        value = f.unit.orEmpty(),
-                                        onValueChange = { new -> vm.update(f.id) { it.copy(unit = new) } },
-                                        label = { Text("Ед. изм.") },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true
-                                    )
-                                    OutlinedTextField(
-                                        value = f.min.orEmpty(),
-                                        onValueChange = { new -> vm.update(f.id) { it.copy(min = new) } },
-                                        label = { Text("Min") },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true
-                                    )
-                                    OutlinedTextField(
-                                        value = f.max.orEmpty(),
-                                        onValueChange = { new -> vm.update(f.id) { it.copy(max = new) } },
-                                        label = { Text("Max") },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true
-                                    )
-                                }
-                            } else {
-                                // Не NUMBER тип, ничего не показываем
-                            }
-
                         }
-
                     }
                 }
             }
@@ -722,6 +482,229 @@ private fun InfoTooltip(
             }
         } else {
             // anchorPosition == null или containerPosition == null, карточка не показывается
+        }
+    }
+}
+
+// Компонент карточки поля для редактирования
+@Composable
+private fun FieldCard(
+    field: TemplatesViewModel.UiField,
+    index: Int,
+    vm: TemplatesViewModel,
+    reorderableState: ReorderableState?,
+    onInfoClick: (androidx.compose.ui.geometry.Rect) -> Unit
+) {
+    var characteristicInfoIconBounds by remember(field.id) { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = Color(0xFFFFFFFF)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Заголовок карточки: ручка для перетаскивания, номер, переключатель "Характеристика" справа
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Левая часть: ручка и номер
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = "Перетащить",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .then(
+                                if (reorderableState != null) {
+                                    Modifier.detectReorder(reorderableState)
+                                } else {
+                                    Modifier
+                                }
+                            )
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "${index + 1}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Правая часть: переключатель "Характеристика" с иконкой info
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "Характеристика",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        IconButton(
+                            onClick = {
+                                characteristicInfoIconBounds?.let { rect ->
+                                    onInfoClick(rect)
+                                }
+                            },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "Информация",
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .onGloballyPositioned { coordinates ->
+                                        val position = coordinates.localToWindow(Offset.Zero)
+                                        val size = coordinates.size
+                                        val bounds = androidx.compose.ui.geometry.Rect(
+                                            position.x,
+                                            position.y,
+                                            position.x + size.width,
+                                            position.y + size.height
+                                        )
+                                        characteristicInfoIconBounds = bounds
+                                    },
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = field.isCharacteristic,
+                        onCheckedChange = { checked ->
+                            vm.update(field.id) { it.copy(isCharacteristic = checked) }
+                        }
+                    )
+                }
+            }
+
+            // Имя (label)
+            OutlinedTextField(
+                value = field.label,
+                onValueChange = { newLabel ->
+                    val prevAuto = Translit.ruToEnKey(field.label)
+                    val looksAuto = field.key.isBlank() ||
+                            field.key == prevAuto ||
+                            field.key.startsWith("field_") ||
+                            (field.key.any { it.isDigit() } && field.key.length >= 12)
+                    val newAuto = Translit.ruToEnKey(newLabel)
+                    vm.update(field.id) {
+                        it.copy(
+                            label = newLabel,
+                            key = if (looksAuto) newAuto else it.key
+                        )
+                    }
+                },
+                label = { Text("Имя") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            // Сегменты типа поля и корзина справа
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+                    var selected by remember(field.id, field.type) { mutableStateOf(field.type) }
+                    SegmentedButton(
+                        selected = selected == FieldType.TEXT,
+                        onClick = {
+                            selected = FieldType.TEXT
+                            vm.setType(field.id, FieldType.TEXT)
+                        },
+                        shape = SegmentedButtonStyle.getShape(index = 0, count = 3),
+                        label = {
+                            Text(
+                                "TXT",
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    )
+                    SegmentedButton(
+                        selected = selected == FieldType.CHECKBOX,
+                        onClick = {
+                            selected = FieldType.CHECKBOX
+                            vm.setType(field.id, FieldType.CHECKBOX)
+                        },
+                        shape = SegmentedButtonStyle.getShape(index = 1, count = 3),
+                        label = {
+                            Text(
+                                "CHK",
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    )
+                    SegmentedButton(
+                        selected = selected == FieldType.NUMBER,
+                        onClick = {
+                            selected = FieldType.NUMBER
+                            vm.setType(field.id, FieldType.NUMBER)
+                        },
+                        shape = SegmentedButtonStyle.getShape(index = 2, count = 3),
+                        label = {
+                            Text(
+                                "NUM",
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    )
+                }
+                IconButton(onClick = { vm.remove(field.id) }) {
+                    Icon(
+                        imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
+                        contentDescription = "Удалить"
+                    )
+                }
+            }
+
+            // Только для NUMBER — ед. изм. + Min/Max
+            if (field.type == FieldType.NUMBER) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = field.unit.orEmpty(),
+                        onValueChange = { new -> vm.update(field.id) { it.copy(unit = new) } },
+                        label = { Text("Ед. изм.") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = field.min.orEmpty(),
+                        onValueChange = { new -> vm.update(field.id) { it.copy(min = new) } },
+                        label = { Text("Min") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = field.max.orEmpty(),
+                        onValueChange = { new -> vm.update(field.id) { it.copy(max = new) } },
+                        label = { Text("Max") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                }
+            }
         }
     }
 }

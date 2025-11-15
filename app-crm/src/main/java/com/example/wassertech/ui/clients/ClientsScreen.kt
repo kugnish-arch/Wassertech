@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.Modifier
@@ -23,6 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.clickable
 import ru.wassertech.data.entities.ClientEntity
 import ru.wassertech.data.entities.ClientGroupEntity
 import ru.wassertech.core.ui.R
@@ -48,6 +55,11 @@ private data class DeleteDialogState(
     val isClient: Boolean,
     val id: String,
     val name: String
+)
+
+private data class ClientSearchMatch(
+    val client: ClientEntity,
+    val score: Int
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -115,12 +127,31 @@ fun ClientsScreen(
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<DeleteDialogState?>(null) }
 
+    // Состояние поиска
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+
     // Фильтруем клиентов: архивные показываются только в режиме редактирования
     val filteredClients = remember(clients, isEditMode, includeArchived) {
         if (isEditMode && includeArchived) {
             clients // Показываем всех клиентов в режиме редактирования с включенным includeArchived
         } else {
             clients.filter { it.isArchived != true } // В обычном режиме скрываем архивных
+        }
+    }
+
+    // Результаты поиска с fuzzy-поиском и сортировкой по релевантности
+    val searchResults = remember(filteredClients, searchQuery) {
+        if (searchQuery.isBlank()) {
+            emptyList<ClientEntity>()
+        } else {
+            val q = searchQuery.trim().lowercase()
+            val matches = filteredClients
+                .mapNotNull { client ->
+                    val score = computeClientSearchScore(client, q)
+                    if (score > 0) ClientSearchMatch(client, score) else null
+                }
+                .sortedByDescending { it.score }
+            matches.map { it.client }
         }
     }
 
@@ -313,7 +344,18 @@ fun ClientsScreen(
                         .fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
                 ) {
-                    item(key = "header_general") {
+                    // Поле поиска
+                    item(key = "search_bar") {
+                        ClientsSearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // ТЕКУЩАЯ ЛОГИКА: отображение групп и секций (только если поиск пуст)
+                    if (searchQuery.isBlank()) {
+                        item(key = "header_general") {
                         EntityGroupHeader(
                             title = "Общая",
                             count = localOrderGeneral.size,
@@ -640,6 +682,75 @@ fun ClientsScreen(
                             }
                         }
                     }
+                    }
+
+                    // РЕЖИМ ПОИСКА: единый плоский список результатов (только если поиск не пуст)
+                    if (searchQuery.isNotBlank()) {
+                        if (searchResults.isEmpty()) {
+                            item(key = "search_empty") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Клиенты не найдены",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else {
+                            items(
+                                items = searchResults,
+                                key = { it.id }
+                            ) { client ->
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    ClientRowWithEdit(
+                                        client = client,
+                                        groupId = client.clientGroupId,
+                                        groups = groups,
+                                        isEditMode = isEditMode,
+                                        searchQuery = searchQuery,
+                                        onClick = { onClientClick(client.id) },
+                                        onArchive = { onArchiveClient(client.id) },
+                                        onRestore = { onRestoreClient(client.id) },
+                                        onMoveUp = { /* не используется в режиме поиска */ },
+                                        onMoveDown = { /* не используется в режиме поиска */ },
+                                        onMoveToGroup = { targetGroupId ->
+                                            onAssignClientGroup(client.id, targetGroupId)
+                                        },
+                                        onEditName = {
+                                            editClientId = client.id
+                                            editClientName = client.name
+                                            editClientGroupId = client.clientGroupId
+                                        },
+                                        onDelete = {
+                                            deleteDialogState = DeleteDialogState(
+                                                isClient = true,
+                                                id = client.id,
+                                                name = client.name
+                                            )
+                                        },
+                                        isDragging = false,
+                                        reorderableState = null,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.White)
+                                    )
+                                    // Разделительная линия между клиентами (кроме последнего)
+                                    val index = searchResults.indexOf(client)
+                                    if (index >= 0 && index < searchResults.size - 1) {
+                                        HorizontalDivider(
+                                            color = ClientsRowDivider,
+                                            thickness = 1.dp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Диалоги и т.д. — код ниже оставлен без изменений (включая диалоги создания/редактирования/удаления)
@@ -893,7 +1004,250 @@ fun ClientsScreen(
     }
 }
 
+/* ---------- Вспомогательные функции для поиска ---------- */
+
+/**
+ * Вычисляет релевантность клиента для поискового запроса.
+ * Возвращает score > 0, если клиент подходит под запрос, иначе 0.
+ * Чем выше score, тем более релевантен клиент.
+ */
+private fun computeClientSearchScore(
+    client: ClientEntity,
+    query: String
+): Int {
+    if (query.isBlank()) return 0
+    
+    val name = client.name.orEmpty().lowercase()
+    val phone = client.phone.orEmpty().lowercase()
+    val email = client.email.orEmpty().lowercase()
+    val address = client.addressFull.orEmpty().lowercase()
+    
+    var score = 0
+    
+    // Поиск по имени (наиболее важное поле)
+    if (name.isNotEmpty()) {
+        when {
+            name == query -> score += 1000 // Точное совпадение
+            name.startsWith(query) -> score += 500 // Начинается с запроса
+            name.contains(query) -> {
+                score += 300 // Содержит запрос
+                // Бонус за близость к началу
+                val index = name.indexOf(query)
+                score += (100 - index.coerceAtMost(100))
+            }
+            else -> {
+                // Fuzzy-поиск: проверяем подстроки и похожесть
+                val fuzzyScore = calculateFuzzyScore(name, query)
+                if (fuzzyScore > 0) {
+                    score += fuzzyScore
+                }
+            }
+        }
+    }
+    
+    // Поиск по телефону
+    if (phone.isNotEmpty() && phone.contains(query)) {
+        score += 200
+        if (phone.startsWith(query)) score += 50
+    }
+    
+    // Поиск по email
+    if (email.isNotEmpty() && email.contains(query)) {
+        score += 150
+        if (email.startsWith(query)) score += 30
+    }
+    
+    // Поиск по адресу
+    if (address.isNotEmpty() && address.contains(query)) {
+        score += 100
+        if (address.startsWith(query)) score += 20
+    }
+    
+    return score
+}
+
+/**
+ * Вычисляет fuzzy-оценку для строки на основе подстрок и похожести.
+ * Использует простую эвристику для поиска похожих строк.
+ * Поддерживает поиск с опечатками и неполными совпадениями.
+ */
+private fun calculateFuzzyScore(text: String, query: String): Int {
+    if (text.length < query.length) return 0
+    
+    // Проверяем, содержит ли текст все символы запроса в правильном порядке
+    // Это позволяет находить "кембридж" при запросе "кмбрдж"
+    var textIndex = 0
+    var queryIndex = 0
+    var matchedChars = 0
+    var firstMatchIndex = -1
+    
+    while (textIndex < text.length && queryIndex < query.length) {
+        if (text[textIndex] == query[queryIndex]) {
+            if (firstMatchIndex == -1) {
+                firstMatchIndex = textIndex
+            }
+            matchedChars++
+            queryIndex++
+        }
+        textIndex++
+    }
+    
+    // Если все символы запроса найдены в правильном порядке
+    if (queryIndex == query.length) {
+        // Бонус за близость символов (меньше пропусков = выше score)
+        val ratio = matchedChars.toFloat() / query.length
+        val distancePenalty = (textIndex - query.length).coerceAtMost(50)
+        val positionBonus = if (firstMatchIndex < 10) 20 else 0 // Бонус за раннее совпадение
+        return ((ratio * 200).toInt() - distancePenalty + positionBonus).coerceAtLeast(50)
+    }
+    
+    // Проверяем максимальную общую подстроку
+    val maxSubstring = findMaxCommonSubstring(text, query)
+    if (maxSubstring.length >= query.length / 2) {
+        val substringRatio = maxSubstring.length.toFloat() / query.length
+        return (substringRatio * 100).toInt().coerceAtMost(100)
+    }
+    
+    // Проверяем похожесть через сравнение символов (для очень коротких запросов)
+    if (query.length <= 3) {
+        var similarChars = 0
+        val queryChars = query.toSet()
+        text.forEach { char ->
+            if (char in queryChars) {
+                similarChars++
+            }
+        }
+        if (similarChars >= query.length) {
+            return (similarChars * 5).coerceAtMost(30)
+        }
+    }
+    
+    return 0
+}
+
+/**
+ * Находит максимальную общую подстроку между двумя строками.
+ */
+private fun findMaxCommonSubstring(text: String, query: String): String {
+    var maxSubstring = ""
+    for (i in text.indices) {
+        for (j in i + 1..text.length) {
+            val substring = text.substring(i, j)
+            if (query.contains(substring) && substring.length > maxSubstring.length) {
+                maxSubstring = substring
+            }
+        }
+    }
+    return maxSubstring
+}
+
 /* ---------- Вспомогательные UI-компоненты ---------- */
+
+@Composable
+private fun HighlightedText(
+    text: String,
+    query: String,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium,
+    normalColor: Color = Color.Unspecified,
+    highlightColor: Color = MaterialTheme.colorScheme.primary,
+    highlightFontWeight: FontWeight = FontWeight.SemiBold
+) {
+    val normalColorValue = if (normalColor != Color.Unspecified) normalColor else MaterialTheme.colorScheme.onSurface
+    
+    if (query.isBlank() || text.isBlank()) {
+        Text(
+            text = text,
+            style = style,
+            color = normalColorValue,
+            modifier = modifier
+        )
+        return
+    }
+    
+    val lowerText = text.lowercase()
+    val lowerQuery = query.trim().lowercase()
+    
+    if (!lowerText.contains(lowerQuery)) {
+        Text(
+            text = text,
+            style = style,
+            color = normalColorValue,
+            modifier = modifier
+        )
+        return
+    }
+    
+    val annotatedString = buildAnnotatedString {
+        var startIndex = 0
+        
+        while (true) {
+            val index = lowerText.indexOf(lowerQuery, startIndex)
+            if (index == -1) {
+                // Добавляем оставшийся текст
+                append(text.substring(startIndex))
+                break
+            }
+            
+            // Добавляем текст до совпадения
+            if (index > startIndex) {
+                append(text.substring(startIndex, index))
+            }
+            
+            // Добавляем выделенный текст
+            withStyle(
+                style = SpanStyle(
+                    color = highlightColor,
+                    fontWeight = highlightFontWeight
+                )
+            ) {
+                append(text.substring(index, index + lowerQuery.length))
+            }
+            
+            startIndex = index + lowerQuery.length
+        }
+    }
+    
+    Text(
+        text = annotatedString,
+        style = style,
+        color = normalColorValue,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun ClientsSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        singleLine = true,
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Поиск"
+            )
+        },
+        placeholder = { Text("Поиск по клиентам") },
+        trailingIcon = if (query.isNotEmpty()) {
+            {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Очистить"
+                    )
+                }
+            }
+        } else null
+    )
+}
 
 @Composable
 private fun ClientRowWithEdit(
@@ -901,6 +1255,7 @@ private fun ClientRowWithEdit(
     @Suppress("UNUSED_PARAMETER") groupId: String?,
     groups: List<ClientGroupEntity>,
     isEditMode: Boolean,
+    searchQuery: String = "",
     onClick: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
@@ -931,39 +1286,224 @@ private fun ClientRowWithEdit(
     // Преобразуем группы в формат (id, title) для EntityRowWithMenu
     val availableGroups = groups.map { it.id to it.title }
 
-    EntityRowWithMenu(
-        title = client.name,
-        subtitle = subtitle,
-        leadingIcon = {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент",
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
+    // Если есть поисковый запрос, используем кастомную версию с подсветкой
+    if (searchQuery.isNotBlank()) {
+        ClientRowWithHighlight(
+            client = client,
+            iconRes = iconRes,
+            subtitle = subtitle,
+            groups = groups,
+            isEditMode = isEditMode,
+            searchQuery = searchQuery,
+            onClick = onClick,
+            onArchive = onArchive,
+            onRestore = onRestore,
+            onDelete = onDelete,
+            onEditName = onEditName,
+            onMoveToGroup = onMoveToGroup,
+            availableGroups = availableGroups,
+            modifier = modifier.background(Color.White)
+        )
+    } else {
+        EntityRowWithMenu(
+            title = client.name,
+            subtitle = subtitle,
+            leadingIcon = {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент",
+                    modifier = Modifier.size(48.dp),
+                    contentScale = ContentScale.Fit
+                )
+            },
+            trailingIcon = if (!isEditMode) {
+                {
+                    Icon(
+                        imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                        contentDescription = "Открыть",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else null,
+            isEditMode = isEditMode,
+            isArchived = client.isArchived == true,
+            onClick = onClick,
+            onRestore = onRestore,
+            onArchive = onArchive,
+            onDelete = onDelete,
+            onEdit = onEditName,
+            onMoveToGroup = onMoveToGroup,
+            availableGroups = availableGroups,
+            modifier = modifier.background(Color.White),
+            reorderableState = reorderableState,
+            showDragHandle = isEditMode && !client.isArchived
+        )
+    }
+}
+
+/**
+ * Кастомная версия строки клиента с подсветкой совпадений для режима поиска.
+ * Повторяет структуру EntityRowWithMenu, но использует HighlightedText для title и subtitle.
+ */
+@Composable
+private fun ClientRowWithHighlight(
+    client: ClientEntity,
+    iconRes: Int,
+    subtitle: String?,
+    groups: List<ClientGroupEntity>,
+    isEditMode: Boolean,
+    searchQuery: String,
+    onClick: () -> Unit,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
+    onEditName: () -> Unit,
+    onMoveToGroup: (String?) -> Unit,
+    availableGroups: List<Pair<String, String>>,
+    modifier: Modifier = Modifier
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (!isEditMode) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
             )
-        },
-        trailingIcon = if (!isEditMode) {
-            {
-                Icon(
-                    imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
-                    contentDescription = "Открыть",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент",
+            modifier = Modifier.size(48.dp),
+            contentScale = ContentScale.Fit
+        )
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            HighlightedText(
+                text = client.name,
+                query = searchQuery,
+                style = MaterialTheme.typography.titleMedium,
+                normalColor = if (client.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onBackground,
+                highlightColor = MaterialTheme.colorScheme.primary,
+                highlightFontWeight = FontWeight.SemiBold
+            )
+            if (subtitle != null && subtitle.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                HighlightedText(
+                    text = subtitle,
+                    query = searchQuery,
+                    style = MaterialTheme.typography.bodyMedium,
+                    normalColor = if (client.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
+                    highlightColor = MaterialTheme.colorScheme.primary,
+                    highlightFontWeight = FontWeight.SemiBold
                 )
             }
-        } else null,
-        isEditMode = isEditMode,
-        isArchived = client.isArchived == true,
-        onClick = onClick,
-        onRestore = onRestore,
-        onArchive = onArchive,
-        onDelete = onDelete,
-        onEdit = onEditName,
-        onMoveToGroup = onMoveToGroup,
-        availableGroups = availableGroups,
-        modifier = modifier.background(Color.White),
-        reorderableState = reorderableState,
-        showDragHandle = isEditMode && !client.isArchived
-    )
+        }
+
+        if (!isEditMode) {
+            Icon(
+                imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                contentDescription = "Открыть",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        if (isEditMode) {
+            if (client.isArchived == true) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    onRestore?.let {
+                        IconButton(onClick = it) {
+                            Icon(
+                                Icons.Filled.Unarchive,
+                                contentDescription = "Восстановить",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    onDelete?.let {
+                        IconButton(onClick = it) {
+                            Icon(
+                                imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
+                                contentDescription = "Удалить",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            } else {
+                onEditName?.let {
+                    IconButton(onClick = it) {
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = "Редактировать",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                if (onMoveToGroup != null || onArchive != null) {
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = "Ещё",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground)
+                        ) {
+                            if (onMoveToGroup != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Переместить в: Без группы") },
+                                    onClick = {
+                                        menuOpen = false
+                                        onMoveToGroup(null)
+                                    }
+                                )
+                                if (availableGroups.isNotEmpty()) {
+                                    HorizontalDivider()
+                                }
+                                availableGroups.forEach { (groupId, groupTitle) ->
+                                    DropdownMenuItem(
+                                        text = { Text("Переместить в: $groupTitle") },
+                                        onClick = {
+                                            menuOpen = false
+                                            onMoveToGroup(groupId)
+                                        }
+                                    )
+                                }
+                            }
+                            if (onMoveToGroup != null && onArchive != null) {
+                                HorizontalDivider()
+                            }
+                            onArchive?.let {
+                                DropdownMenuItem(
+                                    text = { Text("Архивировать") },
+                                    onClick = {
+                                        menuOpen = false
+                                        it()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 

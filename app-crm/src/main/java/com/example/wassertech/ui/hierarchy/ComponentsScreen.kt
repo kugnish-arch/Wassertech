@@ -2,18 +2,16 @@
 
 package ru.wassertech.ui.hierarchy
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SettingsApplications
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -30,6 +28,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import ru.wassertech.core.ui.R
+import ru.wassertech.core.ui.components.AppEmptyState
+import ru.wassertech.core.ui.components.EntityRowWithMenu
+import ru.wassertech.core.ui.components.ScreenTitleWithSubtitle
+import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
+import ru.wassertech.core.ui.reorderable.ReorderableState
+import ru.wassertech.core.ui.theme.ClientsRowDivider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.wassertech.viewmodel.HierarchyViewModel
 import ru.wassertech.viewmodel.TemplatesViewModel
@@ -224,7 +228,7 @@ fun ComponentsScreen(
         ) {
             // ===== Заголовок установки =====
             val instName = installation?.name?.takeIf { it.isNotBlank() } ?: "Без названия"
-            val metaText: String? = when {
+            val siteSubtitle: String? = when {
                 clientName != null && site?.name != null ->
                     "Объект: $clientName — ${site!!.name}"
                 site?.name != null ->
@@ -253,10 +257,14 @@ fun ComponentsScreen(
                                 contentScale = ContentScale.Fit
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = instName,
-                                style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                                color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                            // Используем ScreenTitleWithSubtitle для текстовой части заголовка
+                            ScreenTitleWithSubtitle(
+                                title = instName,
+                                subtitle = siteSubtitle,
+                                titleStyle = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                                subtitleStyle = MaterialTheme.typography.bodySmall,
+                                titleColor = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                                subtitleColor = Color.White, // Белый цвет для подзаголовка на графитовом фоне
                                 modifier = Modifier.weight(1f)
                             )
                             if (isEditing) {
@@ -277,17 +285,6 @@ fun ComponentsScreen(
                                         tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                                     )
                                 }
-                            }
-                        }
-                        metaText?.let {
-                            Spacer(Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Spacer(Modifier.width(8.dp)) // Сдвигаем подпись правее
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White // Белый цвет для подзаголовка (адрес/объект)
-                                )
                             }
                         }
                     }
@@ -346,70 +343,81 @@ fun ComponentsScreen(
             }
 
             if (orderedComponents.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Нет компонентов. Нажмите «Компонент».")
+                AppEmptyState(
+                    icon = Icons.Filled.Lightbulb,
+                    title = "Нет компонентов",
+                    description = "Нажмите кнопку «+», чтобы добавить компонент к этой установке."
+                )
+            } else if (isEditing) {
+                // В режиме редактирования используем ReorderableLazyColumn для drag-n-drop
+                ReorderableLazyColumn(
+                    items = orderedComponents,
+                    onMove = { fromIndex, toIndex ->
+                        val mutable = localOrder.toMutableList()
+                        val item = mutable.removeAt(fromIndex)
+                        mutable.add(toIndex, item)
+                        localOrder = mutable
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp),
+                    key = { it.id },
+                    contentPadding = PaddingValues(0.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) { comp, isDragging, reorderableState ->
+                    val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
+                    
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ComponentRowWithEdit(
+                            component = comp,
+                            templateTitle = tmplTitle,
+                            isEditMode = isEditing,
+                            onDelete = { pendingDeleteId = comp.id },
+                            isDragging = isDragging,
+                            reorderableState = reorderableState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White)
+                        )
+                        // Разделительная линия между компонентами (кроме последнего)
+                        val index = orderedComponents.indexOf(comp)
+                        if (index >= 0 && index < orderedComponents.size - 1) {
+                            HorizontalDivider(
+                                color = ClientsRowDivider,
+                                thickness = 1.dp
+                            )
+                        }
+                    }
                 }
             } else {
+                // В обычном режиме используем обычный список без drag-n-drop
                 LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(0.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     items(orderedComponents, key = { it.id }) { comp ->
                         val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
-                        ElevatedCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
-                        ) {
-                            ListItem(
-                                leadingContent = {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.ui_gear),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(48.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                },
-                                headlineContent = { Text(comp.name) },
-                                supportingContent = { Text(tmplTitle) },
-                                trailingContent = {
-                                    if (isEditing) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            IconButton(
-                                                onClick = {
-                                                    val i = localOrder.indexOf(comp.id)
-                                                    if (i > 0) {
-                                                        val m = localOrder.toMutableList()
-                                                        m[i - 1] = m[i].also { _ -> m[i] = m[i - 1] }
-                                                        localOrder = m
-                                                    }
-                                                }
-                                            ) { Icon(Icons.Filled.ArrowUpward, contentDescription = "Вверх") }
-
-                                            IconButton(
-                                                onClick = {
-                                                    val i = localOrder.indexOf(comp.id)
-                                                    if (i != -1 && i < localOrder.lastIndex) {
-                                                        val m = localOrder.toMutableList()
-                                                        m[i + 1] = m[i].also { _ -> m[i] = m[i + 1] }
-                                                        localOrder = m
-                                                    }
-                                                }
-                                            ) { Icon(Icons.Filled.ArrowDownward, contentDescription = "Вниз") }
-
-                                            Spacer(Modifier.width(4.dp))
-                                            IconButton(onClick = { pendingDeleteId = comp.id }) {
-                                                Icon(
-                                                    imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
-                                                    contentDescription = "Удалить компонент"
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                        
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            ComponentRowWithEdit(
+                                component = comp,
+                                templateTitle = tmplTitle,
+                                isEditMode = isEditing,
+                                onDelete = { },
+                                isDragging = false,
+                                reorderableState = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White)
                             )
+                            // Разделительная линия между компонентами (кроме последнего)
+                            val index = orderedComponents.indexOf(comp)
+                            if (index >= 0 && index < orderedComponents.size - 1) {
+                                HorizontalDivider(
+                                    color = ClientsRowDivider,
+                                    thickness = 1.dp
+                                )
+                            }
                         }
                     }
                 }
@@ -572,4 +580,43 @@ fun ComponentsScreen(
             }
         )
     }
+}
+
+/* ---------- Вспомогательные UI-компоненты ---------- */
+
+@Composable
+private fun ComponentRowWithEdit(
+    component: ru.wassertech.data.entities.ComponentEntity,
+    templateTitle: String,
+    isEditMode: Boolean,
+    onDelete: () -> Unit,
+    isDragging: Boolean,
+    reorderableState: ReorderableState?,
+    modifier: Modifier = Modifier
+) {
+    EntityRowWithMenu(
+        title = component.name,
+        subtitle = templateTitle,
+        leadingIcon = {
+            Image(
+                painter = painterResource(id = R.drawable.ui_gear),
+                contentDescription = "Компонент",
+                modifier = Modifier.size(48.dp),
+                contentScale = ContentScale.Fit
+            )
+        },
+        trailingIcon = null,
+        isEditMode = isEditMode,
+        isArchived = component.isArchived == true,
+        onClick = null, // Компоненты не кликабельны
+        onRestore = null,
+        onArchive = null,
+        onDelete = onDelete,
+        onEdit = null, // Редактирование компонента пока не поддерживается
+        onMoveToGroup = null,
+        availableGroups = emptyList(),
+        modifier = modifier,
+        reorderableState = reorderableState,
+        showDragHandle = isEditMode && !component.isArchived
+    )
 }

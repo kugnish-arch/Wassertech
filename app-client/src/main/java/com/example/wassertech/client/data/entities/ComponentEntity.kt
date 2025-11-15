@@ -12,5 +12,16 @@ data class ComponentEntity(
     val name: String,
     val type: ComponentType,
     val orderIndex: Int,
-    @ColumnInfo(name = "templateId") val templateId: String? = null
-)
+    @ColumnInfo(name = "templateId") val templateId: String? = null,
+    // TODO: Добавить поля ownerClientId и origin после миграции БД
+    val ownerClientId: String? = null, // FK → clients.id
+    val origin: String? = null // "CRM" или "CLIENT"
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     * Переименовано из getOrigin() чтобы избежать конфликта с Room (Room генерирует getOrigin() для поля origin).
+     */
+    fun getOriginType(): ru.wassertech.client.auth.OriginType {
+        return ru.wassertech.client.auth.OriginType.fromString(origin)
+    }
+}

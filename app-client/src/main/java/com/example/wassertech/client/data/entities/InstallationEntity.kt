@@ -30,5 +30,16 @@ data class InstallationEntity(
     val dirtyFlag: Boolean = false,
     val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
     // Другие поля
-    val orderIndex: Int = 0
-)
+    val orderIndex: Int = 0,
+    // TODO: Добавить поля ownerClientId и origin после миграции БД
+    val ownerClientId: String? = null, // FK → clients.id
+    val origin: String? = null // "CRM" или "CLIENT"
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     * Переименовано из getOrigin() чтобы избежать конфликта с Room (Room генерирует getOrigin() для поля origin).
+     */
+    fun getOriginType(): ru.wassertech.client.auth.OriginType {
+        return ru.wassertech.client.auth.OriginType.fromString(origin)
+    }
+}
