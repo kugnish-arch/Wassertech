@@ -6,9 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,15 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.zIndex
 import ru.wassertech.data.entities.ClientEntity
 import ru.wassertech.data.entities.ClientGroupEntity
 import ru.wassertech.core.ui.R
@@ -43,7 +37,10 @@ import ru.wassertech.core.ui.theme.ClientsGroupBorder
 import ru.wassertech.core.ui.theme.ClientsRowDivider
 import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
 import ru.wassertech.core.ui.reorderable.ReorderableState
-import ru.wassertech.core.ui.reorderable.detectReorder
+import ru.wassertech.core.ui.components.EntityGroupHeader
+import ru.wassertech.core.ui.components.EmptyGroupPlaceholder
+import ru.wassertech.core.ui.components.AppEmptyState
+import ru.wassertech.core.ui.components.EntityRowWithMenu
 
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
 
@@ -300,7 +297,11 @@ fun ClientsScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
             if (!hasAnyData && !isEditMode) {
-                EmptyStateHint()
+                AppEmptyState(
+                    icon = Icons.Filled.Lightbulb,
+                    title = "Начните с клиентов",
+                    description = "Создайте клиента или группу клиентов, чтобы добавить их объекты и установки. После этого вы сможете проводить и сохранять техническое обслуживание, а также формировать PDF-отчёты прямо в приложении."
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -313,21 +314,21 @@ fun ClientsScreen(
                     contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
                 ) {
                     item(key = "header_general") {
-                        GroupHeader(
+                        EntityGroupHeader(
                             title = "Общая",
                             count = localOrderGeneral.size,
                             isExpanded = expandedSectionId == GENERAL_SECTION_ID,
                             isArchived = false,
                             canArchive = false,
                             showActions = isEditMode,
-                            onArchive = {},
-                            onRestore = {},
+                            onArchive = null,
+                            onRestore = null,
                             onToggle = {
                                 expandedSectionId =
                                     if (expandedSectionId == GENERAL_SECTION_ID) "" else GENERAL_SECTION_ID
                             },
-                            onMoveUp = {},
-                            onMoveDown = {},
+                            onMoveUp = null,
+                            onMoveDown = null,
                         )
                     }
                     item(key = "general_content") {
@@ -337,7 +338,7 @@ fun ClientsScreen(
                             exit = shrinkVertically(animationSpec = tween(300))
                         ) {
                             if (localOrderGeneral.isEmpty()) {
-                                EmptyGroupStub(indent = 16.dp)
+                                EmptyGroupPlaceholder(text = "Клиенты отсутствуют", indent = 16.dp)
                             } else if (isEditMode) {
                                 // Используем ReorderableLazyColumn только в режиме редактирования
                                 // НЕ оборачиваем в Column, чтобы избежать бесконечных ограничений по высоте
@@ -473,7 +474,7 @@ fun ClientsScreen(
                         key = { "header_${it.id}" }
                     ) { group ->
                         val groupId = group.id
-                        GroupHeader(
+                        EntityGroupHeader(
                             title = group.title,
                             count = (localOrderByGroup[groupId] ?: emptyList()).size,
                             isExpanded = expandedSectionId == groupId,
@@ -510,7 +511,7 @@ fun ClientsScreen(
                             val listIds = localOrderByGroup[groupId] ?: emptyList()
                             if (listIds.isEmpty()) {
                                 Column(modifier = Modifier.animateContentSize()) {
-                                    EmptyGroupStub(indent = 16.dp)
+                                    EmptyGroupPlaceholder(text = "Клиенты отсутствуют", indent = 16.dp)
                                     HorizontalDivider(color = ClientsRowDivider, thickness = 1.dp)
                                 }
                             } else if (isEditMode) {
@@ -895,195 +896,6 @@ fun ClientsScreen(
 /* ---------- Вспомогательные UI-компоненты ---------- */
 
 @Composable
-private fun GroupHeader(
-    title: String,
-    count: Int,
-    isExpanded: Boolean,
-    isArchived: Boolean,
-    canArchive: Boolean,
-    showActions: Boolean,
-    @Suppress("UNUSED_PARAMETER") onArchive: () -> Unit,
-    onRestore: () -> Unit,
-    onToggle: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onEdit: () -> Unit = {},
-    onDelete: () -> Unit = {},
-    onDragStart: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    val bg = if (isExpanded) ClientsGroupExpandedBackground else ClientsGroupCollapsedBackground
-    val contentColor =
-        if (isExpanded) ClientsGroupExpandedText else MaterialTheme.colorScheme.onBackground
-    var lastMoveThreshold by remember { mutableStateOf(0f) }
-    var dragOffset by remember { mutableStateOf(0.dp) }
-    var isDragging by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-
-    Column(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(bg)
-                .clickable { onToggle() }
-                .offset(y = dragOffset)
-                .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемая группа поверх всех
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .animateContentSize(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (showActions && !isArchived && canArchive) {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = "Перетащить",
-                    tint = contentColor.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .pointerInput("group_$title") {
-                            detectDragGestures(
-                                onDragStart = {
-                                    lastMoveThreshold = 0f
-                                    dragOffset = 0.dp
-                                    isDragging = true
-                                    onDragStart?.invoke()
-                                },
-                                onDrag = { change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset ->
-                                    // NOTE: не вызываем consumePositionChange(), т.к. в используемой версии Compose этот метод отсутствует.
-                                    dragOffset += with(density) { dragAmount.y.toDp() }
-
-                                    val threshold = 10f
-                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                        onMoveUp()
-                                        lastMoveThreshold = -threshold
-                                        dragOffset = 0.dp
-                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                        onMoveDown()
-                                        lastMoveThreshold = threshold
-                                        dragOffset = 0.dp
-                                    }
-                                    if (dragAmount.y in -threshold..threshold) {
-                                        lastMoveThreshold = dragAmount.y
-                                    }
-                                },
-                                onDragEnd = {
-                                    lastMoveThreshold = 0f
-                                    dragOffset = 0.dp
-                                    isDragging = false
-                                }
-                            )
-                        }
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                "$title ($count)",
-                color = contentColor,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
-            if (showActions) {
-                if (!isArchived && canArchive) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onEdit) {
-                            Icon(
-                                Icons.Filled.Edit,
-                                contentDescription = "Переименовать группу",
-                                tint = contentColor
-                            )
-                        }
-                        IconButton(onClick = onArchive) {
-                            Icon(
-                                Icons.Filled.Archive,
-                                contentDescription = "Архивировать группу",
-                                tint = contentColor
-                            )
-                        }
-                    }
-                } else if (isArchived) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onRestore) {
-                            Icon(
-                                Icons.Filled.Unarchive,
-                                contentDescription = "Восстановить группу",
-                                tint = contentColor
-                            )
-                        }
-                        IconButton(onClick = onDelete) {
-                            Icon(
-                                imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
-                                contentDescription = "Удалить группу",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-            }
-            Icon(
-                imageVector = if (isExpanded) ru.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else ru.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
-                contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
-                tint = contentColor
-            )
-        }
-        HorizontalDivider(
-            color = ClientsGroupBorder,
-            thickness = 1.dp
-        )
-    }
-}
-
-@Composable
-private fun EmptyGroupStub(indent: Dp) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = indent, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    ) {
-        Text("Клиенты отсутствуют", style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun EmptyStateHint() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Lightbulb,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Text(
-                text = "Начните с клиентов",
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            Text(
-                text = "Создайте клиента или группу клиентов, чтобы добавить их объекты и установки. После этого вы сможете проводить и сохранять техническое обслуживание, а также формировать PDF-отчёты прямо в приложении.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
 private fun ClientRowWithEdit(
     client: ClientEntity,
     @Suppress("UNUSED_PARAMETER") groupId: String?,
@@ -1101,73 +913,37 @@ private fun ClientRowWithEdit(
     reorderableState: ReorderableState? = null,
     modifier: Modifier = Modifier
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
+    // Определяем иконку клиента в зависимости от состояния
+    val iconRes = when {
+        client.isArchived == true && client.isCorporate == true -> R.drawable.person_client_corporate_red
+        client.isArchived == true && client.isCorporate != true -> R.drawable.person_client_red
+        client.isCorporate == true -> R.drawable.person_client_corporate_blue
+        else -> R.drawable.person_client_blue
+    }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (!isEditMode) {
-                    Modifier.clickable { onClick() }
-                } else {
-                    Modifier
-                }
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (isEditMode && !client.isArchived) {
-            Icon(
-                imageVector = Icons.Filled.Menu,
-                contentDescription = "Перетащить",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier
-                    .size(24.dp)
-                    .then(
-                        if (reorderableState != null) {
-                            Modifier.detectReorder(reorderableState)
-                        } else {
-                            Modifier
-                        }
-                    )
-            )
-            Spacer(Modifier.width(8.dp))
-        }
+    // Формируем подзаголовок из контактных данных
+    val subtitle = listOfNotNull(
+        client.phone?.takeIf { it.isNotBlank() },
+        client.email?.takeIf { it.isNotBlank() },
+        client.addressFull?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ").takeIf { it.isNotBlank() }
 
-        val iconRes = when {
-                client.isArchived == true && client.isCorporate == true -> R.drawable.person_client_corporate_red
-                client.isArchived == true && client.isCorporate != true -> R.drawable.person_client_red
-                client.isCorporate == true -> R.drawable.person_client_corporate_blue
-                else -> R.drawable.person_client_blue
-            }
+    // Преобразуем группы в формат (id, title) для EntityRowWithMenu
+    val availableGroups = groups.map { it.id to it.title }
+
+    EntityRowWithMenu(
+        title = client.name,
+        subtitle = subtitle,
+        leadingIcon = {
             Image(
                 painter = painterResource(id = iconRes),
                 contentDescription = if (client.isCorporate == true) "Корпоративный" else "Клиент",
                 modifier = Modifier.size(48.dp),
                 contentScale = ContentScale.Fit
             )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    client.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (client.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(Modifier.height(4.dp))
-                val secondary = listOfNotNull(
-                    client.phone?.takeIf { it.isNotBlank() },
-                    client.email?.takeIf { it.isNotBlank() },
-                    client.addressFull?.takeIf { it.isNotBlank() }
-                ).joinToString(" · ")
-                if (secondary.isNotBlank()) {
-                    Text(
-                        secondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (client.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            if (!isEditMode) {
+        },
+        trailingIcon = if (!isEditMode) {
+            {
                 Icon(
                     imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
                     contentDescription = "Открыть",
@@ -1175,78 +951,19 @@ private fun ClientRowWithEdit(
                     modifier = Modifier.size(24.dp)
                 )
             }
-            if (isEditMode) {
-                if (client.isArchived == true) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onRestore) {
-                            Icon(
-                                Icons.Filled.Unarchive,
-                                contentDescription = "Восстановить клиента",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = onDelete) {
-                            Icon(
-                                imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
-                                contentDescription = "Удалить клиента",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                } else {
-                    IconButton(onClick = onEditName) {
-                        Icon(
-                            Icons.Filled.Edit,
-                            contentDescription = "Редактировать клиента",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Box {
-                        var menuOpen by remember { mutableStateOf(false) }
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(
-                                Icons.Filled.MoreVert,
-                                contentDescription = "Ещё",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = menuOpen,
-                            onDismissRequest = { menuOpen = false },
-                            modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground)
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Переместить в: Без группы") },
-                                onClick = {
-                                    menuOpen = false
-                                    onMoveToGroup(null)
-                                }
-                            )
-                            if (groups.isNotEmpty()) HorizontalDivider()
-                            groups.forEach { g ->
-                                DropdownMenuItem(
-                                    text = { Text("Переместить в: ${g.title}") },
-                                    onClick = {
-                                        menuOpen = false
-                                        onMoveToGroup(g.id)
-                                    }
-                                )
-                            }
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("Архивировать") },
-                                onClick = {
-                                    menuOpen = false
-                                    onArchive()
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+        } else null,
+        isEditMode = isEditMode,
+        isArchived = client.isArchived == true,
+        onClick = onClick,
+        onRestore = onRestore,
+        onArchive = onArchive,
+        onDelete = onDelete,
+        onEdit = onEditName,
+        onMoveToGroup = onMoveToGroup,
+        availableGroups = availableGroups,
+        modifier = modifier.background(Color.White),
+        reorderableState = reorderableState,
+        showDragHandle = isEditMode && !client.isArchived
+    )
+}
 

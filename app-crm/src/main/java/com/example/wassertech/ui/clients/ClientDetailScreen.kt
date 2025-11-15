@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,12 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -51,6 +46,9 @@ import ru.wassertech.ui.common.FABTemplate
 import ru.wassertech.ui.common.FABOption
 import ru.wassertech.ui.common.CommonAddDialog
 import androidx.compose.material.icons.filled.Add
+import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
+import ru.wassertech.core.ui.reorderable.ReorderableState
+import ru.wassertech.core.ui.reorderable.detectReorder
 
 private data class SiteDeleteDialogState(
     val isSite: Boolean,
@@ -64,63 +62,17 @@ fun SiteRowWithDrag(
     site: SiteEntity,
     index: Int,
     isArchived: Boolean,
+    isCorporate: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    reorderableState: ReorderableState? = null
 ) {
-    var lastMoveThreshold by remember { mutableStateOf(0f) }
-    var dragOffset by remember { mutableStateOf(0.dp) }
-    var isDragging by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (!isArchived) {
-                    Modifier
-                        .offset(y = dragOffset)
-                        .zIndex(if (isDragging) 1f else 0f) // Перетаскиваемый объект поверх всех
-                        .pointerInput(site.id, index, density) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    lastMoveThreshold = 0f
-                                    dragOffset = 0.dp
-                                    isDragging = true
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
-                                    dragOffset += with(density) { dragAmount.y.toDp() }
-                                    
-                                    // Еще больше уменьшаем порог для физических устройств
-                                    val threshold = 10f
-                                    if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                        onMoveUp()
-                                        lastMoveThreshold = -threshold
-                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                    } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                        onMoveDown()
-                                        lastMoveThreshold = threshold
-                                        dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                    }
-                                    if (dragAmount.y in -threshold..threshold) {
-                                        lastMoveThreshold = dragAmount.y
-                                    }
-                                },
-                                onDragEnd = {
-                                    lastMoveThreshold = 0f
-                                    dragOffset = 0.dp
-                                    isDragging = false
-                                }
-                            )
-                        }
-                } else {
-                    Modifier
-                }
-            )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -130,14 +82,25 @@ fun SiteRowWithDrag(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Перетащить",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .then(
+                        if (reorderableState != null) {
+                            Modifier.detectReorder(reorderableState)
+                        } else {
+                            Modifier
+                        }
+                    )
             )
             Spacer(Modifier.width(8.dp))
         }
         // Иконка объекта - используем Image вместо Icon для консистентности
+        // Учитываем isCorporate для выбора иконки
         val siteIconRes = when {
-            isArchived -> R.drawable.object_house_red // По умолчанию дом, если архив
-            else -> R.drawable.object_house_blue // По умолчанию дом
+            isArchived && isCorporate -> R.drawable.object_factory_red
+            isArchived && !isCorporate -> R.drawable.object_house_red
+            isCorporate -> R.drawable.object_factory_blue
+            else -> R.drawable.object_house_blue
         }
         Image(
             painter = painterResource(id = siteIconRes),
@@ -195,18 +158,11 @@ fun InstallationRowWithDrag(
     onMoveDown: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    reorderableState: ReorderableState? = null
 ) {
-    var lastMoveThreshold by remember { mutableStateOf(0f) }
-    var dragOffset by remember { mutableStateOf(0.dp) }
-    var isDragging by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-
     ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .offset(y = dragOffset)
-            .zIndex(if (isDragging) 1f else 0f), // Перетаскиваемая установка поверх всех
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (isArchived)
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -217,47 +173,6 @@ fun InstallationRowWithDrag(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(
-                    if (!isArchived) {
-                        Modifier
-                            .pointerInput(installation.id, index, density) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        lastMoveThreshold = 0f
-                                        dragOffset = 0.dp
-                                        isDragging = true
-                                    },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        // Обновляем визуальное смещение элемента (dragAmount.y в пикселях, преобразуем в dp)
-                                        dragOffset += with(density) { dragAmount.y.toDp() }
-                                        
-                                        // Еще больше уменьшаем порог для физических устройств
-                                        val threshold = 15f // Еще более чувствительный порог
-                                        if (dragAmount.y < -threshold && lastMoveThreshold >= -threshold) {
-                                            onMoveUp()
-                                            lastMoveThreshold = -threshold
-                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                        } else if (dragAmount.y > threshold && lastMoveThreshold <= threshold) {
-                                            onMoveDown()
-                                            lastMoveThreshold = threshold
-                                            dragOffset = 0.dp // Сбрасываем смещение после перемещения
-                                        }
-                                        if (dragAmount.y in -threshold..threshold) {
-                                            lastMoveThreshold = dragAmount.y
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        lastMoveThreshold = 0f
-                                        dragOffset = 0.dp
-                                        isDragging = false
-                                    }
-                                )
-                            }
-                    } else {
-                        Modifier
-                    }
-                )
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -267,7 +182,15 @@ fun InstallationRowWithDrag(
                     imageVector = Icons.Filled.Menu,
                     contentDescription = "Перетащить",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier
+                        .size(20.dp)
+                        .then(
+                            if (reorderableState != null) {
+                                Modifier.detectReorder(reorderableState)
+                            } else {
+                                Modifier
+                            }
+                        )
                 )
                 Spacer(Modifier.width(8.dp))
             }
@@ -571,146 +494,155 @@ fun ClientDetailScreen(
                 // ======= Список объектов/установок =======
                 if (isEditing) {
                     // Режим редактирования: drag-and-drop для объектов и установок
-                    LazyColumn(
+                    ReorderableLazyColumn(
+                        items = localOrder,
+                        onMove = { fromIndex, toIndex ->
+                            val mutable = localOrder.toMutableList()
+                            val item = mutable.removeAt(fromIndex)
+                            mutable.add(toIndex, item)
+                            localOrder = mutable
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        key = { it },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(localOrder, key = { it }) { siteId ->
-                            val site = sitesToShow.find { it.id == siteId } ?: return@items
-                            val index = localOrder.indexOf(siteId)
-                            val installations = allInstallations[siteId] ?: emptyList()
-                            val installationOrder =
-                                localInstallationOrders[siteId] ?: installations.map { it.id }
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) { siteId, isDragging, reorderableState ->
+                        val site = sitesToShow.find { it.id == siteId } ?: return@ReorderableLazyColumn
+                        val index = localOrder.indexOf(siteId)
+                        val installations = allInstallations[siteId] ?: emptyList()
+                        val installationOrder =
+                            localInstallationOrders[siteId] ?: installations.map { it.id }
 
-                            ElevatedCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.elevatedCardColors(
-                                    containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
-                                ),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
-                            ) {
-                                Column {
-                                    // Рядок объекта с ручкой для drag-and-drop
-                                    SiteRowWithDrag(
-                                        site = site,
-                                        index = index,
-                                        isArchived = site.isArchived,
-                                        onMoveUp = {
-                                            val pos = localOrder.indexOf(siteId)
-                                            if (pos > 0) {
-                                                val list = localOrder.toMutableList()
-                                                val tmp = list[pos - 1]; list[pos - 1] =
-                                                    list[pos]; list[pos] = tmp
-                                                localOrder = list
-                                            }
-                                        },
-                                        onMoveDown = {
-                                            val pos = localOrder.indexOf(siteId)
-                                            if (pos >= 0 && pos < localOrder.lastIndex) {
-                                                val list = localOrder.toMutableList()
-                                                val tmp = list[pos + 1]; list[pos + 1] =
-                                                    list[pos]; list[pos] = tmp
-                                                localOrder = list
-                                            }
-                                        },
-                                        onArchive = { vm.archiveSite(siteId) },
-                                        onRestore = { vm.restoreSite(siteId) },
-                                        onDelete = {
-                                            deleteDialogState = SiteDeleteDialogState(
-                                                isSite = true,
-                                                id = siteId,
-                                                name = site.name
-                                            )
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                        ) {
+                            Column {
+                                // Рядок объекта с ручкой для drag-and-drop
+                                SiteRowWithDrag(
+                                    site = site,
+                                    index = index,
+                                    isArchived = site.isArchived,
+                                    isCorporate = isCorporate,
+                                    onMoveUp = {
+                                        val pos = localOrder.indexOf(siteId)
+                                        if (pos > 0) {
+                                            val list = localOrder.toMutableList()
+                                            val tmp = list[pos - 1]; list[pos - 1] =
+                                                list[pos]; list[pos] = tmp
+                                            localOrder = list
                                         }
-                                    )
+                                    },
+                                    onMoveDown = {
+                                        val pos = localOrder.indexOf(siteId)
+                                        if (pos >= 0 && pos < localOrder.lastIndex) {
+                                            val list = localOrder.toMutableList()
+                                            val tmp = list[pos + 1]; list[pos + 1] =
+                                                list[pos]; list[pos] = tmp
+                                            localOrder = list
+                                        }
+                                    },
+                                    onArchive = { vm.archiveSite(siteId) },
+                                    onRestore = { vm.restoreSite(siteId) },
+                                    onDelete = {
+                                        deleteDialogState = SiteDeleteDialogState(
+                                            isSite = true,
+                                            id = siteId,
+                                            name = site.name
+                                        )
+                                    },
+                                    reorderableState = reorderableState
+                                )
 
-                                    // Установки внутри объекта (показываем все в режиме редактирования, включая архивные)
-                                    val installationsToShow =
-                                        if (site.isArchived) emptyList() else installations
-                                    // Обновляем локальный порядок, если в нем отсутствуют некоторые установки
-                                    LaunchedEffect(siteId, installations.size) {
-                                        if (isEditing) {
-                                            val currentOrder =
-                                                localInstallationOrders[siteId] ?: emptyList()
-                                            val allIds = installations.map { it.id }
-                                            // Добавляем отсутствующие установки в конец
-                                            val newOrder =
-                                                (currentOrder + allIds.filter { it !in currentOrder }).distinct()
-                                            if (newOrder != currentOrder) {
-                                                localInstallationOrders =
-                                                    localInstallationOrders.toMutableMap().apply {
-                                                        put(siteId, newOrder)
-                                                    }
-                                            }
+                                // Установки внутри объекта (показываем все в режиме редактирования, включая архивные)
+                                val installationsToShow =
+                                    if (site.isArchived) emptyList() else installations
+                                // Обновляем локальный порядок, если в нем отсутствуют некоторые установки
+                                LaunchedEffect(siteId, installations.size) {
+                                    if (isEditing) {
+                                        val currentOrder =
+                                            localInstallationOrders[siteId] ?: emptyList()
+                                        val allIds = installations.map { it.id }
+                                        // Добавляем отсутствующие установки в конец
+                                        val newOrder =
+                                            (currentOrder + allIds.filter { it !in currentOrder }).distinct()
+                                        if (newOrder != currentOrder) {
+                                            localInstallationOrders =
+                                                localInstallationOrders.toMutableMap().apply {
+                                                    put(siteId, newOrder)
+                                                }
                                         }
                                     }
-                                    if (installationOrder.isNotEmpty() && installationsToShow.isNotEmpty()) {
-                                        Column(
-                                            modifier = Modifier.padding(
+                                }
+                                if (installationOrder.isNotEmpty() && installationsToShow.isNotEmpty()) {
+                                    // Используем ReorderableLazyColumn для установок внутри объекта
+                                    ReorderableLazyColumn(
+                                        items = installationOrder.filter { instId -> installations.any { it.id == instId } },
+                                        onMove = { fromIndex, toIndex ->
+                                            val filteredOrder = installationOrder.filter { instId -> installations.any { it.id == instId } }
+                                            val mutable = filteredOrder.toMutableList()
+                                            val item = mutable.removeAt(fromIndex)
+                                            mutable.add(toIndex, item)
+                                            // Восстанавливаем полный порядок с учетом отфильтрованных элементов
+                                            val fullOrder = installationOrder.toMutableList()
+                                            val filteredIds = filteredOrder.toSet()
+                                            val nonFilteredIds = fullOrder.filter { it !in filteredIds }
+                                            val newOrder = mutable + nonFilteredIds
+                                            localInstallationOrders = localInstallationOrders.toMutableMap().apply {
+                                                put(siteId, newOrder)
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .padding(
                                                 start = 16.dp,
                                                 end = 16.dp,
                                                 bottom = 8.dp
-                                            ),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            // Показываем все установки в порядке installationOrder
-                                            installationOrder.filter { instId -> installations.any { it.id == instId } }
-                                                .forEach { instId ->
-                                                    val inst =
-                                                        installations.find { it.id == instId }
-                                                            ?: return@forEach
-                                                    val instIndex =
-                                                        installationOrder.indexOf(instId)
-                                                    InstallationRowWithDrag(
-                                                        installation = inst,
-                                                        index = instIndex,
-                                                        isArchived = inst.isArchived,
-                                                        onMoveUp = {
-                                                            val pos =
-                                                                installationOrder.indexOf(instId)
-                                                            if (pos > 0) {
-                                                                val list =
-                                                                    installationOrder.toMutableList()
-                                                                val tmp =
-                                                                    list[pos - 1]; list[pos - 1] =
-                                                                    list[pos]; list[pos] = tmp
-                                                                localInstallationOrders =
-                                                                    localInstallationOrders.toMutableMap()
-                                                                        .apply {
-                                                                            put(siteId, list)
-                                                                        }
-                                                            }
-                                                        },
-                                                        onMoveDown = {
-                                                            val pos =
-                                                                installationOrder.indexOf(instId)
-                                                            if (pos >= 0 && pos < installationOrder.lastIndex) {
-                                                                val list =
-                                                                    installationOrder.toMutableList()
-                                                                val tmp =
-                                                                    list[pos + 1]; list[pos + 1] =
-                                                                    list[pos]; list[pos] = tmp
-                                                                localInstallationOrders =
-                                                                    localInstallationOrders.toMutableMap()
-                                                                        .apply {
-                                                                            put(siteId, list)
-                                                                        }
-                                                            }
-                                                        },
-                                                        onArchive = { vm.archiveInstallation(instId) },
-                                                        onRestore = { vm.restoreInstallation(instId) },
-                                                        onDelete = {
-                                                            deleteDialogState =
-                                                                SiteDeleteDialogState(
-                                                                    isSite = false,
-                                                                    id = instId,
-                                                                    name = inst.name
-                                                                )
-                                                        }
-                                                    )
+                                            )
+                                            .heightIn(max = 400.dp),
+                                        key = { it },
+                                        contentPadding = PaddingValues(0.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) { instId, _, installationReorderableState ->
+                                        val inst = installations.find { it.id == instId } ?: return@ReorderableLazyColumn
+                                        val instIndex = installationOrder.indexOf(instId)
+                                        InstallationRowWithDrag(
+                                            installation = inst,
+                                            index = instIndex,
+                                            isArchived = inst.isArchived,
+                                            onMoveUp = {
+                                                val pos = installationOrder.indexOf(instId)
+                                                if (pos > 0) {
+                                                    val list = installationOrder.toMutableList()
+                                                    val tmp = list[pos - 1]; list[pos - 1] = list[pos]; list[pos] = tmp
+                                                    localInstallationOrders = localInstallationOrders.toMutableMap().apply {
+                                                        put(siteId, list)
+                                                    }
                                                 }
-                                        }
+                                            },
+                                            onMoveDown = {
+                                                val pos = installationOrder.indexOf(instId)
+                                                if (pos >= 0 && pos < installationOrder.lastIndex) {
+                                                    val list = installationOrder.toMutableList()
+                                                    val tmp = list[pos + 1]; list[pos + 1] = list[pos]; list[pos] = tmp
+                                                    localInstallationOrders = localInstallationOrders.toMutableMap().apply {
+                                                        put(siteId, list)
+                                                    }
+                                                }
+                                            },
+                                            onArchive = { vm.archiveInstallation(instId) },
+                                            onRestore = { vm.restoreInstallation(instId) },
+                                            onDelete = {
+                                                deleteDialogState = SiteDeleteDialogState(
+                                                    isSite = false,
+                                                    id = instId,
+                                                    name = inst.name
+                                                )
+                                            },
+                                            reorderableState = installationReorderableState
+                                        )
                                     }
                                 }
                             }

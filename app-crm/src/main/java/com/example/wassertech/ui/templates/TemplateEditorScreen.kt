@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -579,13 +580,65 @@ private fun InfoTooltip(
     onDismiss: () -> Unit
 ) {
     val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    
+    // Позиция и размеры контейнера Box в window координатах
+    var containerPosition by remember { mutableStateOf<Offset?>(null) }
+    var containerSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+    
+    // Состояние для размеров тултипа
+    var tooltipSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+    
+    // Вычисляем относительную позицию тултипа с учетом границ экрана
+    val tooltipOffset = remember(anchorPosition, containerPosition, containerSize, tooltipSize, screenWidthPx, density) {
+        if (anchorPosition == null || containerPosition == null || tooltipSize.width == 0f || tooltipSize.height == 0f) {
+            Offset.Zero
+        } else {
+            val tooltipWidthPx = tooltipSize.width
+            
+            // Вычисляем относительную позицию относительно контейнера
+            val relativeX = anchorPosition.x - containerPosition!!.x
+            val relativeY = anchorPosition.y - containerPosition!!.y
+            
+            // Горизонтальная позиция: центрируем относительно иконки, но не выходим за края
+            val desiredX = relativeX - tooltipWidthPx / 2f // Центрируем относительно иконки
+            
+            // Границы контейнера с учетом отступов от краев экрана
+            val minX = 16f // Минимальная позиция с учетом отступа от левого края контейнера
+            val maxX = if (containerSize.width > 0f) {
+                containerSize.width - tooltipWidthPx - 16f // Максимальная позиция с учетом отступа от правого края контейнера
+            } else {
+                screenWidthPx - tooltipWidthPx - 16f // Fallback на размеры экрана
+            }
+            
+            val x = when {
+                desiredX < minX -> minX
+                desiredX > maxX -> maxX
+                else -> desiredX
+            }
+            
+            // Вертикальная позиция: верхняя грань тултипа на уровне иконки
+            val y = relativeY
+            
+            Offset(x, y)
+        }
+    }
 
     // Используем Box с fillMaxSize для верхнего слоя
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(1000f), // Верхний слой
-        contentAlignment = Alignment.Center
+            .zIndex(1000f) // Верхний слой
+            .onGloballyPositioned { coordinates ->
+                // Получаем позицию и размеры контейнера в window координатах
+                containerPosition = coordinates.localToWindow(Offset.Zero)
+                containerSize = androidx.compose.ui.geometry.Size(
+                    width = coordinates.size.width.toFloat(),
+                    height = coordinates.size.height.toFloat()
+                )
+            },
+        contentAlignment = Alignment.TopStart
     ) {
         // Полупрозрачный фон - кликабельный для закрытия
         Surface(
@@ -596,14 +649,20 @@ private fun InfoTooltip(
         ) {}
 
         // Карточка с подсказкой - позиционируется относительно иконки
-        if (anchorPosition != null) {
+        if (anchorPosition != null && containerPosition != null) {
             Card(
                 modifier = Modifier
                     .offset(
-                        x = with(density) { anchorPosition.x.toDp() - 250.dp }, // Смещаем влево от иконки
-                        y = with(density) { anchorPosition.y.toDp() - 50.dp } // Позиционируем на уровне иконки (чуть выше)
+                        x = with(density) { tooltipOffset.x.toDp() },
+                        y = with(density) { tooltipOffset.y.toDp() }
                     )
                     .widthIn(max = 300.dp)
+                    .onGloballyPositioned { coordinates ->
+                        tooltipSize = androidx.compose.ui.geometry.Size(
+                            width = coordinates.size.width.toFloat(),
+                            height = coordinates.size.height.toFloat()
+                        )
+                    }
                     .clickable(enabled = false) {}, // Предотвращаем закрытие при клике на карточку
                 colors = CardDefaults.cardColors(
                     containerColor = Color(0xFFFFEB3B).copy(alpha = 0.85f) // Жёлтый фон с прозрачностью 85%
@@ -662,7 +721,7 @@ private fun InfoTooltip(
                 }
             }
         } else {
-            // anchorPosition == null, карточка не показывается
+            // anchorPosition == null или containerPosition == null, карточка не показывается
         }
     }
 }
