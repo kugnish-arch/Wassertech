@@ -42,6 +42,8 @@ import ru.wassertech.core.ui.theme.ClientsGroupExpandedText
 import ru.wassertech.core.ui.theme.ClientsGroupBorder
 import ru.wassertech.core.ui.theme.ClientsRowDivider
 import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
+import ru.wassertech.core.ui.reorderable.ReorderableState
+import ru.wassertech.core.ui.reorderable.detectReorder
 
 private const val GENERAL_SECTION_ID: String = "__GENERAL__SECTION__"
 
@@ -353,7 +355,7 @@ fun ClientsScreen(
                                     key = { it }, // clientId: String
                                     contentPadding = PaddingValues(0.dp),
                                     verticalArrangement = Arrangement.spacedBy(0.dp)
-                                ) { clientId, isDragging ->
+                                ) { clientId, isDragging, reorderableState ->
                                     val client = generalById[clientId] ?: return@ReorderableLazyColumn
                                     
                                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -399,6 +401,7 @@ fun ClientsScreen(
                                                 )
                                             },
                                             isDragging = isDragging,
+                                            reorderableState = reorderableState,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .background(Color.White)
@@ -527,7 +530,7 @@ fun ClientsScreen(
                                     key = { it }, // clientId: String
                                     contentPadding = PaddingValues(0.dp),
                                     verticalArrangement = Arrangement.spacedBy(0.dp)
-                                ) { cid, isDragging ->
+                                ) { cid, isDragging, reorderableState ->
                                     val client = byGroupIdMap[groupId]?.get(cid) ?: return@ReorderableLazyColumn
                                     
                                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -573,6 +576,7 @@ fun ClientsScreen(
                                                 )
                                             },
                                             isDragging = isDragging,
+                                            reorderableState = reorderableState,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .background(Color.White)
@@ -1094,6 +1098,7 @@ private fun ClientRowWithEdit(
     onEditName: () -> Unit,
     onDelete: () -> Unit = {},
     isDragging: Boolean,
+    reorderableState: ReorderableState? = null,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -1116,7 +1121,15 @@ private fun ClientRowWithEdit(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Перетащить",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .then(
+                        if (reorderableState != null) {
+                            Modifier.detectReorder(reorderableState)
+                        } else {
+                            Modifier
+                        }
+                    )
             )
             Spacer(Modifier.width(8.dp))
         }
