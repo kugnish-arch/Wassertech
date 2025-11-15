@@ -36,5 +36,11 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.compose.foundation:foundation")
+
+    // ComposeReorderable для drag-n-drop в списках
+    // Версия 0.9.6 совместима с Compose BOM 2024.10.01
+    // Библиотека предоставляет готовые компоненты для перетаскивания элементов в LazyColumn/LazyRow
+    implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
 }
 
