@@ -30,6 +30,7 @@ include(":core:auth")
 // Feature modules
 include(":feature:auth")
 include(":feature:reports")
+include(":feature:icons")
 
 // App modules
 include(":app-crm")

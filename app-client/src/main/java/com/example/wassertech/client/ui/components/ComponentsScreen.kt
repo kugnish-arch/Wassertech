@@ -126,7 +126,9 @@ fun ComponentsScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            if (currentUser != null && canCreateEntity(currentUser) && installation != null) {
+            // Показываем FAB только если пользователь является создателем установки
+            val currentInstallation = installation
+            if (currentUser != null && currentInstallation != null && currentInstallation.createdByUserId == currentUser.userId) {
                 FloatingActionButton(
                     onClick = {
                         showAddDialog = true

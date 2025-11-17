@@ -131,6 +131,7 @@ dependencies {
     // Feature modules
     implementation(project(":feature:auth"))
     implementation(project(":feature:reports"))
+    implementation(project(":feature:icons"))
     
     // Retrofit (транзитивно из core:network, но добавляем явно для надежности)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

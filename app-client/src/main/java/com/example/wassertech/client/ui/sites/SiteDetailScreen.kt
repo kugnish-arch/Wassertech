@@ -38,6 +38,7 @@ import ru.wassertech.core.ui.R
 import ru.wassertech.core.ui.components.AppEmptyState
 import ru.wassertech.core.ui.components.EmptyGroupPlaceholder
 import ru.wassertech.core.ui.components.EntityRowWithMenu
+import ru.wassertech.core.ui.components.ScreenTitleWithSubtitle
 import ru.wassertech.core.ui.theme.ClientsRowDivider
 import ru.wassertech.core.ui.icons.IconResolver
 import ru.wassertech.core.ui.icons.IconEntityType
@@ -111,7 +112,9 @@ fun SiteDetailScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            if (currentUser != null && canCreateEntity(currentUser) && site != null) {
+            // Показываем FAB только если пользователь является создателем объекта
+            val currentSite = site
+            if (currentUser != null && currentSite != null && currentSite.createdByUserId == currentUser.userId) {
                 FloatingActionButton(
                     onClick = {
                         showAddDialog = true
@@ -172,12 +175,16 @@ fun SiteDetailScreen(
                             localImagePath = siteLocalImagePath // Передаем локальный путь к файлу изображения
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            siteName,
-                            style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                            color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                        // Используем ScreenTitleWithSubtitle для текстовой части заголовка
+                        ScreenTitleWithSubtitle(
+                            title = siteName,
+                            subtitle = null,
+                            titleStyle = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                            subtitleStyle = MaterialTheme.typography.bodySmall,
+                            titleColor = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
+                            subtitleColor = Color.White, // Белый цвет для подзаголовка на графитовом фоне
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(Modifier.weight(1f))
                         // Кнопки действий для объекта
                         val siteForEdit = site
                         if (currentUser != null && siteForEdit != null) {

@@ -72,6 +72,7 @@ dependencies {
     // Feature modules
     implementation(project(":feature:auth"))
     implementation(project(":feature:reports"))
+    implementation(project(":feature:icons"))
     
     // Compose BOM: 2024.10.01
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")

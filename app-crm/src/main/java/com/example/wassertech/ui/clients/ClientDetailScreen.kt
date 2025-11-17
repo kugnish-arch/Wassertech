@@ -203,6 +203,7 @@ fun InstallationRowWithDrag(
     installation: InstallationEntity,
     index: Int,
     isArchived: Boolean,
+    icon: ru.wassertech.data.entities.IconEntity? = null,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onArchive: () -> Unit,
@@ -269,14 +270,24 @@ fun InstallationRowWithDrag(
                 )
                 Spacer(Modifier.width(8.dp))
             }
-            // Иконка установки - используем Image вместо Icon для консистентности
-            Image(
-                painter = painterResource(id = R.drawable.equipment_filter_triple),
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
+            // Отображаем иконку из БД или дефолтную
+            val context = LocalContext.current
+            val iconRepository = remember { ru.wassertech.data.repository.IconRepository(context) }
+            val localImagePath by remember(icon?.id) {
+                kotlinx.coroutines.flow.flow {
+                    val path = icon?.id?.let { iconRepository.getLocalIconPath(it) }
+                    emit(path)
+                }
+            }.collectAsState(initial = null)
+            IconResolver.IconImage(
+                androidResName = icon?.androidResName,
+                entityType = IconEntityType.INSTALLATION,
+                contentDescription = "Установка",
+                size = 48.dp,
+                code = icon?.code, // Передаем code для fallback
+                localImagePath = localImagePath // Передаем локальный путь к файлу изображения
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
                 "${index + 1}. ${installation.name}",
                 style = MaterialTheme.typography.titleMedium,
@@ -447,6 +458,25 @@ fun ClientDetailScreen(
                 }
             }
             siteIcons = iconsMap
+        }
+    }
+    
+    // Загружаем иконки для всех установок
+    var installationIcons by remember {
+        mutableStateOf<Map<String, ru.wassertech.data.entities.IconEntity?>>(emptyMap())
+    }
+    LaunchedEffect(allInstallations) {
+        scope.launch(Dispatchers.IO) {
+            val iconsMap = mutableMapOf<String, ru.wassertech.data.entities.IconEntity?>()
+            allInstallations.values.flatten().forEach { installation ->
+                if (installation.iconId != null) {
+                    val icon = vm.getIcon(installation.iconId)
+                    iconsMap[installation.id] = icon
+                } else {
+                    iconsMap[installation.id] = null
+                }
+            }
+            installationIcons = iconsMap
         }
     }
 
@@ -747,6 +777,7 @@ fun ClientDetailScreen(
                                         installation = inst,
                                         index = instIndex,
                                         isArchived = inst.isArchived,
+                                        icon = installationIcons[instId],
                                         onMoveUp = {
                                             if (isEditing) {
                                                 val pos = installationOrder.indexOf(instId)
