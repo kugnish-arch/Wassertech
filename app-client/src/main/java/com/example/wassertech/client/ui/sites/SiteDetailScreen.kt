@@ -155,11 +155,21 @@ fun SiteDetailScreen(
                             site?.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
                         }.collectAsState(initial = null)
                         
+                        // Загружаем локальный путь к изображению иконки объекта
+                        val siteLocalImagePath by remember(site?.iconId) {
+                            kotlinx.coroutines.flow.flow {
+                                val path = site?.iconId?.let { iconRepository.getLocalIconPath(it) }
+                                emit(path)
+                            }
+                        }.collectAsState(initial = null)
+                        
                         IconResolver.IconImage(
                             androidResName = siteIcon?.androidResName,
                             entityType = IconEntityType.SITE,
                             contentDescription = "Объект",
-                            size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2
+                            size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2,
+                            code = siteIcon?.code, // Передаем code для fallback
+                            localImagePath = siteLocalImagePath // Передаем локальный путь к файлу изображения
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
@@ -181,6 +191,33 @@ fun SiteDetailScreen(
                                             icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
                                         }
                                         val iconsByPack = filteredIcons.groupBy { it.packId }
+                                        
+                                        // Загружаем localImagePath для каждой иконки (suspend функция)
+                                        // Если файл не существует и есть imageUrl, загружаем изображение
+                                        val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
+                                            icons.map { icon ->
+                                                var localPath = iconRepository.getLocalIconPath(icon.id)
+                                                
+                                                // Если файл не существует и есть imageUrl, загружаем изображение
+                                                if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
+                                                    val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
+                                                    if (downloadResult.isSuccess) {
+                                                        localPath = iconRepository.getLocalIconPath(icon.id)
+                                                    }
+                                                }
+                                                
+                                                ru.wassertech.core.ui.components.IconUiData(
+                                                    id = icon.id,
+                                                    packId = icon.packId,
+                                                    label = icon.label,
+                                                    entityType = icon.entityType,
+                                                    androidResName = icon.androidResName,
+                                                    code = icon.code, // Передаем code для fallback
+                                                    localImagePath = localPath // Загружаем локальный путь через IconRepository
+                                                )
+                                            }
+                                        }
+                                        
                                         iconPickerStateForSite = IconPickerUiState(
                                             packs = packs.map { 
                                                 ru.wassertech.core.ui.components.IconPackUiData(
@@ -188,20 +225,7 @@ fun SiteDetailScreen(
                                                     name = it.name
                                                 )
                                             },
-                                            iconsByPack = iconsByPack.mapValues { (_, icons) ->
-                                                icons.map { icon ->
-                                                    val localPath = iconRepository.getLocalIconPath(icon.id)
-                                                    ru.wassertech.core.ui.components.IconUiData(
-                                                        id = icon.id,
-                                                        packId = icon.packId,
-                                                        label = icon.label,
-                                                        entityType = icon.entityType,
-                                                        androidResName = icon.androidResName,
-                                                        code = icon.code, // Передаем code для fallback
-                                                        localImagePath = localPath // Загружаем локальный путь через IconRepository
-                                                    )
-                                                }
-                                            }
+                                            iconsByPack = iconsByPackWithPaths
                                         )
                                         isIconPickerVisibleForSite = true
                                     }
@@ -254,10 +278,19 @@ fun SiteDetailScreen(
                             installation.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
                         }.collectAsState(initial = null)
                         
+                        // Загружаем локальный путь к изображению иконки установки
+                        val installationLocalImagePath by remember(installation.iconId) {
+                            kotlinx.coroutines.flow.flow {
+                                val path = installation.iconId?.let { iconRepository.getLocalIconPath(it) }
+                                emit(path)
+                            }
+                        }.collectAsState(initial = null)
+                        
                         Column(modifier = Modifier.fillMaxWidth()) {
                             InstallationRow(
                                 installation = installation,
                                 icon = installationIcon,
+                                localImagePath = installationLocalImagePath,
                                 onClick = { onOpenInstallation(installation.id) },
                                 onEdit = if (currentUser != null && canEditInstallation(currentUser, installation, site)) {
                                     { /* TODO: Реализовать редактирование установки */ }
@@ -481,6 +514,8 @@ fun SiteDetailScreen(
                             syncStatus = 1 // QUEUED
                         )
                         db.hierarchyDao().upsertSite(updatedSite)
+                        // Принудительно обновляем Flow, чтобы UI перерисовался сразу
+                        // Это делается через upsertSite, который должен обновить observeSite
                     }
                 }
                 isIconPickerVisibleForSite = false
@@ -517,6 +552,7 @@ fun SiteDetailScreen(
                                 syncStatus = 1 // QUEUED
                             )
                             db.hierarchyDao().upsertInstallation(updatedInstallation)
+                            // Принудительно обновляем Flow, чтобы UI перерисовался сразу
                         }
                     }
                 }
@@ -532,6 +568,7 @@ fun SiteDetailScreen(
 private fun InstallationRow(
     installation: InstallationEntity,
     icon: ru.wassertech.client.data.entities.IconEntity? = null,
+    localImagePath: String? = null,
     onClick: () -> Unit,
     onEdit: (() -> Unit)? = null,
     onChangeIcon: (() -> Unit)? = null,
@@ -551,7 +588,9 @@ private fun InstallationRow(
             androidResName = icon?.androidResName,
             entityType = IconEntityType.INSTALLATION,
             contentDescription = "Установка",
-            size = 48.dp
+            size = 48.dp,
+            code = icon?.code, // Передаем code для fallback
+            localImagePath = localImagePath // Передаем локальный путь к файлу изображения
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

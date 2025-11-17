@@ -18,6 +18,7 @@ import ru.wassertech.core.ui.components.IconPackCard
 import ru.wassertech.core.ui.icons.IconEntityType
 import ru.wassertech.client.data.AppDatabase
 import ru.wassertech.client.viewmodel.ClientIconPacksViewModel
+import ru.wassertech.client.data.repository.IconRepository
 
 /**
  * Экран списка доступных икон-паков для клиента.
@@ -38,6 +39,9 @@ fun ClientIconPacksScreen(
     // Загружаем все иконки для превью
     val db = remember { AppDatabase.getInstance(context) }
     val allIcons by db.iconDao().observeAllActive().collectAsState(initial = emptyList())
+    
+    // IconRepository для получения локальных путей к изображениям
+    val iconRepository = remember { IconRepository(context) }
     
     Scaffold(
         topBar = {
@@ -112,15 +116,25 @@ fun ClientIconPacksScreen(
                             val pack = packWithCount.pack
                             
                             // Находим первую иконку пака для превью
-                            val previewIcon = allIcons
-                                .firstOrNull { it.packId == pack.id }
-                                ?.androidResName
+                            val previewIcon = allIcons.firstOrNull { it.packId == pack.id }
+                            
+                            // Получаем локальный путь к превью-иконке, если она загружена
+                            var previewIconLocalPath by remember(pack.id, previewIcon?.id) { mutableStateOf<String?>(null) }
+                            LaunchedEffect(pack.id, previewIcon?.id) {
+                                previewIconLocalPath = previewIcon?.id?.let { iconId ->
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        iconRepository.getLocalIconPath(iconId)
+                                    }
+                                }
+                            }
                             
                             IconPackCard(
                                 title = pack.name,
                                 description = pack.description,
                                 iconsCount = packWithCount.iconsCount,
-                                previewIconResName = previewIcon,
+                                previewIconResName = previewIcon?.androidResName,
+                                previewIconLocalPath = previewIconLocalPath,
+                                previewIconImageUrl = previewIcon?.imageUrl,
                                 entityType = IconEntityType.ANY,
                                 isSystem = pack.isBuiltin,
                                 // Для клиента показываем статусы, но тексты адаптированы

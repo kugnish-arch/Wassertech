@@ -160,6 +160,37 @@ class AuthRepository(private val context: Context) {
      * Выход из системы
      */
     suspend fun logout() {
+        // Получаем информацию о текущей сессии перед очисткой
+        val currentSession = ru.wassertech.core.auth.SessionManager.getInstance(context).getCurrentSession()
+        val userRole = currentSession?.role
+        val userClientId = currentSession?.clientId
+        val isClientRole = userRole == ru.wassertech.core.auth.UserRole.CLIENT
+        
+        // Для роли CLIENT очищаем все данные из Room при выходе
+        if (isClientRole && userClientId != null) {
+            Log.d(TAG, "Очистка данных для роли CLIENT при выходе (clientId: $userClientId)")
+            try {
+                val database = ru.wassertech.client.data.AppDatabase.getInstance(context)
+                
+                // Удаляем все данные клиента
+                database.hierarchyDao().deleteClientsExcept(userClientId)
+                database.hierarchyDao().deleteSitesNotBelongingToClient(userClientId)
+                database.hierarchyDao().deleteInstallationsNotBelongingToClient(userClientId)
+                database.hierarchyDao().deleteComponentsNotBelongingToClient(userClientId)
+                database.sessionsDao().deleteSessionsNotBelongingToClient(userClientId)
+                database.sessionsDao().deleteValuesNotBelongingToClient(userClientId)
+                
+                // Удаляем все иконки и паки (они будут загружены заново при следующем входе)
+                database.iconPackDao().deleteAll()
+                database.iconDao().deleteAll()
+                
+                Log.d(TAG, "Данные клиента очищены из Room")
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при очистке данных при выходе", e)
+                // Продолжаем выход даже при ошибке очистки
+            }
+        }
+        
         tokenStorage.clearTokensAsync()
         ru.wassertech.core.auth.SessionManager.getInstance(context).clearSession()
         Log.d(TAG, "Пользователь вышел из системы, сессия очищена")

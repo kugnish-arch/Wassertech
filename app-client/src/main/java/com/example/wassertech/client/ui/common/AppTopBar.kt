@@ -7,6 +7,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,11 +25,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import ru.wassertech.client.auth.AuthRepository
 import ru.wassertech.navigation.AppRoutes
 import ru.wassertech.feature.auth.AuthRoutes
+import ru.wassertech.core.ui.theme.EditButtonStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
     navController: NavController,
+    isEditing: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
+    onSave: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null,
     onLogout: (() -> Unit)? = null
 ) {
     val backEntry by navController.currentBackStackEntryAsState()
@@ -77,10 +87,15 @@ fun AppTopBar(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Настройки") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Settings,
+                                        contentDescription = null
+                                    )
+                                },
                                 onClick = {
                                     menuOpen = false
-                                    navController.navigate(AppRoutes.HOME) {
-                                        // Переключаемся на вкладку настроек
+                                    navController.navigate(AppRoutes.HOME_SETTINGS) {
                                         launchSingleTop = true
                                     }
                                 }
@@ -88,6 +103,12 @@ fun AppTopBar(
                             if (onLogout != null) {
                                 DropdownMenuItem(
                                     text = { Text("Выйти") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Filled.Logout,
+                                            contentDescription = null
+                                        )
+                                    },
                                     onClick = {
                                         menuOpen = false
                                         onLogout()
@@ -104,6 +125,49 @@ fun AppTopBar(
                 text = pageTitle,
                 style = MaterialTheme.typography.titleLarge
             )
+        },
+        actions = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Переключатель режима редактирования (если доступен)
+                if (onToggleEdit != null || onSave != null || onCancel != null) {
+                    if (isEditing) {
+                        // В режиме редактирования показываем две кнопки: Отмена и Сохранить
+                        // Кнопка "Отмена" (красный кружок с крестом)
+                        if (onCancel != null) {
+                            IconButton(onClick = onCancel) {
+                                Icon(
+                                    imageVector = EditButtonStyle.CancelIcon,
+                                    contentDescription = "Отмена",
+                                    tint = EditButtonStyle.CancelIconColor
+                                )
+                            }
+                        }
+                        // Кнопка "Сохранить" (зеленый кружок с галочкой)
+                        if (onSave != null) {
+                            IconButton(onClick = onSave) {
+                                Icon(
+                                    imageVector = EditButtonStyle.SaveIcon,
+                                    contentDescription = "Сохранить",
+                                    tint = EditButtonStyle.SaveIconColor
+                                )
+                            }
+                        }
+                    } else {
+                        // Вне режима редактирования показываем кнопку "Редактировать"
+                        if (onToggleEdit != null) {
+                            IconButton(onClick = onToggleEdit) {
+                                Icon(
+                                    imageVector = EditButtonStyle.EditIcon,
+                                    contentDescription = "Редактировать"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     )
 }

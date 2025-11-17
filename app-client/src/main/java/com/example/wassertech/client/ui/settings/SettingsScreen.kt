@@ -14,10 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import ru.wassertech.core.auth.UserAuthService
 import ru.wassertech.client.sync.SyncEngine
 import androidx.navigation.NavHostController
 import ru.wassertech.navigation.AppRoutes
@@ -125,7 +125,8 @@ fun SettingsScreen(
                         syncing = true
                         syncMessage = null
                         try {
-                            if (!UserAuthService.isLoggedIn(context)) {
+                            val sessionManager = ru.wassertech.core.auth.SessionManager.getInstance(context)
+                            if (!sessionManager.isLoggedIn()) {
                                 syncMessage = "Необходимо войти в систему для синхронизации"
                                 snackbarHostState.showSnackbar(syncMessage!!)
                                 return@launch
@@ -150,7 +151,7 @@ fun SettingsScreen(
                         }
                     }
                 },
-                enabled = !syncing && UserAuthService.isLoggedIn(context),
+                enabled = !syncing && ru.wassertech.core.auth.SessionManager.getInstance(context).isLoggedIn(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (syncing) {
@@ -241,12 +242,19 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        // Выполняем logout через UserAuthService
-                        UserAuthService.logout(context)
-                        // Закрываем диалог
-                        showLogoutDialog = false
-                        // Вызываем callback для навигации
-                        onLogout()
+                        // Выполняем logout через AuthRepository (очищает данные для CLIENT)
+                        scope.launch {
+                            try {
+                                val authRepository = ru.wassertech.client.auth.AuthRepository(context)
+                                authRepository.logout()
+                            } catch (e: Exception) {
+                                Log.e("SettingsScreen", "Ошибка при выходе", e)
+                            }
+                            // Закрываем диалог
+                            showLogoutDialog = false
+                            // Вызываем callback для навигации
+                            onLogout()
+                        }
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error

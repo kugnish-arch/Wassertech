@@ -69,12 +69,24 @@ class SyncEngine(private val context: Context) {
                 
                 Log.d(TAG, "Токен найден: ${token.take(20)}... (длина: ${token.length})")
                 
-                // Получаем информацию о текущем пользователе для логирования
+                // Получаем информацию о текущем пользователе для логирования и передачи client_id
                 val currentSession = ru.wassertech.core.auth.SessionManager.getInstance(context).getCurrentSession()
                 val userClientId = currentSession?.clientId
-                val userRole = currentSession?.role?.name
+                val userRole = currentSession?.role
                 val userId = currentSession?.userId
-                Log.d(TAG, "Информация о пользователе: userId=$userId, role=$userRole, clientId=$userClientId")
+                Log.d(TAG, "=== ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ ===")
+                Log.d(TAG, "userId=$userId")
+                Log.d(TAG, "role=${userRole?.name} (enum: $userRole)")
+                Log.d(TAG, "clientId=$userClientId")
+                Log.d(TAG, "isClientRole=${userRole == ru.wassertech.core.auth.UserRole.CLIENT}")
+                Log.d(TAG, "clientId.isNullOrBlank()=${userClientId.isNullOrBlank()}")
+                
+                // Определяем, нужно ли передавать client_id в запрос
+                // Для роли CLIENT передаем client_id, если он доступен
+                val shouldSendClientId = userRole == ru.wassertech.core.auth.UserRole.CLIENT && !userClientId.isNullOrBlank()
+                val clientIdForRequest = if (shouldSendClientId) userClientId else null
+                Log.d(TAG, "shouldSendClientId=$shouldSendClientId")
+                Log.d(TAG, "clientIdForRequest=$clientIdForRequest")
                 
                 // Получаем timestamp последней синхронизации (в миллисекундах)
                 var lastSyncTimestampMs = getLastSyncTimestamp() ?: 0L
@@ -94,14 +106,42 @@ class SyncEngine(private val context: Context) {
                 val lastSyncTimestampSec = if (lastSyncTimestampMs == 0L) 1L else lastSyncTimestampMs / 1000
                 Log.d(TAG, "Последняя синхронизация: ${lastSyncTimestampMs}ms = ${lastSyncTimestampSec}s")
                 
+                // Формируем URL для логирования
                 val baseUrl = ApiConfig.getBaseUrl()
-                val fullUrl = "$baseUrl/sync/pull?since=$lastSyncTimestampSec"
-                Log.d(TAG, "Вызываю syncApi.syncPull(since=$lastSyncTimestampSec)")
+                val urlParams = buildString {
+                    append("since=$lastSyncTimestampSec")
+                    if (clientIdForRequest != null) {
+                        append("&client_id=$clientIdForRequest")
+                    }
+                }
+                val fullUrl = "$baseUrl/sync/pull?$urlParams"
+                Log.d(TAG, "=== ВЫЗОВ SYNC API ===")
+                Log.d(TAG, "Вызываю syncApi.syncPull(since=$lastSyncTimestampSec${if (clientIdForRequest != null) ", client_id=$clientIdForRequest" else ", client_id=null"})")
                 Log.d(TAG, "Полный URL запроса: $fullUrl")
-                Log.d(TAG, "Пользователь: userId=$userId, role=$userRole, clientId=$userClientId")
+                Log.d(TAG, "Параметры запроса: since=$lastSyncTimestampSec, clientId=$clientIdForRequest")
                 
-                // Запрашиваем изменения
-                val response = syncApi.syncPull(since = lastSyncTimestampSec)
+                // Запрашиваем изменения с передачей client_id для роли CLIENT
+                // ВАЖНО: Retrofit автоматически игнорирует null параметры, поэтому clientIdForRequest будет добавлен в URL только если не null
+                Log.d(TAG, "Перед вызовом syncApi.syncPull: since=$lastSyncTimestampSec, clientId=$clientIdForRequest")
+                val response = syncApi.syncPull(since = lastSyncTimestampSec, clientId = clientIdForRequest)
+                
+                Log.d(TAG, "=== ПОСЛЕ ВЫЗОВА SYNC API ===")
+                Log.d(TAG, "Запрос выполнен, получен ответ")
+                
+                // Дополнительная проверка: логируем фактический URL запроса из ответа (если доступен)
+                try {
+                    val requestUrl = response.raw().request.url.toString()
+                    Log.d(TAG, "Фактический URL запроса (из response.raw()): $requestUrl")
+                    if (clientIdForRequest != null && !requestUrl.contains("client_id=$clientIdForRequest")) {
+                        Log.e(TAG, "⚠️ ОШИБКА: client_id НЕ найден в фактическом URL запроса!")
+                        Log.e(TAG, "Ожидалось: client_id=$clientIdForRequest")
+                        Log.e(TAG, "Фактический URL: $requestUrl")
+                    } else if (clientIdForRequest != null) {
+                        Log.d(TAG, "✓ client_id найден в URL запроса")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Не удалось получить URL из response.raw(): ${e.message}")
+                }
                 
                 Log.d(TAG, "Ответ от сервера: код=${response.code()}, успешно=${response.isSuccessful}")
                 
@@ -217,6 +257,12 @@ class SyncEngine(private val context: Context) {
         
         Log.d(TAG, "=== ОБРАБОТКА ПОЛУЧЕННЫХ ДАННЫХ ===")
         
+        // Получаем информацию о текущем пользователе для определения необходимости очистки
+        val currentSession = ru.wassertech.core.auth.SessionManager.getInstance(context).getCurrentSession()
+        val userRole = currentSession?.role
+        val userClientId = currentSession?.clientId
+        val isClientRole = userRole == ru.wassertech.core.auth.UserRole.CLIENT
+        
         // Обрабатываем объекты (sites)
         Log.d(TAG, "Обработка объектов (sites): ${response.sites.size}")
         response.sites.forEachIndexed { index, dto ->
@@ -281,6 +327,71 @@ class SyncEngine(private val context: Context) {
                 }
                 
                 handleDeletedRecord(entityName, recordId)
+            }
+        }
+        
+        // Для роли CLIENT: очищаем чужие данные после применения ответа
+        if (isClientRole && userClientId != null) {
+            Log.d(TAG, "=== ОЧИСТКА ЧУЖИХ ДАННЫХ ДЛЯ РОЛИ CLIENT ===")
+            Log.d(TAG, "Текущий clientId: $userClientId")
+            
+            try {
+                // Удаляем клиентов, кроме текущего
+                val deletedClients = database.clientDao().getAllClientsNow()
+                    .filter { it.id != userClientId }
+                    .map { it.id }
+                if (deletedClients.isNotEmpty()) {
+                    database.hierarchyDao().deleteClientsExcept(userClientId)
+                    Log.d(TAG, "Удалено чужих клиентов: ${deletedClients.size}")
+                }
+                
+                // Удаляем объекты, не принадлежащие текущему клиенту
+                database.hierarchyDao().deleteSitesNotBelongingToClient(userClientId)
+                Log.d(TAG, "Удалены чужие объекты (sites)")
+                
+                // Удаляем установки, не принадлежащие текущему клиенту
+                database.hierarchyDao().deleteInstallationsNotBelongingToClient(userClientId)
+                Log.d(TAG, "Удалены чужие установки (installations)")
+                
+                // Удаляем компоненты, не принадлежащие текущему клиенту
+                database.hierarchyDao().deleteComponentsNotBelongingToClient(userClientId)
+                Log.d(TAG, "Удалены чужие компоненты (components)")
+                
+                // Удаляем сессии ТО, не принадлежащие текущему клиенту
+                database.sessionsDao().deleteSessionsNotBelongingToClient(userClientId)
+                Log.d(TAG, "Удалены чужие сессии ТО (maintenance_sessions)")
+                
+                // Удаляем значения ТО, не принадлежащие текущему клиенту
+                database.sessionsDao().deleteValuesNotBelongingToClient(userClientId)
+                Log.d(TAG, "Удалены чужие значения ТО (maintenance_values)")
+                
+                // Очищаем иконки и паки: удаляем те, которых нет в ответе
+                val receivedPackIds = response.iconPacks.map { it.id }
+                if (receivedPackIds.isNotEmpty()) {
+                    database.iconPackDao().deletePacksNotInList(receivedPackIds)
+                    Log.d(TAG, "Удалены чужие паки иконок (icon_packs), оставлено: ${receivedPackIds.size}")
+                } else {
+                    // Если не пришло ни одного пака, удаляем все (не должно быть, но на всякий случай)
+                    database.iconPackDao().deleteAll()
+                    Log.d(TAG, "Удалены все паки иконок (ответ пустой)")
+                }
+                
+                val receivedIconIds = response.icons.mapNotNull { dto ->
+                    dto.toEntity()?.id
+                }
+                if (receivedIconIds.isNotEmpty()) {
+                    database.iconDao().deleteIconsNotInList(receivedIconIds)
+                    Log.d(TAG, "Удалены чужие иконки (icons), оставлено: ${receivedIconIds.size}")
+                } else {
+                    // Если не пришло ни одной иконки, удаляем все
+                    database.iconDao().deleteAll()
+                    Log.d(TAG, "Удалены все иконки (ответ пустой)")
+                }
+                
+                Log.d(TAG, "✓ Очистка чужих данных завершена")
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при очистке чужих данных", e)
+                // Не прерываем синхронизацию из-за ошибки очистки
             }
         }
         

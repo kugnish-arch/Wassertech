@@ -21,6 +21,13 @@ class AuthInterceptor(
         val originalRequest = chain.request()
         val url = originalRequest.url.toString()
         
+        // Логируем URL для sync/pull запросов для отладки
+        if (url.contains("/sync/pull")) {
+            Log.d(TAG, "=== SYNC/PULL ЗАПРОС ===")
+            Log.d(TAG, "Полный URL: $url")
+            Log.d(TAG, "Query параметры: ${originalRequest.url.query}")
+        }
+        
         // Не добавляем токен к запросам авторизации
         if (url.contains("/auth/login")) {
             Log.d(TAG, "Пропускаем добавление токена для /auth/login")

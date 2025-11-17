@@ -171,5 +171,25 @@ interface SessionsDao {
             insertValues(values)
         }
     }
+    
+    // ---- Методы для очистки данных по clientId (для роли CLIENT) ----
+    
+    /** Удалить все сессии ТО, не принадлежащие указанному клиенту (через sites) */
+    @Query("""
+        DELETE FROM maintenance_sessions 
+        WHERE siteId NOT IN (SELECT id FROM sites WHERE clientId = :clientId)
+    """)
+    suspend fun deleteSessionsNotBelongingToClient(clientId: String)
+    
+    /** Удалить все значения ТО, не принадлежащие указанному клиенту (через sessions -> sites) */
+    @Query("""
+        DELETE FROM maintenance_values 
+        WHERE sessionId NOT IN (
+            SELECT ms.id FROM maintenance_sessions ms
+            JOIN sites s ON ms.siteId = s.id
+            WHERE s.clientId = :clientId
+        )
+    """)
+    suspend fun deleteValuesNotBelongingToClient(clientId: String)
 
 }

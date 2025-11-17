@@ -46,6 +46,19 @@ interface IconPackDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(packs: List<IconPackEntity>)
+    
+    /**
+     * Удалить все паки, которых нет в списке разрешенных packId.
+     * Используется для очистки данных после синхронизации для роли CLIENT.
+     */
+    @Query("DELETE FROM icon_packs WHERE id NOT IN (:allowedPackIds)")
+    suspend fun deletePacksNotInList(allowedPackIds: List<String>)
+    
+    /**
+     * Удалить все паки (используется при полной очистке для смены клиента).
+     */
+    @Query("DELETE FROM icon_packs")
+    suspend fun deleteAll()
 }
 
 

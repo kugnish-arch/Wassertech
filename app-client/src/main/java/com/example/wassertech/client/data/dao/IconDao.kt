@@ -83,6 +83,19 @@ interface IconDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(icons: List<IconEntity>)
+    
+    /**
+     * Удалить все иконки, которых нет в списке разрешенных iconIds.
+     * Используется для очистки данных после синхронизации для роли CLIENT.
+     */
+    @Query("DELETE FROM icons WHERE id NOT IN (:allowedIconIds)")
+    suspend fun deleteIconsNotInList(allowedIconIds: List<String>)
+    
+    /**
+     * Удалить все иконки (используется при полной очистке для смены клиента).
+     */
+    @Query("DELETE FROM icons")
+    suspend fun deleteAll()
 }
 
 

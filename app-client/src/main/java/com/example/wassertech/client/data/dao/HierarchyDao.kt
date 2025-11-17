@@ -136,6 +136,10 @@ interface HierarchyDao {
       orderIndex ASC, name COLLATE NOCASE ASC
 """)
     suspend fun getComponentsNow(installationId: String): List<ComponentEntity>
+    
+    /** Получить все компоненты по templateId */
+    @Query("SELECT * FROM components WHERE templateId = :templateId")
+    suspend fun getComponentsByTemplate(templateId: String): List<ComponentEntity>
 
     /** Получить все объекты для синхронизации */
     @Query("SELECT * FROM sites")
@@ -194,4 +198,82 @@ interface HierarchyDao {
     /** Пометить компоненты как синхронизированные */
     @Query("UPDATE components SET dirtyFlag = 0, syncStatus = 0 WHERE id IN (:componentIds)")
     suspend fun markComponentsAsSynced(componentIds: List<String>)
+    
+    // ---- Методы для архивации/восстановления ----
+    
+    /** Архивировать объект */
+    @Query("""
+        UPDATE sites
+        SET isArchived = 1, archivedAtEpoch = :timestamp, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :siteId
+    """)
+    suspend fun archiveSite(siteId: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** Восстановить объект из архива */
+    @Query("""
+        UPDATE sites
+        SET isArchived = 0, archivedAtEpoch = NULL, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :siteId
+    """)
+    suspend fun restoreSite(siteId: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** Архивировать установку */
+    @Query("""
+        UPDATE installations
+        SET isArchived = 1, archivedAtEpoch = :timestamp, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :installationId
+    """)
+    suspend fun archiveInstallation(installationId: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** Восстановить установку из архива */
+    @Query("""
+        UPDATE installations
+        SET isArchived = 0, archivedAtEpoch = NULL, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :installationId
+    """)
+    suspend fun restoreInstallation(installationId: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** Архивировать компонент */
+    @Query("""
+        UPDATE components
+        SET isArchived = 1, archivedAtEpoch = :timestamp, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :componentId
+    """)
+    suspend fun archiveComponent(componentId: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** Восстановить компонент из архива */
+    @Query("""
+        UPDATE components
+        SET isArchived = 0, archivedAtEpoch = NULL, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :componentId
+    """)
+    suspend fun restoreComponent(componentId: String, timestamp: Long = System.currentTimeMillis())
+    
+    // ---- Методы для очистки данных по clientId (для роли CLIENT) ----
+    
+    /** Удалить все объекты, не принадлежащие указанному клиенту */
+    @Query("DELETE FROM sites WHERE clientId != :clientId")
+    suspend fun deleteSitesNotBelongingToClient(clientId: String)
+    
+    /** Удалить все установки, не принадлежащие указанному клиенту (через sites) */
+    @Query("""
+        DELETE FROM installations 
+        WHERE siteId NOT IN (SELECT id FROM sites WHERE clientId = :clientId)
+    """)
+    suspend fun deleteInstallationsNotBelongingToClient(clientId: String)
+    
+    /** Удалить все компоненты, не принадлежащие указанному клиенту (через installations -> sites) */
+    @Query("""
+        DELETE FROM components 
+        WHERE installationId NOT IN (
+            SELECT i.id FROM installations i 
+            JOIN sites s ON i.siteId = s.id 
+            WHERE s.clientId = :clientId
+        )
+    """)
+    suspend fun deleteComponentsNotBelongingToClient(clientId: String)
+    
+    /** Удалить все клиенты, кроме указанного */
+    @Query("DELETE FROM clients WHERE id != :clientId")
+    suspend fun deleteClientsExcept(clientId: String)
 }

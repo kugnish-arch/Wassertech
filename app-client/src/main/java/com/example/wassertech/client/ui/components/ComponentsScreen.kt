@@ -41,8 +41,10 @@ import ru.wassertech.core.ui.components.ScreenTitleWithSubtitle
 import ru.wassertech.core.ui.theme.ClientsRowDivider
 import ru.wassertech.core.ui.icons.IconResolver
 import ru.wassertech.core.ui.icons.IconEntityType
+import ru.wassertech.core.ui.icons.IconPickerUiState
 import ru.wassertech.core.ui.components.IconPickerDialog
 import ru.wassertech.client.permissions.canChangeIconForComponent
+import ru.wassertech.client.data.repository.IconRepository
 import androidx.compose.material.icons.filled.Image
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -62,6 +64,7 @@ fun ComponentsScreen(
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
+    val iconRepository = remember { IconRepository(context) }
     val scope = rememberCoroutineScope()
     val layoutDir = LocalLayoutDirection.current
     
@@ -117,7 +120,7 @@ fun ComponentsScreen(
     
     // Состояние для IconPickerDialog
     var isIconPickerVisible by remember { mutableStateOf(false) }
-    var iconPickerState by remember { mutableStateOf<Pair<List<ru.wassertech.core.ui.components.IconPackUiData>, Map<String, List<ru.wassertech.core.ui.components.IconUiData>>>?>(null) }
+    var iconPickerState by remember { mutableStateOf<IconPickerUiState?>(null) }
     var iconPickerComponentId by remember { mutableStateOf<String?>(null) }
     
     Scaffold(
@@ -167,11 +170,21 @@ fun ComponentsScreen(
                                 installation?.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
                             }.collectAsState(initial = null)
                             
+                            // Загружаем локальный путь к изображению иконки установки
+                            val installationLocalImagePath by remember(installation?.iconId) {
+                                kotlinx.coroutines.flow.flow {
+                                    val path = installation?.iconId?.let { iconRepository.getLocalIconPath(it) }
+                                    emit(path)
+                                }
+                            }.collectAsState(initial = null)
+                            
                             IconResolver.IconImage(
                                 androidResName = installationIcon?.androidResName,
                                 entityType = IconEntityType.INSTALLATION,
                                 contentDescription = "Установка",
-                                size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2
+                                size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2,
+                                code = installationIcon?.code, // Передаем code для fallback
+                                localImagePath = installationLocalImagePath // Передаем локальный путь к файлу изображения
                             )
                             Spacer(Modifier.width(8.dp))
                             ScreenTitleWithSubtitle(
@@ -227,11 +240,20 @@ fun ComponentsScreen(
                             component.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
                         }.collectAsState(initial = null)
                         
+                        // Загружаем локальный путь к изображению иконки
+                        val localImagePath by remember(component.iconId) {
+                            kotlinx.coroutines.flow.flow {
+                                val path = component.iconId?.let { iconRepository.getLocalIconPath(it) }
+                                emit(path)
+                            }
+                        }.collectAsState(initial = null)
+                        
                         Column(modifier = Modifier.fillMaxWidth()) {
                             ComponentRow(
                                 component = component,
                                 templateTitle = templateTitle,
                                 icon = componentIcon,
+                                localImagePath = localImagePath,
                                 onChangeIcon = if (currentUser != null && canChangeIconForComponent(currentUser, component, site)) {
                                     {
                                         scope.launch(Dispatchers.IO) {
@@ -241,26 +263,41 @@ fun ComponentsScreen(
                                                 icon.entityType == "ANY" || icon.entityType == IconEntityType.COMPONENT.name
                                             }
                                             val iconsByPack = filteredIcons.groupBy { it.packId }
-                                            iconPickerState = Pair(
-                                                packs.map { 
+                                            
+                                            // Загружаем localImagePath для каждой иконки (suspend функция)
+                                            // Если файл не существует и есть imageUrl, загружаем изображение
+                                            val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
+                                                icons.map { icon ->
+                                                    var localPath = iconRepository.getLocalIconPath(icon.id)
+                                                    
+                                                    // Если файл не существует и есть imageUrl, загружаем изображение
+                                                    if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
+                                                        val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
+                                                        if (downloadResult.isSuccess) {
+                                                            localPath = iconRepository.getLocalIconPath(icon.id)
+                                                        }
+                                                    }
+                                                    
+                                                    ru.wassertech.core.ui.components.IconUiData(
+                                                        id = icon.id,
+                                                        packId = icon.packId,
+                                                        label = icon.label,
+                                                        entityType = icon.entityType,
+                                                        androidResName = icon.androidResName,
+                                                        code = icon.code, // Передаем code для fallback
+                                                        localImagePath = localPath // Загружаем локальный путь через IconRepository
+                                                    )
+                                                }
+                                            }
+                                            
+                                            iconPickerState = IconPickerUiState(
+                                                packs = packs.map { 
                                                     ru.wassertech.core.ui.components.IconPackUiData(
                                                         id = it.id,
                                                         name = it.name
                                                     )
                                                 },
-                                                iconsByPack.mapValues { (_, icons) ->
-                                                    icons.map { icon ->
-                                                        ru.wassertech.core.ui.components.IconUiData(
-                                                            id = icon.id,
-                                                            packId = icon.packId,
-                                                            label = icon.label,
-                                                            entityType = icon.entityType,
-                                                            androidResName = icon.androidResName,
-                                                            code = icon.code, // Передаем code для fallback
-                                                            localImagePath = null // В app-client загрузка изображений не реализована
-                                                        )
-                                                    }
-                                                }
+                                                iconsByPack = iconsByPackWithPaths
                                             )
                                             iconPickerComponentId = component.id
                                             isIconPickerVisible = true
@@ -426,7 +463,7 @@ fun ComponentsScreen(
     }
     
     // Диалог выбора иконки компонента
-    iconPickerState?.let { (packs, iconsByPack) ->
+    iconPickerState?.let { state ->
         val component = iconPickerComponentId?.let { compId ->
             components.firstOrNull { it.id == compId }
         }
@@ -437,8 +474,8 @@ fun ComponentsScreen(
                 iconPickerComponentId = null
             },
             entityType = IconEntityType.COMPONENT,
-            packs = packs,
-            iconsByPack = iconsByPack,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
             selectedIconId = component?.iconId,
             onIconSelected = { newIconId ->
                 iconPickerComponentId?.let { compId ->
@@ -452,6 +489,8 @@ fun ComponentsScreen(
                                 syncStatus = 1 // QUEUED
                             )
                             db.hierarchyDao().upsertComponent(updatedComponent)
+                            // Принудительно обновляем Flow, чтобы UI перерисовался сразу
+                            // observeComponents должен автоматически обновиться через Flow
                         }
                     }
                 }
@@ -467,6 +506,7 @@ private fun ComponentRow(
     component: ComponentEntity,
     templateTitle: String,
     icon: ru.wassertech.client.data.entities.IconEntity? = null,
+    localImagePath: String? = null,
     onChangeIcon: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -483,7 +523,9 @@ private fun ComponentRow(
             androidResName = icon?.androidResName,
             entityType = IconEntityType.COMPONENT,
             contentDescription = "Компонент",
-            size = 48.dp
+            size = 48.dp,
+            code = icon?.code, // Передаем code для fallback
+            localImagePath = localImagePath // Передаем локальный путь к файлу изображения
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
