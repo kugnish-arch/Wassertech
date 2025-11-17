@@ -1,5 +1,6 @@
 package ru.wassertech.client.data.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -9,7 +10,9 @@ import androidx.room.PrimaryKey
     indices = [
         Index("isArchived"),
         Index("dirtyFlag"),
-        Index("syncStatus")
+        Index("syncStatus"),
+        Index("origin"),
+        Index("created_by_user_id")
     ]
 )
 /**
@@ -31,15 +34,17 @@ data class InstallationEntity(
     val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
     // Другие поля
     val orderIndex: Int = 0,
-    // TODO: Добавить поля ownerClientId и origin после миграции БД
+    @ColumnInfo(name = "icon_id") val iconId: String? = null, // FK → icons.id
+    // Поля для ролей и владения данными
     val ownerClientId: String? = null, // FK → clients.id
-    val origin: String? = null // "CRM" или "CLIENT"
+    val origin: String? = null, // "CRM" или "CLIENT"
+    @ColumnInfo(name = "created_by_user_id") val createdByUserId: String? = null // FK → users.id
 ) {
     /**
      * Получает OriginType (по умолчанию CRM для старых данных).
      * Переименовано из getOrigin() чтобы избежать конфликта с Room (Room генерирует getOrigin() для поля origin).
      */
-    fun getOriginType(): ru.wassertech.client.auth.OriginType {
-        return ru.wassertech.client.auth.OriginType.fromString(origin)
+    fun getOriginType(): ru.wassertech.core.auth.OriginType {
+        return ru.wassertech.core.auth.OriginType.fromString(origin)
     }
 }

@@ -15,6 +15,8 @@ data class SyncPullResponse(
     val maintenance_values: List<SyncMaintenanceValueDto> = emptyList(),
     val component_templates: List<SyncComponentTemplateDto> = emptyList(),
     val component_template_fields: List<SyncChecklistFieldDto> = emptyList(), // Используем SyncChecklistFieldDto для совместимости структуры
+    @SerializedName("icon_packs") val iconPacks: List<SyncIconPackDto> = emptyList(),
+    val icons: List<SyncIconDto> = emptyList(),
     val deleted: List<DeletedRecordDto> = emptyList()
 )
 

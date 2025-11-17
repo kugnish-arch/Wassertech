@@ -54,3 +54,4 @@ data class ComponentTemplateFieldEntity(
     val syncStatus: Int = 0 // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
 )
 
+

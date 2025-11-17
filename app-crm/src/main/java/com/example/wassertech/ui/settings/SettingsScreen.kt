@@ -1,11 +1,13 @@
 package ru.wassertech.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,9 +23,12 @@ import ru.wassertech.sync.SyncEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.navigation.NavHostController
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    navController: NavHostController? = null
+) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
     val scope = rememberCoroutineScope()
@@ -55,6 +60,57 @@ fun SettingsScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(Modifier.height(8.dp))
+            
+            // Пункт для перехода к икон-пакам
+            if (navController != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            navController.navigate("icon_packs") {
+                                launchSingleTop = true
+                            }
+                        },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Икон-паки",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "Просмотр всех доступных пакетов иконок",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+                            contentDescription = "Открыть",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
             
             // Настройка сохранения HTML
             Card(

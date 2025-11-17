@@ -7,7 +7,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import ru.wassertech.client.api.dto.InstallationDto
 import ru.wassertech.client.api.dto.LoginRequest
-import ru.wassertech.client.api.dto.LoginResponse
+import ru.wassertech.core.network.dto.LoginResponse
 
 /**
  * Интерфейс API для Wassertech Client

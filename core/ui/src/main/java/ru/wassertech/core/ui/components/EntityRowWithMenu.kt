@@ -2,6 +2,7 @@ package ru.wassertech.core.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,9 +10,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import ru.wassertech.core.ui.reorderable.ReorderableState
 import ru.wassertech.core.ui.reorderable.detectReorder
+import ru.wassertech.core.ui.reorderable.detectReorderAfterLongPress
 import ru.wassertech.core.ui.theme.DeleteIcon
 import ru.wassertech.core.ui.theme.DropdownMenuBackground
 import ru.wassertech.core.ui.theme.NavigationIcons
@@ -30,11 +33,15 @@ import ru.wassertech.core.ui.theme.NavigationIcons
  * @param onArchive Обработчик архивации
  * @param onDelete Обработчик удаления
  * @param onEdit Обработчик редактирования
+ * @param onChangeIcon Обработчик смены иконки (отображается отдельной кнопкой с иконкой Image)
  * @param onMoveToGroup Обработчик перемещения в группу (принимает ID группы или null для "Без группы")
  * @param availableGroups Список доступных групп в формате (id, title)
  * @param modifier Модификатор для применения к компоненту
  * @param reorderableState Состояние для drag-n-drop (если null, drag-n-drop отключен)
  * @param showDragHandle Показывать ли drag handle (иконку меню для перетаскивания)
+ * @param onLongClick Обработчик длительного нажатия (для активации режима редактирования)
+ * @param isDragging Флаг, указывающий, перетаскивается ли элемент в данный момент
+ * @param onToggleEdit Обработчик для включения режима редактирования (вызывается автоматически при начале перетаскивания)
  */
 @Composable
 fun EntityRowWithMenu(
@@ -49,19 +56,60 @@ fun EntityRowWithMenu(
     onArchive: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
+    onChangeIcon: (() -> Unit)? = null,
     onMoveToGroup: ((String?) -> Unit)? = null,
     availableGroups: List<Pair<String, String>> = emptyList(), // (id, title)
     modifier: Modifier = Modifier,
     reorderableState: ReorderableState? = null,
-    showDragHandle: Boolean = false
+    showDragHandle: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    isDragging: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    var hasTriggeredEditMode by remember { mutableStateOf(false) }
+    
+    // Автоматически включаем режим редактирования, когда начинается перетаскивание
+    // и режим редактирования еще не включен
+    LaunchedEffect(isDragging, isEditMode) {
+        if (isDragging && !isEditMode && !hasTriggeredEditMode && onToggleEdit != null) {
+            hasTriggeredEditMode = true
+            onToggleEdit()
+        }
+        // Сбрасываем флаг, когда перетаскивание заканчивается или режим редактирования включается
+        if (!isDragging || isEditMode) {
+            hasTriggeredEditMode = false
+        }
+    }
+    
+    // Определяем, нужно ли применять обработку жестов на всей карточке
+    // Когда режим редактирования выключен, но есть reorderableState,
+    // НЕ применяем никаких модификаторов для обработки жестов - позволяем detectReorderAfterLongPress на уровне колонки
+    // обработать long press и начать перетаскивание сразу
+    val shouldEnableDragOnCard = !isEditMode && reorderableState != null && !isArchived
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (!isEditMode && onClick != null) {
+                if (shouldEnableDragOnCard) {
+                    // Когда есть reorderableState и режим редактирования выключен, НЕ применяем модификаторы для обработки жестов
+                    // detectReorderAfterLongPress на уровне колонки обработает long press и начнет drag сразу
+                    // Обычные клики обрабатываются через Modifier.clickable, который не перехватывает long press
+                    if (onClick != null) {
+                        Modifier.clickable { onClick() }
+                    } else {
+                        Modifier
+                    }
+                } else if (!isEditMode && (onClick != null || onLongClick != null)) {
+                    // Когда нет reorderableState, используем обычную обработку жестов
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onClick?.invoke() },
+                            onLongPress = { onLongClick?.invoke() }
+                        )
+                    }
+                } else if (!isEditMode && onClick != null) {
                     Modifier.clickable { onClick() }
                 } else {
                     Modifier
@@ -139,6 +187,15 @@ fun EntityRowWithMenu(
                     }
                 }
             } else {
+                onChangeIcon?.let {
+                    IconButton(onClick = it) {
+                        Icon(
+                            Icons.Filled.Image,
+                            contentDescription = "Изменить иконку",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
                 onEdit?.let {
                     IconButton(onClick = it) {
                         Icon(

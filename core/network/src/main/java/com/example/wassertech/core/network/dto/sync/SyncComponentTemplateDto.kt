@@ -15,6 +15,9 @@ data class SyncComponentTemplateDto(
     val updatedAtEpoch: Long,
     @JsonAdapter(BooleanFromIntTypeAdapter::class)
     val isArchived: Boolean = false,
-    val archivedAtEpoch: Long? = null
+    val archivedAtEpoch: Long? = null,
+    // Поля для ролей и владения данными
+    val origin: String? = null, // "CRM" или "CLIENT"
+    val created_by_user_id: String? = null // FK → users.id
 )
 

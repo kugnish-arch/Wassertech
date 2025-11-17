@@ -32,3 +32,4 @@ interface SyncMetaEntity {
     var syncStatus: Int
 }
 
+

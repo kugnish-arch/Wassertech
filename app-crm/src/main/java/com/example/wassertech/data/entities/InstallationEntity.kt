@@ -9,7 +9,9 @@ import androidx.room.PrimaryKey
     indices = [
         Index("isArchived"),
         Index("dirtyFlag"),
-        Index("syncStatus")
+        Index("syncStatus"),
+        Index("origin"),
+        Index("created_by_user_id")
     ]
 )
 /**
@@ -30,5 +32,16 @@ data class InstallationEntity(
     val dirtyFlag: Boolean = false,
     val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
     // Другие поля
-    val orderIndex: Int = 0
-)
+    val orderIndex: Int = 0,
+    @androidx.room.ColumnInfo(name = "icon_id") val iconId: String? = null, // FK → icons.id
+    // Поля для ролей и владения данными
+    val origin: String? = null, // "CRM" или "CLIENT", по умолчанию "CRM" для старых данных
+    @androidx.room.ColumnInfo(name = "created_by_user_id") val createdByUserId: String? = null // FK → users.id
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     */
+    fun getOriginType(): ru.wassertech.core.auth.OriginType {
+        return ru.wassertech.core.auth.OriginType.fromString(origin)
+    }
+}

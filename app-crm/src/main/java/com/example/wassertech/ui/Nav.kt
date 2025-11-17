@@ -40,10 +40,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
 import ru.wassertech.crm.R
+import ru.wassertech.core.ui.R as CoreUiR
 import ru.wassertech.auth.UserAuthService
 import ru.wassertech.ui.clients.ClientDetailScreen
 import ru.wassertech.ui.clients.ClientsRoute
+import ru.wassertech.ui.sync.BackgroundSyncHandler
 import ru.wassertech.ui.hierarchy.ComponentsScreen
 import ru.wassertech.ui.hierarchy.SiteDetailScreen
 import ru.wassertech.ui.maintenance.MaintenanceHistoryScreen
@@ -54,6 +59,8 @@ import ru.wassertech.ui.about.AboutScreen
 import ru.wassertech.ui.settings.SettingsScreen
 import ru.wassertech.ui.templates.TemplateEditorScreen
 import ru.wassertech.ui.templates.TemplatesScreen
+import ru.wassertech.ui.icons.IconPacksScreen
+import ru.wassertech.ui.icons.IconPackDetailScreen
 import android.net.Uri
 import ru.wassertech.crm.ui.common.NavigationBottomBar
 
@@ -126,6 +133,11 @@ fun AppTopBar(
             route.startsWith("reports") -> "Отчёты обслуживания"
             route.startsWith("settings") -> "Настройки"
             route.startsWith("about") -> "О программе"
+            route == "icon_packs" -> "Икон-паки"
+            route.startsWith("icon_packs/") -> {
+                // Для детального экрана название будет установлено динамически в IconPackDetailScreen
+                "Икон-пак"
+            }
             else -> "Wassertech CRM"
         }
     }
@@ -159,6 +171,14 @@ fun AppTopBar(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Шаблоны") },
+                                leadingIcon = {
+                                    Image(
+                                        painter = painterResource(id = CoreUiR.drawable.ui_template_component),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                },
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("templates") {
@@ -171,6 +191,14 @@ fun AppTopBar(
                             )
                             DropdownMenuItem(
                                 text = { Text("Настройки") },
+                                leadingIcon = {
+                                    Image(
+                                        painter = painterResource(id = CoreUiR.drawable.ui_gear),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                },
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("settings") {
@@ -183,6 +211,14 @@ fun AppTopBar(
                             )
                             DropdownMenuItem(
                                 text = { Text("О программе") },
+                                leadingIcon = {
+                                    Image(
+                                        painter = painterResource(id = CoreUiR.drawable.ui_info),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                },
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("about") {
@@ -197,9 +233,11 @@ fun AppTopBar(
                                 DropdownMenuItem(
                                     text = { Text("Выйти") },
                                     leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Filled.ExitToApp,
-                                            contentDescription = null
+                                        Image(
+                                            painter = painterResource(id = CoreUiR.drawable.ui_logout),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp),
+                                            contentScale = ContentScale.Fit
                                         )
                                     },
                                     onClick = {
@@ -412,6 +450,7 @@ fun AppNavHost(onLogout: (() -> Unit)? = null) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)? = null) {
+    val context = LocalContext.current
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
     
@@ -546,6 +585,9 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
+            // Фоновая синхронизация при запуске приложения
+            BackgroundSyncHandler(context = context)
+            
             NavHost(
                 navController = navController,
                 startDestination = "clients", // По умолчанию все пользователи начинают с "clients" (см. UserPermissions.startScreen)
@@ -811,7 +853,7 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                 popEnterTransition = { fadeInTransition() },
                 popExitTransition = { fadeOutTransition() }
             ) {
-                SettingsScreen()
+                SettingsScreen(navController = navController)
             }
             
             // Экран "О программе"
@@ -823,6 +865,40 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                 popExitTransition = { fadeOutTransition() }
             ) {
                 AboutScreen()
+            }
+            
+            // Экран списка икон-паков
+            composable(
+                route = "icon_packs",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
+                IconPacksScreen(
+                    onPackClick = { packId ->
+                        navController.navigate("icon_packs/$packId") {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            
+            // Экран детального просмотра икон-пака
+            composable(
+                route = "icon_packs/{packId}",
+                arguments = listOf(navArgument("packId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { slideOutToRight() }
+            ) { bse ->
+                val packId = bse.arguments?.getString("packId") ?: return@composable
+                IconPackDetailScreen(
+                    packId = packId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             }
             

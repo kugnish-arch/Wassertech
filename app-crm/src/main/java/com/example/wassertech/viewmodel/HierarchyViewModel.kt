@@ -16,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -29,6 +31,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     private val db = AppDatabase.getInstance(application)
     private val hierarchyDao = db.hierarchyDao()
     private val clientDao = db.clientDao()
+    private val iconDao = db.iconDao()
+    private val iconPackDao = db.iconPackDao()
+    private val iconRepository = ru.wassertech.data.repository.IconRepository(application)
 
     // ---------------------------------------------------------------------
     // 1) КЛИЕНТЫ
@@ -69,6 +74,9 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Поток одного объекта по id. */
     fun site(id: String): Flow<SiteEntity?> = hierarchyDao.observeSite(id)
+        .onEach { site ->
+            android.util.Log.d("HierarchyViewModel", "site Flow updated: id=$id, iconId=${site?.iconId}")
+        }
 
     /** Алиас для читаемости в UI: observeSite(id). */
     fun observeSite(id: String): Flow<SiteEntity?> = site(id)
@@ -92,7 +100,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     name = name,
                     address = address,
                     orderIndex = 0
-                ).markCreatedForSync()
+                ).markCreatedForSync(getApplication())
             )
         }
     }
@@ -138,7 +146,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     siteId = siteId,
                     name = name,
                     orderIndex = 0
-                ).markCreatedForSync()
+                ).markCreatedForSync(getApplication())
             )
         }
     }
@@ -158,7 +166,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                         name = "Основной",
                         address = null,
                         orderIndex = 0
-                    ).markCreatedForSync()
+                    ).markCreatedForSync(getApplication())
                     hierarchyDao.upsertSite(site)
                     site
                 }
@@ -233,7 +241,7 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
                     type = type,            // тип в логике сейчас не критичен, оставлен для совместимости
                     orderIndex = 0,
                     templateId = templateId
-                ).markCreatedForSync()
+                ).markCreatedForSync(getApplication())
             )
         }
     }
@@ -304,6 +312,137 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
     fun deleteInstallation(installationId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             SafeDeletionHelper.deleteInstallation(db, installationId)
+        }
+    }
+    
+    // ---------------------------------------------------------------------
+    // 5) ИКОНКИ (Icons)
+    // ---------------------------------------------------------------------
+    
+    /** Получить иконку по ID. */
+    suspend fun getIcon(iconId: String?): IconEntity? {
+        if (iconId == null) return null
+        return withContext(Dispatchers.IO) {
+            iconDao.getById(iconId)
+        }
+    }
+    
+    /** Получить Flow иконки по ID. */
+    fun icon(iconId: String?): Flow<IconEntity?> {
+        if (iconId == null) {
+            android.util.Log.d("HierarchyViewModel", "icon: iconId is null, returning null")
+            return kotlinx.coroutines.flow.flowOf(null)
+        }
+        android.util.Log.d("HierarchyViewModel", "icon: Looking for iconId=$iconId")
+        return iconDao.observeAllActive().map { icons ->
+            val found = icons.firstOrNull { it.id == iconId }
+            android.util.Log.d("HierarchyViewModel", 
+                "icon: Found ${if (found != null) "icon id=${found.id}, label=${found.label}" else "nothing"} in ${icons.size} active icons"
+            )
+            found
+        }
+    }
+    
+    /** Получить Flow иконки по ID с автоматическим обновлением при изменении iconId. */
+    fun iconFlow(iconIdFlow: Flow<String?>): Flow<IconEntity?> {
+        return iconIdFlow.flatMapLatest { iconId ->
+            android.util.Log.d("HierarchyViewModel", "iconFlow: iconId changed to $iconId")
+            icon(iconId).onEach { iconEntity ->
+                android.util.Log.d("HierarchyViewModel", 
+                    "iconFlow: Found icon for iconId=$iconId: ${if (iconEntity != null) "id=${iconEntity.id}, label=${iconEntity.label}, androidResName=${iconEntity.androidResName}, code=${iconEntity.code}" else "null"}"
+                )
+            }
+        }
+    }
+    
+    /** Загрузить паки и иконки для типа сущности. */
+    suspend fun loadIconPacksAndIconsFor(entityType: ru.wassertech.core.ui.icons.IconEntityType): ru.wassertech.core.ui.icons.IconPickerUiState {
+        return withContext(Dispatchers.IO) {
+            val packs = iconPackDao.getAll()
+            val allIcons = iconDao.getAllActive()
+            val filteredIcons = allIcons.filter { icon ->
+                icon.entityType == "ANY" || icon.entityType == entityType.name
+            }
+            
+            // Логирование для отладки
+            android.util.Log.d("HierarchyViewModel", 
+                "Loading icons for entityType=${entityType.name}, total icons=${allIcons.size}, filtered=${filteredIcons.size}"
+            )
+            filteredIcons.take(5).forEach { icon ->
+                android.util.Log.d("HierarchyViewModel", 
+                    "Icon sample: id=${icon.id}, label=${icon.label}, " +
+                    "androidResName=${icon.androidResName}, code=${icon.code}, " +
+                    "imageUrl=${icon.imageUrl}, entityType=${icon.entityType}"
+                )
+            }
+            
+            val iconsByPack = filteredIcons.groupBy { it.packId }
+            ru.wassertech.core.ui.icons.IconPickerUiState(
+                packs = packs.map { 
+                    ru.wassertech.core.ui.components.IconPackUiData(
+                        id = it.id,
+                        name = it.name
+                    )
+                },
+                iconsByPack = iconsByPack.mapValues { (_, icons) ->
+                    icons.map { icon ->
+                        val localPath = iconRepository.getLocalIconPath(icon.id)
+                        ru.wassertech.core.ui.components.IconUiData(
+                            id = icon.id,
+                            packId = icon.packId,
+                            label = icon.label,
+                            entityType = icon.entityType,
+                            androidResName = icon.androidResName,
+                            code = icon.code, // Передаем code для fallback
+                            localImagePath = localPath // Передаем локальный путь к файлу
+                        )
+                    }
+                }
+            )
+        }
+    }
+    
+    /** Обновить иконку объекта. */
+    fun updateSiteIcon(siteId: String, iconId: String?) {
+        android.util.Log.d("HierarchyViewModel", "updateSiteIcon: siteId=$siteId, iconId=$iconId")
+        viewModelScope.launch(Dispatchers.IO) {
+            val site = hierarchyDao.getSite(siteId) ?: run {
+                android.util.Log.w("HierarchyViewModel", "updateSiteIcon: Site not found, siteId=$siteId")
+                return@launch
+            }
+            android.util.Log.d("HierarchyViewModel", "updateSiteIcon: Current site iconId=${site.iconId}, updating to $iconId")
+            val updatedSite = site.copy(iconId = iconId).markUpdatedForSync()
+            
+            // Используем @Update вместо @Insert для гарантированного обновления Flow
+            hierarchyDao.updateSites(listOf(updatedSite))
+            
+            // Проверяем, что данные действительно обновились
+            val verifySite = hierarchyDao.getSite(siteId)
+            android.util.Log.d("HierarchyViewModel", "updateSiteIcon: Verification - site.iconId=${verifySite?.iconId}")
+            
+            // Проверяем, что иконка существует в БД
+            if (iconId != null) {
+                val icon = iconDao.getById(iconId)
+                android.util.Log.d("HierarchyViewModel", "updateSiteIcon: Icon exists: ${icon != null}, icon.isActive=${icon?.isActive}, icon.label=${icon?.label}")
+            }
+            
+            android.util.Log.d("HierarchyViewModel", "updateSiteIcon: Site updated successfully")
+        }
+    }
+    
+    /** Обновить иконку установки. */
+    fun updateInstallationIcon(installationId: String, iconId: String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installation = hierarchyDao.getInstallation(installationId) ?: return@launch
+            hierarchyDao.updateInstallation(installation.copy(iconId = iconId).markUpdatedForSync())
+        }
+    }
+    
+    /** Обновить иконку компонента. */
+    fun updateComponentIcon(componentId: String, iconId: String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val component = hierarchyDao.getComponent(componentId) ?: return@launch
+            hierarchyDao.upsertComponent(component.copy(iconId = iconId).markUpdatedForSync())
         }
     }
 }

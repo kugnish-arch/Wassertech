@@ -22,9 +22,13 @@ interface SyncApi {
     
     /**
      * Получение изменений с сервера
-     * @param since Unix timestamp последней синхронизации (в миллисекундах)
+     * @param since Unix timestamp последней синхронизации (в секундах)
+     * @param entities Список сущностей для получения (например, ["icon_packs", "icons"])
      */
     @GET("sync/pull")
-    suspend fun syncPull(@Query("since") since: Long): Response<SyncPullResponse>
+    suspend fun syncPull(
+        @Query("since") since: Long,
+        @Query("entities[]") entities: List<String>? = null
+    ): Response<SyncPullResponse>
 }
 

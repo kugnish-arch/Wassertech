@@ -17,6 +17,9 @@ data class SyncMaintenanceValueDto(
     @JsonAdapter(BooleanFromIntTypeAdapter::class)
     val valueBool: Boolean? = null,
     val createdAtEpoch: Long? = null,
-    val updatedAtEpoch: Long? = null
+    val updatedAtEpoch: Long? = null,
+    // Поля для ролей и владения данными
+    val origin: String? = null, // "CRM" или "CLIENT"
+    val created_by_user_id: String? = null // FK → users.id
 )
 

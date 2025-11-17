@@ -159,15 +159,17 @@ fun TemplatesScreen(
                     title = "Начните с шаблонов",
                     description = "Создайте шаблон компонента, чтобы определить его поля и характеристики. После этого вы сможете использовать этот шаблон при создании компонентов в установках."
                 )
-            } else if (isEditing && localOrder.isNotEmpty()) {
-                // В режиме редактирования используем ReorderableLazyColumn
+            } else if (localOrder.isNotEmpty()) {
+                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
                 ReorderableLazyColumn(
                     items = localOrder,
                     onMove = { fromIndex, toIndex ->
+                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
                         val mutable = localOrder.toMutableList()
                         val item = mutable.removeAt(fromIndex)
                         mutable.add(toIndex, item)
                         localOrder = mutable
+                        // Изменения сохраняются в БД только в режиме редактирования
                     },
                     modifier = Modifier.fillMaxSize(),
                     key = { it },
@@ -206,52 +208,20 @@ fun TemplatesScreen(
                                 }
                             },
                             reorderableState = reorderableState,
+                            isDragging = isDragging,
+                            onToggleEdit = onToggleEdit,
                             modifier = Modifier.background(Color.White)
                         )
                     }
                 }
             } else {
-                // В обычном режиме используем обычный LazyColumn
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 12.dp,
-                        end = 12.dp,
-                        top = 8.dp,
-                        bottom = padding.calculateBottomPadding() + 12.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    items(visibleTemplates, key = { it.id }) { template ->
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            TemplateRowWrapper(
-                                template = template,
-                                isEditing = isEditing,
-                                onArchive = {
-                                    scope.launch {
-                                        Log.d(TAG, "Архивирование шаблона: id=${template.id}, name=${template.name}")
-                                        dao.setArchived(template.id, true)
-                                    }
-                                },
-                                onRestore = {
-                                    scope.launch {
-                                        Log.d(TAG, "Разархивирование шаблона: id=${template.id}, name=${template.name}")
-                                        dao.setArchived(template.id, false)
-                                    }
-                                },
-                                onDelete = {
-                                    deleteDialogState = template
-                                },
-                                onClick = {
-                                    if (!isEditing) {
-                                        onOpenTemplate(template.id)
-                                    }
-                                },
-                                reorderableState = null,
-                                modifier = Modifier.background(Color.White)
-                            )
-                        }
-                    }
+                // Если список пуст, показываем пустое состояние
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AppEmptyState(
+                        icon = Icons.Filled.Lightbulb,
+                        title = "Начните с шаблонов",
+                        description = "Создайте шаблон компонента, чтобы определить его поля и характеристики. После этого вы сможете использовать этот шаблон при создании компонентов в установках."
+                    )
                 }
             }
         }
@@ -286,7 +256,7 @@ fun TemplatesScreen(
                             category = null,
                             defaultParamsJson = null,
                             sortOrder = nextOrder
-                        ).markCreatedForSync()
+                        ).markCreatedForSync(context)
                         Log.d(TAG, "Создание шаблона: id=$id, name=$title, " +
                                 "dirtyFlag=${entity.dirtyFlag}, syncStatus=${entity.syncStatus}, " +
                                 "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}")
@@ -416,6 +386,8 @@ private fun TemplateRowWrapper(
     onDelete: () -> Unit,
     onClick: () -> Unit,
     reorderableState: ReorderableState?,
+    isDragging: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isArchived = template.isArchived == true
@@ -455,7 +427,9 @@ private fun TemplateRowWrapper(
             onDelete = onDelete,
             modifier = Modifier.fillMaxWidth(),
             reorderableState = reorderableState,
-            showDragHandle = isEditing && !isArchived
+            showDragHandle = isEditing && !isArchived,
+            isDragging = isDragging,
+            onToggleEdit = onToggleEdit
         )
     }
 }

@@ -17,6 +17,8 @@ import ru.wassertech.data.entities.*
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.data.types.SyncStatus
+import ru.wassertech.core.network.dto.SyncIconPackDto
+import ru.wassertech.core.network.dto.SyncIconDto
 
 /**
  * Движок синхронизации данных с сервером через REST API
@@ -278,15 +280,37 @@ class SyncEngine(private val context: Context) {
                 }
                 
                 // Получаем timestamp последней синхронизации (в миллисекундах)
-                val lastSyncTimestampMs = getLastSyncTimestamp() ?: 0L
+                var lastSyncTimestampMs = getLastSyncTimestamp() ?: 0L
+                
+                // Проверяем, что timestamp разумен (не больше текущего времени + небольшой запас)
+                val currentTimeMs = System.currentTimeMillis()
+                val maxReasonableTimestamp = currentTimeMs + 86400000L // +1 день запас
+                
+                if (lastSyncTimestampMs > maxReasonableTimestamp) {
+                    Log.w(TAG, "Обнаружен некорректный timestamp: ${lastSyncTimestampMs}ms (текущее время: ${currentTimeMs}ms). Сбрасываем.")
+                    lastSyncTimestampMs = 0L
+                    // Очищаем некорректный timestamp
+                    saveLastSyncTimestamp(0L)
+                }
+                
                 // Backend ожидает timestamp в секундах и требует since > 0
                 // При первом запуске используем 1 вместо 0
                 val lastSyncTimestampSec = if (lastSyncTimestampMs == 0L) 1L else lastSyncTimestampMs / 1000
                 Log.d(TAG, "Последняя синхронизация: ${lastSyncTimestampMs}ms = ${lastSyncTimestampSec}s (${if (lastSyncTimestampMs == 0L) "первый запуск, используем since=1" else "timestamp=$lastSyncTimestampSec"})")
-                Log.d(TAG, "Вызываю syncPull(since=$lastSyncTimestampSec)")
+                
+                // Указываем, какие сущности нужно получить с сервера
+                // Включаем икон-паки и иконки для загрузки метаданных
+                val entities = listOf(
+                    "clients", "sites", "installations", "components",
+                    "maintenance_sessions", "maintenance_values",
+                    "component_templates", "component_template_fields",
+                    "icon_packs", "icons" // Добавляем икон-паки и иконки
+                )
+                
+                Log.d(TAG, "Вызываю syncPull(since=$lastSyncTimestampSec, entities=$entities)")
                 
                 // Запрашиваем изменения (since в секундах, всегда > 0)
-                val response = syncApi.syncPull(since = lastSyncTimestampSec)
+                val response = syncApi.syncPull(since = lastSyncTimestampSec, entities = entities)
                 
                 if (!response.isSuccessful) {
                     val errorCode = response.code()
@@ -329,12 +353,15 @@ class SyncEngine(private val context: Context) {
                 processPullResponse(pullResponse)
                 
                 // Обновляем timestamp последней синхронизации
-                // Backend возвращает timestamp в секундах, конвертируем в миллисекунды для хранения
-                val timestampMs = pullResponse.timestamp * 1000
+                // Сервер возвращает timestamp в миллисекундах, сохраняем как есть
+                val timestampMs = pullResponse.timestamp
                 saveLastSyncTimestamp(timestampMs)
-                Log.d(TAG, "Сохранён новый timestamp последней синхронизации: ${pullResponse.timestamp}s = ${timestampMs}ms")
+                Log.d(TAG, "Сохранён новый timestamp последней синхронизации: ${timestampMs}ms (${timestampMs / 1000}s)")
                 
                 val stats = calculatePullStats(pullResponse)
+                val iconPacksCount = pullResponse.iconPacks.size
+                val iconsCount = pullResponse.icons.size
+                
                 val message = buildString {
                     append("Загружено: ")
                     append("клиентов=${stats.clients}, ")
@@ -344,6 +371,10 @@ class SyncEngine(private val context: Context) {
                     append("сессий ТО=${stats.sessions}, ")
                     append("значений ТО=${stats.values}, ")
                     append("шаблонов=${stats.templates}, ")
+                    if (iconPacksCount > 0 || iconsCount > 0) {
+                        append("икон-паков=$iconPacksCount, ")
+                        append("иконок=$iconsCount, ")
+                    }
                     append("удалено=${stats.deleted}")
                 }
                 
@@ -643,6 +674,42 @@ class SyncEngine(private val context: Context) {
             Log.d(TAG, "Обработано шаблонов компонентов: применено=$appliedCount, пропущено=$skippedCount")
         }
         
+        // Обрабатываем паки иконок
+        if (response.iconPacks.isNotEmpty()) {
+            Log.d(TAG, "Получено паков иконок с сервера: ${response.iconPacks.size}")
+            var appliedCount = 0
+            response.iconPacks.forEach { dto ->
+                val entity = dto.toEntity()
+                database.iconPackDao().upsert(entity)
+                appliedCount++
+            }
+            Log.d(TAG, "Обработано паков иконок: применено=$appliedCount")
+        }
+        
+        // Обрабатываем иконки
+        if (response.icons.isNotEmpty()) {
+            Log.d(TAG, "Получено иконок с сервера: ${response.icons.size}")
+            var appliedCount = 0
+            var skippedCount = 0
+            response.icons.forEach { dto ->
+                // Пропускаем иконки без packId
+                if (dto.packId.isNullOrBlank()) {
+                    Log.w(TAG, "Пропуск иконки ${dto.id} (${dto.label}): packId отсутствует или пустой")
+                    skippedCount++
+                    return@forEach
+                }
+                try {
+                    val entity = dto.toEntity()
+                    database.iconDao().upsert(entity)
+                    appliedCount++
+                } catch (e: Exception) {
+                    Log.e(TAG, "Ошибка при обработке иконки ${dto.id} (${dto.label}): ${e.message}", e)
+                    skippedCount++
+                }
+            }
+            Log.d(TAG, "Обработано иконок: применено=$appliedCount, пропущено=$skippedCount")
+        }
+        
         // Обрабатываем удаления
         // ВАЖНО: обрабатываем удаления ПОСЛЕ обработки основных списков,
         // чтобы не удалить записи, которые просто архивированы (сервер может отправлять их в deleted)
@@ -662,6 +729,8 @@ class SyncEngine(private val context: Context) {
             }
             response.component_templates.forEach { existingIds.add(it.id) }
             response.component_template_fields.forEach { existingIds.add(it.id) }
+            response.iconPacks.forEach { existingIds.add(it.id) }
+            response.icons.forEach { existingIds.add(it.id) }
             
             var deletedCount = 0
             var skippedCount = 0
@@ -745,7 +814,10 @@ class SyncEngine(private val context: Context) {
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
-        archivedAtEpoch = archivedAtEpoch
+        archivedAtEpoch = archivedAtEpoch,
+        origin = origin,
+        created_by_user_id = createdByUserId,
+        iconId = iconId
     )
     
     private fun InstallationEntity.toSyncDto() = SyncInstallationDto(
@@ -756,7 +828,10 @@ class SyncEngine(private val context: Context) {
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
-        archivedAtEpoch = archivedAtEpoch
+        archivedAtEpoch = archivedAtEpoch,
+        origin = origin,
+        created_by_user_id = createdByUserId,
+        iconId = iconId
     )
     
     private fun ComponentEntity.toSyncDto() = SyncComponentDto(
@@ -769,7 +844,10 @@ class SyncEngine(private val context: Context) {
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
-        archivedAtEpoch = archivedAtEpoch
+        archivedAtEpoch = archivedAtEpoch,
+        origin = origin,
+        created_by_user_id = createdByUserId,
+        iconId = iconId
     )
     
     private suspend fun MaintenanceSessionEntity.toSyncDto(): SyncMaintenanceSessionDto {
@@ -789,6 +867,8 @@ class SyncEngine(private val context: Context) {
             updatedAtEpoch = updatedAtEpoch,
             isArchived = isArchived,
             archivedAtEpoch = archivedAtEpoch,
+            origin = origin,
+            created_by_user_id = createdByUserId,
             values = values.ifEmpty { null }
         )
     }
@@ -807,7 +887,9 @@ class SyncEngine(private val context: Context) {
             valueNumber = valueNumber,
             valueBool = valueBool,
             createdAtEpoch = createdAtEpoch.takeIf { it > 0 },
-            updatedAtEpoch = updatedAtEpoch.takeIf { it > 0 }
+            updatedAtEpoch = updatedAtEpoch.takeIf { it > 0 },
+            origin = origin,
+            created_by_user_id = createdByUserId
         )
     }
     
@@ -848,7 +930,9 @@ class SyncEngine(private val context: Context) {
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
-        archivedAtEpoch = archivedAtEpoch
+        archivedAtEpoch = archivedAtEpoch,
+        origin = origin,
+        created_by_user_id = createdByUserId
     )
     
     // Вспомогательные методы для применения DTO -> Room (last-write-wins)
@@ -1081,13 +1165,16 @@ class SyncEngine(private val context: Context) {
         name = name,
         address = address,
         orderIndex = orderIndex,
+        iconId = iconId,
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
         archivedAtEpoch = archivedAtEpoch,
         deletedAtEpoch = null,
         dirtyFlag = false,
-        syncStatus = SyncStatus.SYNCED.value
+        syncStatus = SyncStatus.SYNCED.value,
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = created_by_user_id
     )
     
     private fun SyncInstallationDto.toEntity() = InstallationEntity(
@@ -1095,13 +1182,16 @@ class SyncEngine(private val context: Context) {
         siteId = siteId,
         name = name,
         orderIndex = orderIndex,
+        iconId = iconId,
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
         archivedAtEpoch = archivedAtEpoch,
         deletedAtEpoch = null,
         dirtyFlag = false,
-        syncStatus = SyncStatus.SYNCED.value
+        syncStatus = SyncStatus.SYNCED.value,
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = created_by_user_id
     )
     
     private fun SyncComponentDto.toEntity() = ComponentEntity(
@@ -1111,13 +1201,16 @@ class SyncEngine(private val context: Context) {
         type = ComponentType.valueOf(type),
         orderIndex = orderIndex,
         templateId = templateId,
+        iconId = iconId,
         createdAtEpoch = createdAtEpoch,
         updatedAtEpoch = updatedAtEpoch,
         isArchived = isArchived,
         archivedAtEpoch = archivedAtEpoch,
         deletedAtEpoch = null,
         dirtyFlag = false,
-        syncStatus = SyncStatus.SYNCED.value
+        syncStatus = SyncStatus.SYNCED.value,
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = created_by_user_id
     )
     
     private fun SyncMaintenanceSessionDto.toEntity() = MaintenanceSessionEntity(
@@ -1135,7 +1228,9 @@ class SyncEngine(private val context: Context) {
         deletedAtEpoch = null,
         dirtyFlag = false,
         syncStatus = SyncStatus.SYNCED.value,
-        synced = true
+        synced = true,
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = created_by_user_id
     )
     
     private fun SyncMaintenanceValueDto.toEntity(): MaintenanceValueEntity {
@@ -1153,6 +1248,8 @@ class SyncEngine(private val context: Context) {
             valueBool = valueBool,
             createdAtEpoch = createdAtEpoch ?: 0,
             updatedAtEpoch = updatedAtEpoch ?: 0,
+            origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+            createdByUserId = created_by_user_id,
             isArchived = false,
             archivedAtEpoch = null,
             deletedAtEpoch = null,
@@ -1206,8 +1303,47 @@ class SyncEngine(private val context: Context) {
         isArchived = isArchived,
         archivedAtEpoch = archivedAtEpoch,
         dirtyFlag = false,
-        syncStatus = SyncStatus.SYNCED.value
+        syncStatus = SyncStatus.SYNCED.value,
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = created_by_user_id
     )
+    
+    private fun SyncIconPackDto.toEntity() = IconPackEntity(
+        id = id,
+        code = code,
+        name = name,
+        description = description,
+        isBuiltin = isBuiltin,
+        isPremium = isPremium,
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = createdByUserId,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch
+    )
+    
+    private fun SyncIconDto.toEntity(): IconEntity {
+        // packId должен быть не null, проверка уже выполнена в processPullResponse
+        val packIdValue = packId ?: throw IllegalArgumentException("packId не может быть null для иконки $id")
+        
+        // entityType может быть null на сервере, используем "ANY" по умолчанию
+        val entityTypeValue = entityType ?: "ANY"
+        
+        return IconEntity(
+            id = id,
+            packId = packIdValue,
+            code = code,
+            label = label,
+            entityType = entityTypeValue,
+            imageUrl = imageUrl,
+            thumbnailUrl = thumbnailUrl,
+            androidResName = androidResName,
+            isActive = isActive,
+            origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+            createdByUserId = createdByUserId,
+            createdAtEpoch = createdAtEpoch,
+            updatedAtEpoch = updatedAtEpoch
+        )
+    }
     
     /**
      * Маппинг ComponentTemplateFieldEntity → SyncChecklistFieldDto (для обратной совместимости с API)
@@ -1269,9 +1405,17 @@ class SyncEngine(private val context: Context) {
     private fun calculatePullStats(response: SyncPullResponse): SyncPullStats {
         val componentTemplatesCount = response.component_templates.size
         val componentTemplateFieldsCount = response.component_template_fields.size
+        val iconPacksCount = response.iconPacks.size
+        val iconsCount = response.icons.size
+        
         if (componentTemplatesCount > 0 || componentTemplateFieldsCount > 0) {
             Log.d(TAG, "Получено шаблонов компонентов: component_templates=$componentTemplatesCount, component_template_fields=$componentTemplateFieldsCount")
         }
+        
+        if (iconPacksCount > 0 || iconsCount > 0) {
+            Log.d(TAG, "Получено иконок: icon_packs=$iconPacksCount, icons=$iconsCount")
+        }
+        
         return SyncPullStats(
             clients = response.clients.size,
             sites = response.sites.size,

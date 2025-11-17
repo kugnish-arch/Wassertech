@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,8 +29,8 @@ import ru.wassertech.client.data.entities.ComponentTemplateEntity
 import ru.wassertech.client.data.entities.InstallationEntity
 import ru.wassertech.client.data.entities.SiteEntity
 import ru.wassertech.client.data.types.ComponentType
-import ru.wassertech.client.auth.UserSessionManager
-import ru.wassertech.client.auth.OriginType
+import ru.wassertech.core.auth.SessionManager
+import ru.wassertech.core.auth.OriginType
 import ru.wassertech.client.permissions.canCreateEntity
 import ru.wassertech.client.permissions.canEditComponent
 import ru.wassertech.client.permissions.canDeleteComponent
@@ -38,6 +39,12 @@ import ru.wassertech.core.ui.components.AppEmptyState
 import ru.wassertech.core.ui.components.EntityRowWithMenu
 import ru.wassertech.core.ui.components.ScreenTitleWithSubtitle
 import ru.wassertech.core.ui.theme.ClientsRowDivider
+import ru.wassertech.core.ui.icons.IconResolver
+import ru.wassertech.core.ui.icons.IconEntityType
+import ru.wassertech.core.ui.components.IconPickerDialog
+import ru.wassertech.client.permissions.canChangeIconForComponent
+import androidx.compose.material.icons.filled.Image
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 /**
@@ -50,7 +57,8 @@ import java.util.UUID
 fun ComponentsScreen(
     installationId: String,
     onOpenMaintenanceHistory: (String) -> Unit,
-    onNavigateBack: (() -> Unit)? = null
+    onNavigateBack: (() -> Unit)? = null,
+    paddingValues: PaddingValues = PaddingValues(0.dp)
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
@@ -58,7 +66,7 @@ fun ComponentsScreen(
     val layoutDir = LocalLayoutDirection.current
     
     // Получаем текущую сессию пользователя
-    val currentUser = remember { UserSessionManager.getCurrentSession() }
+    val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
     
     // Получаем данные установки
     val installation by db.hierarchyDao().observeInstallation(installationId).collectAsState(initial = null)
@@ -107,6 +115,11 @@ fun ComponentsScreen(
     
     var deleteComponentId by remember { mutableStateOf<String?>(null) }
     
+    // Состояние для IconPickerDialog
+    var isIconPickerVisible by remember { mutableStateOf(false) }
+    var iconPickerState by remember { mutableStateOf<Pair<List<ru.wassertech.core.ui.components.IconPackUiData>, Map<String, List<ru.wassertech.core.ui.components.IconUiData>>>?>(null) }
+    var iconPickerComponentId by remember { mutableStateOf<String?>(null) }
+    
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
@@ -149,11 +162,16 @@ fun ComponentsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.equipment_filter_triple),
-                                contentDescription = null,
-                                modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2),
-                                contentScale = ContentScale.Fit
+                            // Загружаем иконку установки
+                            val installationIcon by db.iconDao().observeAllActive().map { icons ->
+                                installation?.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
+                            }.collectAsState(initial = null)
+                            
+                            IconResolver.IconImage(
+                                androidResName = installationIcon?.androidResName,
+                                entityType = IconEntityType.INSTALLATION,
+                                contentDescription = "Установка",
+                                size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2
                             )
                             Spacer(Modifier.width(8.dp))
                             ScreenTitleWithSubtitle(
@@ -204,11 +222,52 @@ fun ComponentsScreen(
                     items(components, key = { it.id }) { component ->
                         val templateTitle = component.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
                         
+                        // Загружаем иконку компонента
+                        val componentIcon by db.iconDao().observeAllActive().map { icons ->
+                            component.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
+                        }.collectAsState(initial = null)
+                        
                         Column(modifier = Modifier.fillMaxWidth()) {
                             ComponentRow(
                                 component = component,
                                 templateTitle = templateTitle,
-                                onDelete = if (currentUser != null && canDeleteComponent(currentUser, component)) {
+                                icon = componentIcon,
+                                onChangeIcon = if (currentUser != null && canChangeIconForComponent(currentUser, component, site)) {
+                                    {
+                                        scope.launch(Dispatchers.IO) {
+                                            val packs = db.iconPackDao().getAll()
+                                            val allIcons = db.iconDao().getAllActive()
+                                            val filteredIcons = allIcons.filter { icon ->
+                                                icon.entityType == "ANY" || icon.entityType == IconEntityType.COMPONENT.name
+                                            }
+                                            val iconsByPack = filteredIcons.groupBy { it.packId }
+                                            iconPickerState = Pair(
+                                                packs.map { 
+                                                    ru.wassertech.core.ui.components.IconPackUiData(
+                                                        id = it.id,
+                                                        name = it.name
+                                                    )
+                                                },
+                                                iconsByPack.mapValues { (_, icons) ->
+                                                    icons.map { icon ->
+                                                        ru.wassertech.core.ui.components.IconUiData(
+                                                            id = icon.id,
+                                                            packId = icon.packId,
+                                                            label = icon.label,
+                                                            entityType = icon.entityType,
+                                                            androidResName = icon.androidResName,
+                                                            code = icon.code, // Передаем code для fallback
+                                                            localImagePath = null // В app-client загрузка изображений не реализована
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                            iconPickerComponentId = component.id
+                                            isIconPickerVisible = true
+                                        }
+                                    }
+                                } else null,
+                                onDelete = if (currentUser != null && canDeleteComponent(currentUser, component, site)) {
                                     { deleteComponentId = component.id }
                                 } else null,
                                 modifier = Modifier
@@ -295,6 +354,8 @@ fun ComponentsScreen(
                         }
                         if (tmpl != null || templates.isNotEmpty()) {
                             scope.launch(Dispatchers.IO) {
+                                val session = ru.wassertech.core.auth.SessionManager.getInstance(context).getCurrentSession()
+                                val currentTime = System.currentTimeMillis()
                                 val newComponent = ComponentEntity(
                                     id = UUID.randomUUID().toString(),
                                     installationId = installationId,
@@ -302,8 +363,16 @@ fun ComponentsScreen(
                                     type = ComponentType.COMMON,
                                     orderIndex = components.size,
                                     templateId = tmpl?.id,
+                                    createdAtEpoch = currentTime,
+                                    updatedAtEpoch = currentTime,
+                                    isArchived = false,
+                                    archivedAtEpoch = null,
+                                    deletedAtEpoch = null,
+                                    dirtyFlag = true, // Помечаем как требующий синхронизации
+                                    syncStatus = 1, // QUEUED
                                     ownerClientId = currentUser?.clientId,
-                                    origin = OriginType.CLIENT.name
+                                    origin = OriginType.CLIENT.name,
+                                    createdByUserId = session?.userId
                                 )
                                 db.hierarchyDao().upsertComponent(newComponent)
                             }
@@ -355,39 +424,123 @@ fun ComponentsScreen(
             }
         )
     }
+    
+    // Диалог выбора иконки компонента
+    iconPickerState?.let { (packs, iconsByPack) ->
+        val component = iconPickerComponentId?.let { compId ->
+            components.firstOrNull { it.id == compId }
+        }
+        IconPickerDialog(
+            visible = isIconPickerVisible,
+            onDismissRequest = { 
+                isIconPickerVisible = false
+                iconPickerComponentId = null
+            },
+            entityType = IconEntityType.COMPONENT,
+            packs = packs,
+            iconsByPack = iconsByPack,
+            selectedIconId = component?.iconId,
+            onIconSelected = { newIconId ->
+                iconPickerComponentId?.let { compId ->
+                    scope.launch(Dispatchers.IO) {
+                        val componentToUpdate = db.hierarchyDao().getComponent(compId)
+                        if (componentToUpdate != null) {
+                            val updatedComponent = componentToUpdate.copy(
+                                iconId = newIconId,
+                                updatedAtEpoch = System.currentTimeMillis(),
+                                dirtyFlag = true,
+                                syncStatus = 1 // QUEUED
+                            )
+                            db.hierarchyDao().upsertComponent(updatedComponent)
+                        }
+                    }
+                }
+                isIconPickerVisible = false
+                iconPickerComponentId = null
+            }
+        )
+    }
 }
 
 @Composable
 private fun ComponentRow(
     component: ComponentEntity,
     templateTitle: String,
+    icon: ru.wassertech.client.data.entities.IconEntity? = null,
+    onChangeIcon: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    EntityRowWithMenu(
-        title = component.name,
-        subtitle = templateTitle,
-        leadingIcon = {
-            Image(
-                painter = painterResource(id = R.drawable.ui_gear),
-                contentDescription = "Компонент",
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
+    var menuOpen by remember { mutableStateOf(false) }
+    
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconResolver.IconImage(
+            androidResName = icon?.androidResName,
+            entityType = IconEntityType.COMPONENT,
+            contentDescription = "Компонент",
+            size = 48.dp
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                component.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
             )
-        },
-        trailingIcon = null,
-        isEditMode = false,
-        isArchived = false, // TODO: ComponentEntity не имеет поля isArchived, добавить после миграции БД
-        onClick = null, // Компоненты не кликабельны
-        onRestore = null,
-        onArchive = null,
-        onDelete = onDelete,
-        onEdit = null,
-        onMoveToGroup = null,
-        availableGroups = emptyList(),
-        modifier = modifier,
-        reorderableState = null,
-        showDragHandle = false
-    )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                templateTitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        // Меню действий (если есть действия)
+        if (onChangeIcon != null || onDelete != null) {
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "Действия",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground)
+                ) {
+                    onChangeIcon?.let {
+                        DropdownMenuItem(
+                            text = { Text("Изменить иконку") },
+                            onClick = {
+                                menuOpen = false
+                                it()
+                            }
+                        )
+                    }
+                    if (onChangeIcon != null && onDelete != null) {
+                        HorizontalDivider()
+                    }
+                    onDelete?.let {
+                        DropdownMenuItem(
+                            text = { Text("Удалить") },
+                            onClick = {
+                                menuOpen = false
+                                it()
+                            },
+                            colors = MenuDefaults.itemColors(
+                                textColor = MaterialTheme.colorScheme.error
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 

@@ -1,5 +1,6 @@
 package ru.wassertech.core.network.interceptor
 
+import android.util.Log
 import ru.wassertech.core.network.TokenStorage
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -12,26 +13,40 @@ class AuthInterceptor(
     private val tokenStorage: TokenStorage
 ) : Interceptor {
     
+    companion object {
+        private const val TAG = "AuthInterceptor"
+    }
+    
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
         
         // Не добавляем токен к запросам авторизации
-        val url = originalRequest.url.toString()
         if (url.contains("/auth/login")) {
+            Log.d(TAG, "Пропускаем добавление токена для /auth/login")
             return chain.proceed(originalRequest)
         }
         
         val token = tokenStorage.getAccessToken()
         
         val newRequest = if (token != null) {
+            Log.d(TAG, "Добавляю токен в заголовок для запроса: $url")
+            Log.d(TAG, "Токен: ${token.take(20)}... (длина: ${token.length})")
             originalRequest.newBuilder()
                 .header("Authorization", "Bearer $token")
                 .build()
         } else {
+            Log.w(TAG, "Токен отсутствует для запроса: $url")
             originalRequest
         }
         
-        return chain.proceed(newRequest)
+        val response = chain.proceed(newRequest)
+        
+        if (!response.isSuccessful) {
+            Log.e(TAG, "Запрос неуспешен: код=${response.code}, URL=$url")
+        }
+        
+        return response
     }
 }
 

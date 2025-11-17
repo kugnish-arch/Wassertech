@@ -207,3 +207,4 @@ clientDao.markClientsAsSynced(syncedIds)
 - Поля `dirtyFlag` и `syncStatus` являются локальными и не должны отправляться на сервер
 - Поле `synced` в `MaintenanceSessionEntity` оставлено для обратной совместимости, но рекомендуется использовать `syncStatus`
 
+

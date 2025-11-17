@@ -15,7 +15,9 @@ import androidx.room.PrimaryKey
     tableName = "maintenance_sessions",
     indices = [
         Index("dirtyFlag"),
-        Index("syncStatus")
+        Index("syncStatus"),
+        Index("origin"),
+        Index("created_by_user_id")
     ]
 )
 data class MaintenanceSessionEntity(
@@ -36,6 +38,16 @@ data class MaintenanceSessionEntity(
     val dirtyFlag: Boolean = false,
     val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
     // Legacy поле (для обратной совместимости)
-    val synced: Boolean = false
-)
+    val synced: Boolean = false,
+    // Поля для ролей и владения данными
+    val origin: String? = null, // "CRM" или "CLIENT", по умолчанию "CRM" для старых данных
+    @androidx.room.ColumnInfo(name = "created_by_user_id") val createdByUserId: String? = null // FK → users.id
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     */
+    fun getOriginType(): ru.wassertech.core.auth.OriginType {
+        return ru.wassertech.core.auth.OriginType.fromString(origin)
+    }
+}
 

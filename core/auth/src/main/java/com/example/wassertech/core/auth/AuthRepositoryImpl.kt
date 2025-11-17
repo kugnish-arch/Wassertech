@@ -57,6 +57,20 @@ class AuthRepositoryImpl(private val context: Context) {
                     // Сохраняем токен
                     tokenStorage.saveAccessTokenAsync(loginResponse.token)
                     
+                    // Если в ответе есть данные пользователя, создаём сессию
+                    loginResponse.user?.let { userDto ->
+                        val session = UserSessionImpl(
+                            userId = userDto.id,
+                            login = userDto.login,
+                            role = UserRole.fromString(userDto.role),
+                            clientId = userDto.clientId,
+                            name = userDto.name,
+                            email = userDto.email
+                        )
+                        SessionManager.getInstance(context).setCurrentSession(session)
+                        Log.d(TAG, "Сессия создана из LoginResponse: userId=${session.userId}, role=${session.role}, clientId=${session.clientId}")
+                    }
+                    
                     Log.d(TAG, "Успешный вход. Токен сохранен. Exp: ${loginResponse.exp}")
                     Result.success(
                         AuthTokenData(
@@ -144,6 +158,19 @@ class AuthRepositoryImpl(private val context: Context) {
                 val userMeResponse = response.body()
                 if (userMeResponse != null) {
                     Log.d(TAG, "Информация о пользователе загружена: ${userMeResponse.login}")
+                    
+                    // Обновляем сессию из /auth/me (если она еще не была создана из LoginResponse)
+                    val session = UserSessionImpl(
+                        userId = userMeResponse.id,
+                        login = userMeResponse.login,
+                        role = UserRole.fromString(userMeResponse.role),
+                        clientId = userMeResponse.clientId,
+                        name = userMeResponse.name,
+                        email = userMeResponse.email
+                    )
+                    SessionManager.getInstance(context).setCurrentSession(session)
+                    Log.d(TAG, "Сессия обновлена из /auth/me: userId=${session.userId}, role=${session.role}, clientId=${session.clientId}")
+                    
                     Result.success(
                         CurrentUserData(
                             id = userMeResponse.id,
@@ -152,6 +179,7 @@ class AuthRepositoryImpl(private val context: Context) {
                             email = userMeResponse.email,
                             phone = userMeResponse.phone,
                             role = userMeResponse.role,
+                            clientId = userMeResponse.clientId,
                             permissions = userMeResponse.permissions,
                             lastLoginAtEpoch = userMeResponse.lastLoginAtEpoch,
                             createdAtEpoch = userMeResponse.createdAtEpoch,
@@ -202,7 +230,8 @@ class AuthRepositoryImpl(private val context: Context) {
      */
     suspend fun logout() {
         tokenStorage.clearTokensAsync()
-        Log.d(TAG, "Пользователь вышел из системы")
+        SessionManager.getInstance(context).clearSession()
+        Log.d(TAG, "Пользователь вышел из системы, сессия очищена")
     }
 }
 
@@ -224,6 +253,7 @@ data class CurrentUserData(
     val email: String?,
     val phone: String?,
     val role: String,
+    val clientId: String? = null, // Для CLIENT обязательно, для ADMIN/ENGINEER может быть null
     val permissions: String?,
     val lastLoginAtEpoch: Long?,
     val createdAtEpoch: Long,

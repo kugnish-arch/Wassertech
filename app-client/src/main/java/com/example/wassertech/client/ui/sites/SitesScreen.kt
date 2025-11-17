@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,8 +26,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.wassertech.client.data.AppDatabase
 import ru.wassertech.client.data.entities.SiteEntity
-import ru.wassertech.client.auth.UserSessionManager
-import ru.wassertech.client.auth.OriginType
+import ru.wassertech.core.auth.SessionManager
+import ru.wassertech.core.auth.OriginType
 import ru.wassertech.client.permissions.canCreateEntity
 import ru.wassertech.client.permissions.canEditSite
 import ru.wassertech.client.permissions.canDeleteSite
@@ -35,6 +36,12 @@ import ru.wassertech.core.ui.R
 import ru.wassertech.core.ui.components.AppEmptyState
 import ru.wassertech.core.ui.components.EntityRowWithMenu
 import ru.wassertech.core.ui.theme.ClientsRowDivider
+import ru.wassertech.core.ui.icons.IconResolver
+import ru.wassertech.core.ui.icons.IconEntityType
+import ru.wassertech.core.ui.components.IconPickerDialog
+import ru.wassertech.client.permissions.canChangeIconForSite
+import androidx.compose.material.icons.filled.Image
+import kotlinx.coroutines.flow.map
 // Временно используем стандартные Material3 компоненты
 // TODO: Вынести AppFloatingActionButton и CommonAddDialog в core:ui или создать локальные версии
 import java.util.UUID
@@ -48,14 +55,15 @@ import java.util.UUID
 fun SitesScreen(
     clientId: String,
     onOpenSite: (String) -> Unit,
-    onNavigateBack: (() -> Unit)? = null
+    onNavigateBack: (() -> Unit)? = null,
+    paddingValues: PaddingValues = PaddingValues(0.dp)
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
     val scope = rememberCoroutineScope()
     
     // Получаем текущую сессию пользователя
-    val currentUser = remember { UserSessionManager.getCurrentSession() }
+    val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
     
     // Получаем список объектов для текущего клиента
     val sites by db.hierarchyDao().observeSites(clientId).collectAsState(initial = emptyList())
@@ -76,6 +84,11 @@ fun SitesScreen(
     
     var deleteSiteId by remember { mutableStateOf<String?>(null) }
     
+    // Состояние для IconPickerDialog
+    var isIconPickerVisible by remember { mutableStateOf(false) }
+    var iconPickerState by remember { mutableStateOf<Pair<List<ru.wassertech.core.ui.components.IconPackUiData>, Map<String, List<ru.wassertech.core.ui.components.IconUiData>>>?>(null) }
+    var iconPickerSiteId by remember { mutableStateOf<String?>(null) }
+    
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
@@ -93,17 +106,23 @@ fun SitesScreen(
                 }
             }
         }
-    ) { padding ->
+    ) { _ ->
         val layoutDir = LocalLayoutDirection.current
+        val combinedPadding = PaddingValues(
+            top = paddingValues.calculateTopPadding(),
+            start = paddingValues.calculateStartPadding(layoutDir),
+            end = paddingValues.calculateEndPadding(layoutDir),
+            bottom = paddingValues.calculateBottomPadding()
+        )
         
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = padding.calculateStartPadding(layoutDir),
-                    end = padding.calculateEndPadding(layoutDir),
+                    start = combinedPadding.calculateStartPadding(layoutDir),
+                    end = combinedPadding.calculateEndPadding(layoutDir),
                     top = 0.dp,
-                    bottom = padding.calculateBottomPadding()
+                    bottom = combinedPadding.calculateBottomPadding()
                 )
         ) {
             // Заголовок экрана
@@ -149,15 +168,56 @@ fun SitesScreen(
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     items(sites, key = { it.id }) { site ->
+                        // Загружаем иконку объекта
+                        val siteIcon by db.iconDao().observeAllActive().map { icons ->
+                            site.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
+                        }.collectAsState(initial = null)
+                        
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SiteRow(
                                 site = site,
+                                icon = siteIcon,
                                 onClick = { onOpenSite(site.id) },
                                 onEdit = if (currentUser != null && canEditSite(currentUser, site)) {
                                     {
                                         editSiteId = site.id
                                         editSiteName = site.name
                                         editSiteAddress = site.address ?: ""
+                                    }
+                                } else null,
+                                onChangeIcon = if (currentUser != null && canChangeIconForSite(currentUser, site)) {
+                                    {
+                                        scope.launch(Dispatchers.IO) {
+                                            val packs = db.iconPackDao().getAll()
+                                            val allIcons = db.iconDao().getAllActive()
+                                            val filteredIcons = allIcons.filter { icon ->
+                                                icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
+                                            }
+                                            val iconsByPack = filteredIcons.groupBy { it.packId }
+                                            iconPickerState = Pair(
+                                                packs.map { 
+                                                    ru.wassertech.core.ui.components.IconPackUiData(
+                                                        id = it.id,
+                                                        name = it.name
+                                                    )
+                                                },
+                                                iconsByPack.mapValues { (_, icons) ->
+                                                    icons.map { icon ->
+                                                        ru.wassertech.core.ui.components.IconUiData(
+                                                            id = icon.id,
+                                                            packId = icon.packId,
+                                                            label = icon.label,
+                                                            entityType = icon.entityType,
+                                                            androidResName = icon.androidResName,
+                                                            code = icon.code, // Передаем code для fallback
+                                                            localImagePath = null // В app-client загрузка изображений не реализована
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                            iconPickerSiteId = site.id
+                                            isIconPickerVisible = true
+                                        }
                                     }
                                 } else null,
                                 onDelete = if (currentUser != null && canDeleteSite(currentUser, site)) {
@@ -210,6 +270,8 @@ fun SitesScreen(
                     val name = newSiteName.trim()
                     if (name.isNotEmpty() && currentUser != null) {
                         scope.launch(Dispatchers.IO) {
+                            val session = ru.wassertech.core.auth.SessionManager.getInstance(context).getCurrentSession()
+                            val currentTime = System.currentTimeMillis()
                             val newSite = SiteEntity(
                                 id = UUID.randomUUID().toString(),
                                 clientId = clientId,
@@ -218,8 +280,14 @@ fun SitesScreen(
                                 orderIndex = sites.size,
                                 isArchived = false,
                                 archivedAtEpoch = null,
+                                createdAtEpoch = currentTime,
+                                updatedAtEpoch = currentTime,
+                                deletedAtEpoch = null,
+                                dirtyFlag = true, // Помечаем как требующий синхронизации
+                                syncStatus = 1, // QUEUED
                                 ownerClientId = currentUser.clientId,
-                                origin = OriginType.CLIENT.name
+                                origin = OriginType.CLIENT.name,
+                                createdByUserId = session?.userId
                             )
                             db.hierarchyDao().upsertSite(newSite)
                         }
@@ -273,7 +341,10 @@ fun SitesScreen(
                                 if (site != null) {
                                     val updatedSite = site.copy(
                                         name = name,
-                                        address = editSiteAddress.trim().takeIf { it.isNotEmpty() }
+                                        address = editSiteAddress.trim().takeIf { it.isNotEmpty() },
+                                        updatedAtEpoch = System.currentTimeMillis(),
+                                        dirtyFlag = true, // Помечаем как требующий синхронизации
+                                        syncStatus = 1 // QUEUED
                                     )
                                     db.hierarchyDao().upsertSite(updatedSite)
                                 }
@@ -324,49 +395,146 @@ fun SitesScreen(
             }
         )
     }
+    
+    // Диалог выбора иконки объекта
+    iconPickerState?.let { (packs, iconsByPack) ->
+        val site = iconPickerSiteId?.let { siteId ->
+            sites.firstOrNull { it.id == siteId }
+        }
+        IconPickerDialog(
+            visible = isIconPickerVisible,
+            onDismissRequest = { 
+                isIconPickerVisible = false
+                iconPickerSiteId = null
+            },
+            entityType = IconEntityType.SITE,
+            packs = packs,
+            iconsByPack = iconsByPack,
+            selectedIconId = site?.iconId,
+            onIconSelected = { newIconId ->
+                iconPickerSiteId?.let { siteId ->
+                    scope.launch(Dispatchers.IO) {
+                        val siteToUpdate = db.hierarchyDao().getSite(siteId)
+                        if (siteToUpdate != null) {
+                            val updatedSite = siteToUpdate.copy(
+                                iconId = newIconId,
+                                updatedAtEpoch = System.currentTimeMillis(),
+                                dirtyFlag = true,
+                                syncStatus = 1 // QUEUED
+                            )
+                            db.hierarchyDao().upsertSite(updatedSite)
+                        }
+                    }
+                }
+                isIconPickerVisible = false
+                iconPickerSiteId = null
+            }
+        )
+    }
 }
 
 @Composable
 private fun SiteRow(
     site: SiteEntity,
+    icon: ru.wassertech.client.data.entities.IconEntity? = null,
     onClick: () -> Unit,
     onEdit: (() -> Unit)? = null,
+    onChangeIcon: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val iconRes = R.drawable.object_house_blue // Можно добавить логику выбора иконки
+    var menuOpen by remember { mutableStateOf(false) }
     
-    EntityRowWithMenu(
-        title = site.name,
-        subtitle = site.address,
-        leadingIcon = {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = "Объект",
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconResolver.IconImage(
+            androidResName = icon?.androidResName,
+            entityType = IconEntityType.SITE,
+            contentDescription = "Объект",
+            size = 48.dp
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                site.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (site.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onBackground
             )
-        },
-        trailingIcon = {
-            Icon(
-                imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
-                contentDescription = "Открыть",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-        },
-        isEditMode = false, // В app-client нет режима редактирования для списка объектов
-        isArchived = site.isArchived == true,
-        onClick = onClick,
-        onRestore = null,
-        onArchive = null,
-        onDelete = onDelete,
-        onEdit = onEdit,
-        onMoveToGroup = null,
-        availableGroups = emptyList(),
-        modifier = modifier,
-        reorderableState = null,
-        showDragHandle = false
-    )
+            if (site.address != null && site.address.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    site.address,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (site.isArchived == true) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
+            contentDescription = "Открыть",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        // Меню действий (если есть действия)
+        if (onEdit != null || onChangeIcon != null || onDelete != null) {
+            Spacer(Modifier.width(8.dp))
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "Действия",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    modifier = Modifier.background(ru.wassertech.core.ui.theme.DropdownMenuBackground)
+                ) {
+                    onChangeIcon?.let {
+                        DropdownMenuItem(
+                            text = { Text("Изменить иконку") },
+                            onClick = {
+                                menuOpen = false
+                                it()
+                            }
+                        )
+                    }
+                    if (onChangeIcon != null && onEdit != null) {
+                        HorizontalDivider()
+                    }
+                    onEdit?.let {
+                        DropdownMenuItem(
+                            text = { Text("Редактировать") },
+                            onClick = {
+                                menuOpen = false
+                                it()
+                            }
+                        )
+                    }
+                    if ((onChangeIcon != null || onEdit != null) && onDelete != null) {
+                        HorizontalDivider()
+                    }
+                    onDelete?.let {
+                        DropdownMenuItem(
+                            text = { Text("Удалить") },
+                            onClick = {
+                                menuOpen = false
+                                it()
+                            },
+                            colors = MenuDefaults.itemColors(
+                                textColor = MaterialTheme.colorScheme.error
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 

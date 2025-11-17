@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
@@ -31,6 +32,15 @@ import ru.wassertech.core.ui.R
 import ru.wassertech.core.ui.components.EmptyGroupPlaceholder
 import ru.wassertech.core.ui.components.EntityRowWithMenu
 import ru.wassertech.core.ui.theme.ClientsRowDivider
+import ru.wassertech.core.ui.icons.IconResolver
+import ru.wassertech.core.ui.icons.IconEntityType
+import ru.wassertech.core.ui.components.IconPickerDialog
+import ru.wassertech.core.auth.SessionManager
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SiteDetailScreen(
@@ -40,6 +50,7 @@ fun SiteDetailScreen(
     onOpenInstallation: (String) -> Unit,
     vm: HierarchyViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var siteName by remember { mutableStateOf("Объект") }
     var showEdit by remember { mutableStateOf(false) }
@@ -47,6 +58,43 @@ fun SiteDetailScreen(
     var editAddr by remember { mutableStateOf(TextFieldValue("")) }
     var isSiteArchived by remember { mutableStateOf(false) }
     var isCorporate by remember { mutableStateOf(false) }
+    
+    // Состояние для иконок
+    val site by vm.site(siteId).collectAsState(initial = null)
+    
+    // Локальное состояние для иконки, которое обновляется явно
+    var siteIconId by remember { mutableStateOf<String?>(null) }
+    var siteIcon by remember { mutableStateOf<ru.wassertech.data.entities.IconEntity?>(null) }
+    
+    // Инициализируем siteIconId из site при первой загрузке
+    LaunchedEffect(site?.iconId) {
+        if (siteIconId != site?.iconId) {
+            siteIconId = site?.iconId
+            android.util.Log.d("SiteDetailScreen", "site.iconId changed to: ${site?.iconId}")
+        }
+    }
+    
+    // Загружаем иконку по siteIconId
+    LaunchedEffect(siteIconId) {
+        if (siteIconId != null) {
+            val icon = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                vm.getIcon(siteIconId)
+            }
+            siteIcon = icon
+            android.util.Log.d("SiteDetailScreen", "Loaded icon: id=${icon?.id}, label=${icon?.label}, androidResName=${icon?.androidResName}, code=${icon?.code}")
+        } else {
+            siteIcon = null
+        }
+    }
+    
+    // Состояние для IconPickerDialog (для объекта)
+    var isIconPickerVisible by remember { mutableStateOf(false) }
+    var iconPickerState by remember { mutableStateOf<ru.wassertech.core.ui.icons.IconPickerUiState?>(null) }
+    
+    // Состояние для IconPickerDialog (для установок)
+    var isIconPickerVisibleForInstallation by remember { mutableStateOf(false) }
+    var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.viewmodel.IconPickerUiState?>(null) }
+    var iconPickerInstallationId by remember { mutableStateOf<String?>(null) }
 
     val installations: List<InstallationEntity> by vm.installations(siteId)
         .collectAsState(initial = emptyList())
@@ -65,6 +113,13 @@ fun SiteDetailScreen(
             // Получаем информацию о клиенте для определения типа
             val client = vm.getClient(s.clientId)
             isCorporate = client?.isCorporate ?: false
+        }
+    }
+    
+    // Загружаем данные для IconPickerDialog при открытии
+    LaunchedEffect(isIconPickerVisible) {
+        if (isIconPickerVisible && iconPickerState == null) {
+            iconPickerState = vm.loadIconPacksAndIconsFor(IconEntityType.SITE)
         }
     }
 
@@ -103,18 +158,30 @@ fun SiteDetailScreen(
                             .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Выбираем иконку объекта в зависимости от типа клиента и архивации
-                        val siteIconRes = when {
-                            isSiteArchived && isCorporate -> R.drawable.object_factory_red
-                            isSiteArchived && !isCorporate -> R.drawable.object_house_red
-                            isCorporate -> R.drawable.object_factory_blue
-                            else -> R.drawable.object_house_blue
+                        // Отображаем иконку из БД или дефолтную
+                        // Логирование для отладки
+                        LaunchedEffect(site?.iconId, siteIcon?.id) {
+                            val icon = siteIcon
+                            android.util.Log.d("SiteDetailScreen", 
+                                "Header icon: site.iconId=${site?.iconId}, siteIconId=$siteIconId, siteIcon=${if (icon != null) "id=${icon.id}, label=${icon.label}, androidResName=${icon.androidResName}, code=${icon.code}" else "null"}"
+                            )
                         }
-                        Image(
-                            painter = painterResource(id = siteIconRes),
-                            contentDescription = null,
-                            modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2),
-                            contentScale = ContentScale.Fit
+                        // Логирование параметров перед передачей в IconImage
+                        val localImagePath = siteIcon?.let { icon ->
+                            ru.wassertech.data.repository.IconRepository(context).getLocalIconPath(icon)
+                        }
+                        LaunchedEffect(siteIcon?.id, siteIcon?.androidResName, siteIcon?.code, localImagePath) {
+                            android.util.Log.d("SiteDetailScreen", 
+                                "IconImage params: androidResName=${siteIcon?.androidResName}, code=${siteIcon?.code}, localImagePath=$localImagePath, siteIcon.id=${siteIcon?.id}"
+                            )
+                        }
+                        IconResolver.IconImage(
+                            androidResName = siteIcon?.androidResName,
+                            entityType = IconEntityType.SITE,
+                            contentDescription = "Объект",
+                            size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2,
+                            code = siteIcon?.code, // Передаем code для fallback
+                            localImagePath = localImagePath // Передаем локальный путь к файлу изображения
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
@@ -123,8 +190,22 @@ fun SiteDetailScreen(
                             color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
                         )
                         Spacer(Modifier.weight(1f))
-                        // Иконка редактирования видна только в режиме редактирования
+                        // Иконки действий видны только в режиме редактирования
                         if (isEditing) {
+                            // Кнопка изменения иконки
+                            IconButton(onClick = {
+                                scope.launch {
+                                    iconPickerState = vm.loadIconPacksAndIconsFor(IconEntityType.SITE)
+                                    isIconPickerVisible = true
+                                }
+                            }) {
+                                Icon(
+                                    Icons.Filled.Image,
+                                    contentDescription = "Изменить иконку",
+                                    tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                                )
+                            }
+                            // Кнопка редактирования
                             IconButton(onClick = { showEdit = true }) {
                                 Icon(
                                     Icons.Filled.Edit,
@@ -155,6 +236,7 @@ fun SiteDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     items(installations, key = { it.id }) { inst ->
+                        val installationIcon by vm.icon(inst.iconId).collectAsState(initial = null)
                         Column(modifier = Modifier.fillMaxWidth()) {
                             InstallationRowWithEdit(
                                 installation = inst,
@@ -163,6 +245,16 @@ fun SiteDetailScreen(
                                 onArchive = { vm.archiveInstallation(inst.id) },
                                 onRestore = { vm.restoreInstallation(inst.id) },
                                 onDelete = { vm.deleteInstallation(inst.id) },
+                                onChangeIcon = if (isEditing) {
+                                    {
+                                        scope.launch {
+                                            iconPickerStateForInstallation = vm.loadIconPacksAndIconsFor(IconEntityType.INSTALLATION)
+                                            iconPickerInstallationId = inst.id
+                                            isIconPickerVisibleForInstallation = true
+                                        }
+                                    }
+                                } else null,
+                                icon = installationIcon,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(Color.White)
@@ -227,6 +319,56 @@ fun SiteDetailScreen(
             confirmEnabled = newInstName.text.trim().isNotEmpty()
         )
     }
+    
+    // Диалог выбора иконки объекта
+    iconPickerState?.let { state ->
+        IconPickerDialog(
+            visible = isIconPickerVisible,
+            onDismissRequest = { 
+                isIconPickerVisible = false
+                iconPickerState = null
+            },
+            entityType = IconEntityType.SITE,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
+            selectedIconId = site?.iconId,
+            onIconSelected = { newIconId ->
+                android.util.Log.d("SiteDetailScreen", "onIconSelected called: newIconId=$newIconId, siteId=$siteId")
+                vm.updateSiteIcon(siteId, newIconId)
+                // Явно обновляем локальное состояние иконки
+                siteIconId = newIconId
+                isIconPickerVisible = false
+                iconPickerState = null
+            }
+        )
+    }
+    
+    // Диалог выбора иконки установки
+    iconPickerStateForInstallation?.let { state ->
+        val installation = iconPickerInstallationId?.let { instId ->
+            installations.firstOrNull { it.id == instId }
+        }
+        IconPickerDialog(
+            visible = isIconPickerVisibleForInstallation,
+            onDismissRequest = { 
+                isIconPickerVisibleForInstallation = false
+                iconPickerInstallationId = null
+                iconPickerStateForInstallation = null
+            },
+            entityType = IconEntityType.INSTALLATION,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
+            selectedIconId = installation?.iconId,
+            onIconSelected = { newIconId ->
+                iconPickerInstallationId?.let { instId ->
+                    vm.updateInstallationIcon(instId, newIconId)
+                }
+                isIconPickerVisibleForInstallation = false
+                iconPickerInstallationId = null
+                iconPickerStateForInstallation = null
+            }
+        )
+    }
 }
 
 /* ---------- Вспомогательные UI-компоненты ---------- */
@@ -239,20 +381,26 @@ private fun InstallationRowWithEdit(
     onArchive: () -> Unit,
     onRestore: () -> Unit,
     onDelete: () -> Unit,
+    onChangeIcon: (() -> Unit)? = null,
+    icon: ru.wassertech.data.entities.IconEntity? = null,
     modifier: Modifier = Modifier
 ) {
-    // Определяем иконку установки
-    val iconRes = R.drawable.equipment_filter_triple
-
     EntityRowWithMenu(
         title = installation.name,
         subtitle = null,
         leadingIcon = {
-            Image(
-                painter = painterResource(id = iconRes),
+            val installationIconLocalPath = icon?.let { iconEntity ->
+                ru.wassertech.data.repository.IconRepository(
+                    androidx.compose.ui.platform.LocalContext.current
+                ).getLocalIconPath(iconEntity)
+            }
+            IconResolver.IconImage(
+                androidResName = icon?.androidResName,
+                entityType = IconEntityType.INSTALLATION,
                 contentDescription = "Установка",
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
+                size = 48.dp,
+                code = icon?.code, // Передаем code для fallback
+                localImagePath = installationIconLocalPath // Передаем локальный путь к файлу изображения
             )
         },
         trailingIcon = if (!isEditMode) {
@@ -272,6 +420,7 @@ private fun InstallationRowWithEdit(
         onArchive = onArchive,
         onDelete = onDelete,
         onEdit = null, // Редактирование установки пока не поддерживается на этом экране
+        onChangeIcon = onChangeIcon,
         onMoveToGroup = null,
         availableGroups = emptyList(),
         modifier = modifier,

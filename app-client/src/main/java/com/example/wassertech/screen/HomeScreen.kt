@@ -2,7 +2,6 @@ package ru.wassertech.screen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -10,69 +9,65 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import ru.wassertech.core.ui.theme.NavigationBarStyle
+import androidx.navigation.compose.currentBackStackEntryAsState
 import ru.wassertech.client.ui.settings.SettingsScreen
-import ru.wassertech.client.data.AppDatabase
-import ru.wassertech.client.ui.reports.ReportsDatabaseProvider
-import ru.wassertech.client.ui.reports.InstallationsReportsScreen
 import ru.wassertech.client.ui.sites.SitesScreen
-import ru.wassertech.client.auth.UserSessionManager
-import ru.wassertech.feature.reports.ReportsDatabaseProvider as IReportsDatabaseProvider
+import ru.wassertech.core.auth.SessionManager
 import ru.wassertech.navigation.AppRoutes
 import ru.wassertech.feature.auth.AuthRoutes
+import ru.wassertech.client.sync.SyncEngine
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Главный экран с табами
  */
 @Composable
-fun HomeScreen(navController: NavController? = null) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
+fun HomeScreen(
+    navController: NavController? = null,
+    paddingValues: PaddingValues = PaddingValues(0.dp),
+    initialTab: Int = 0
+) {
     val context = LocalContext.current
-    val databaseProvider = remember {
-        ReportsDatabaseProvider(AppDatabase.getInstance(context)) as IReportsDatabaseProvider
+    val scope = rememberCoroutineScope()
+    
+    var selectedTabIndex by remember { mutableStateOf(initialTab) }
+    
+    // Обновляем selectedTabIndex при изменении initialTab
+    LaunchedEffect(initialTab) {
+        selectedTabIndex = initialTab
     }
     
     // Получаем текущую сессию пользователя для получения clientId
-    val currentUser = remember { UserSessionManager.getCurrentSession() }
+    val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
     val clientId = currentUser?.clientId
     
-    Scaffold(
-        bottomBar = {
-            NavigationBar(
-                containerColor = NavigationBarStyle.backgroundColor,
-                tonalElevation = 3.dp
-            ) {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("Объекты") },
-                    selected = selectedTabIndex == 0,
-                    onClick = { selectedTabIndex = 0 },
-                    colors = NavigationBarStyle.itemColors()
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Description, contentDescription = null) },
-                    label = { Text("Отчёты") },
-                    selected = selectedTabIndex == 1,
-                    onClick = { selectedTabIndex = 1 },
-                    colors = NavigationBarStyle.itemColors()
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    label = { Text("Настройки") },
-                    selected = selectedTabIndex == 2,
-                    onClick = { selectedTabIndex = 2 },
-                    colors = NavigationBarStyle.itemColors()
-                )
+    // Автоматическая синхронизация при первом запуске экрана
+    LaunchedEffect(clientId) {
+        if (clientId != null) {
+            android.util.Log.d("HomeScreen", "Начинаю автоматическую синхронизацию для clientId: $clientId")
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val syncEngine = SyncEngine(context)
+                    val result = syncEngine.syncFull() // Используем полную синхронизацию (push + pull)
+                    android.util.Log.d("HomeScreen", "Автоматическая синхронизация завершена: ${result.message}")
+                } catch (e: Exception) {
+                    android.util.Log.e("HomeScreen", "Ошибка автоматической синхронизации", e)
+                }
             }
+        } else {
+            android.util.Log.w("HomeScreen", "clientId отсутствует, синхронизация не выполняется")
         }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
             when (selectedTabIndex) {
                 0 -> {
                     // Экран списка объектов
@@ -84,28 +79,32 @@ fun HomeScreen(navController: NavController? = null) {
                             }
                         )
                     } else {
-                        // Если нет clientId, показываем сообщение об ошибке
+                        // Если нет clientId (например, для ADMIN/ENGINEER), показываем сообщение
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Ошибка: не удалось определить ID клиента")
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    text = if (currentUser?.isAdmin() == true || currentUser?.isEngineer() == true) {
+                                        "Приложение предназначено для клиентов.\nДля работы с системой используйте CRM-приложение."
+                                    } else {
+                                        "Ошибка: не удалось определить ID клиента"
+                                    },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
-                1 -> InstallationsReportsScreen(
-                    databaseProvider = databaseProvider,
-                    onNavigateToSessionDetail = { sessionId ->
-                        navController?.navigate(AppRoutes.sessionDetail(sessionId))
-                    },
-                    onNavigateToLogin = {
-                        // Навигация на экран логина с очисткой стека
-                        navController?.navigate(AuthRoutes.LOGIN) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                )
-                2 -> SettingsScreen(
+                1 -> SettingsScreen(
+                    navController = navController,
                     onLogout = {
                         // Навигация на экран логина с очисткой стека
                         navController?.navigate(AuthRoutes.LOGIN) {
@@ -116,6 +115,6 @@ fun HomeScreen(navController: NavController? = null) {
             }
         }
     }
-}
+
 
 

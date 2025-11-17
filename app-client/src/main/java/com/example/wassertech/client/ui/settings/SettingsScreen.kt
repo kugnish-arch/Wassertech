@@ -1,10 +1,12 @@
 package ru.wassertech.client.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,11 +18,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.wassertech.core.auth.UserAuthService
-import ru.wassertech.client.repository.InstallationsRepository
+import ru.wassertech.client.sync.SyncEngine
+import androidx.navigation.NavHostController
+import ru.wassertech.navigation.AppRoutes
+import ru.wassertech.core.ui.theme.NavigationIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    navController: NavHostController? = null,
     onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -31,7 +37,7 @@ fun SettingsScreen(
     var syncMessage by remember { mutableStateOf<String?>(null) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     
-    val installationsRepository = remember { InstallationsRepository(context) }
+    val syncEngine = remember { SyncEngine(context) }
     
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -46,6 +52,59 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(Modifier.height(8.dp))
+            
+            // Пункт для перехода к икон-пакам
+            if (navController != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            navController.navigate(AppRoutes.CLIENT_ICON_PACKS) {
+                                launchSingleTop = true
+                            }
+                        },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Мои икон-паки",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "Просмотр доступных наборов иконок",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = NavigationIcons.NavigateIcon,
+                            contentDescription = "Открыть",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(8.dp))
+            }
             
             Text(
                 text = "Синхронизация данных",
@@ -73,20 +132,15 @@ fun SettingsScreen(
                             }
                             
                             val result = withContext(Dispatchers.IO) {
-                                installationsRepository.syncInstallations()
+                                syncEngine.syncFull() // Используем полную синхронизацию (push + pull)
                             }
                             
-                            result.fold(
-                                onSuccess = { count ->
-                                    syncMessage = "Синхронизация завершена. Загружено установок: $count"
-                                    snackbarHostState.showSnackbar(syncMessage!!)
-                                },
-                                onFailure = { error ->
-                                    val errorMsg = "Ошибка при синхронизации: ${error.message}"
-                                    syncMessage = errorMsg
-                                    snackbarHostState.showSnackbar(errorMsg)
-                                }
-                            )
+                            syncMessage = result.message
+                            if (result.success) {
+                                snackbarHostState.showSnackbar(result.message)
+                            } else {
+                                snackbarHostState.showSnackbar(result.message, duration = SnackbarDuration.Long)
+                            }
                         } catch (e: Exception) {
                             val errorMsg = "Ошибка при синхронизации: ${e.message}"
                             syncMessage = errorMsg

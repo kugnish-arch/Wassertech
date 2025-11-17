@@ -1,20 +1,21 @@
-package ru.wassertech.client.auth
+package ru.wassertech.core.auth
 
 /**
  * Тип происхождения сущности (откуда она была создана).
+ * Соответствует серверному полю origin в таблицах БД.
  */
-enum class OriginType {
+enum class OriginType(val serverValue: String) {
     /**
      * Сущность создана инженером в CRM (официальные данные под сервисный контракт).
      * В app-client такие сущности доступны только для просмотра (read-only).
      */
-    CRM,
+    CRM("CRM"),
     
     /**
      * Сущность создана самим клиентом в app-client (его внутренние записи).
      * В app-client такие сущности можно редактировать и удалять.
      */
-    CLIENT;
+    CLIENT("CLIENT");
     
     companion object {
         /**
@@ -23,32 +24,22 @@ enum class OriginType {
          */
         fun fromString(value: String?): OriginType {
             return try {
-                if (value == null) CRM else valueOf(value.uppercase())
+                if (value == null) CRM else {
+                    when (value.uppercase()) {
+                        "CRM" -> CRM
+                        "CLIENT" -> CLIENT
+                        else -> {
+                            android.util.Log.w("OriginType", "Неизвестное значение origin: $value, используем CRM")
+                            CRM
+                        }
+                    }
+                }
             } catch (e: Exception) {
+                android.util.Log.e("OriginType", "Ошибка парсинга origin: $value", e)
                 CRM // По умолчанию считаем CRM
-            }
-        }
-        
-        /**
-         * Преобразует числовое значение (0=CRM, 1=CLIENT) в OriginType.
-         */
-        fun fromInt(value: Int): OriginType {
-            return when (value) {
-                0 -> CRM
-                1 -> CLIENT
-                else -> CRM // По умолчанию
-            }
-        }
-        
-        /**
-         * Преобразует OriginType в числовое значение (0=CRM, 1=CLIENT).
-         */
-        fun OriginType.toInt(): Int {
-            return when (this) {
-                CRM -> 0
-                CLIENT -> 1
             }
         }
     }
 }
+
 

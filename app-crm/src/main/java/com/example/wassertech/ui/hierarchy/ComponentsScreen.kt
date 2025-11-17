@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
@@ -51,6 +52,11 @@ import kotlinx.coroutines.launch
 import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
 import ru.wassertech.core.ui.theme.SegmentedButtonStyle
+import ru.wassertech.core.ui.icons.IconResolver
+import ru.wassertech.core.ui.icons.IconEntityType
+import ru.wassertech.core.ui.components.IconPickerDialog
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 
 @Composable
@@ -195,6 +201,15 @@ fun ComponentsScreen(
     var templateMenu by remember { mutableStateOf(false) }
 
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    
+    // Состояние для IconPickerDialog (для компонентов)
+    var isIconPickerVisible by remember { mutableStateOf(false) }
+    var iconPickerState by remember { mutableStateOf<ru.wassertech.core.ui.icons.IconPickerUiState?>(null) }
+    var iconPickerComponentId by remember { mutableStateOf<String?>(null) }
+    
+    // Состояние для IconPickerDialog (для установки)
+    var isIconPickerVisibleForInstallation by remember { mutableStateOf(false) }
+    var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.viewmodel.IconPickerUiState?>(null) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
@@ -249,12 +264,18 @@ fun ComponentsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Иконка установки
-                            Image(
-                                painter = painterResource(id = R.drawable.equipment_filter_triple),
-                                contentDescription = null,
-                                modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2),
-                                contentScale = ContentScale.Fit
+                            // Иконка установки из БД
+                            val installationIcon by vm.icon(installation?.iconId).collectAsState(initial = null)
+                            val installationIconLocalPath = installationIcon?.let { icon ->
+                                ru.wassertech.data.repository.IconRepository(context).getLocalIconPath(icon)
+                            }
+                            IconResolver.IconImage(
+                                androidResName = installationIcon?.androidResName,
+                                entityType = IconEntityType.INSTALLATION,
+                                contentDescription = "Установка",
+                                size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2,
+                                code = installationIcon?.code, // Передаем code для fallback
+                                localImagePath = installationIconLocalPath // Передаем локальный путь к файлу изображения
                             )
                             Spacer(Modifier.width(8.dp))
                             // Используем ScreenTitleWithSubtitle для текстовой части заголовка
@@ -268,6 +289,23 @@ fun ComponentsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             if (isEditing) {
+                                // Кнопка смены иконки установки
+                                IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            iconPickerStateForInstallation = vm.loadIconPacksAndIconsFor(IconEntityType.INSTALLATION)
+                                            isIconPickerVisibleForInstallation = true
+                                        }
+                                    },
+                                    enabled = installation != null
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Image,
+                                        contentDescription = "Изменить иконку",
+                                        tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                                    )
+                                }
+                                // Кнопка редактирования установки
                                 IconButton(
                                     onClick = {
                                         editName = TextFieldValue(installation?.name ?: "")
@@ -348,33 +386,45 @@ fun ComponentsScreen(
                     title = "Нет компонентов",
                     description = "Нажмите кнопку «+», чтобы добавить компонент к этой установке."
                 )
-            } else if (isEditing) {
-                // В режиме редактирования используем ReorderableLazyColumn для drag-n-drop
+            } else {
+                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
                 ReorderableLazyColumn(
                     items = orderedComponents,
                     onMove = { fromIndex, toIndex ->
+                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
                         val mutable = localOrder.toMutableList()
                         val item = mutable.removeAt(fromIndex)
                         mutable.add(toIndex, item)
                         localOrder = mutable
+                        // Изменения сохраняются в БД только в режиме редактирования
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 400.dp),
+                        .weight(1f), // Используем weight вместо heightIn для правильного заполнения пространства
                     key = { it.id },
                     contentPadding = PaddingValues(0.dp),
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) { comp, isDragging, reorderableState ->
                     val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
+                    val componentIcon by vm.icon(comp.iconId).collectAsState(initial = null)
                     
                     Column(modifier = Modifier.fillMaxWidth()) {
                         ComponentRowWithEdit(
                             component = comp,
                             templateTitle = tmplTitle,
                             isEditMode = isEditing,
+                            icon = componentIcon,
                             onDelete = { pendingDeleteId = comp.id },
+                            onChangeIcon = {
+                                scope.launch {
+                                    iconPickerComponentId = comp.id
+                                    iconPickerState = vm.loadIconPacksAndIconsFor(IconEntityType.COMPONENT)
+                                    isIconPickerVisible = true
+                                }
+                            },
                             isDragging = isDragging,
                             reorderableState = reorderableState,
+                            onToggleEdit = onToggleEdit,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(Color.White)
@@ -386,38 +436,6 @@ fun ComponentsScreen(
                                 color = ClientsRowDivider,
                                 thickness = 1.dp
                             )
-                        }
-                    }
-                }
-            } else {
-                // В обычном режиме используем обычный список без drag-n-drop
-                LazyColumn(
-                    contentPadding = PaddingValues(0.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    items(orderedComponents, key = { it.id }) { comp ->
-                        val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
-                        
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            ComponentRowWithEdit(
-                                component = comp,
-                                templateTitle = tmplTitle,
-                                isEditMode = isEditing,
-                                onDelete = { },
-                                isDragging = false,
-                                reorderableState = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color.White)
-                            )
-                            // Разделительная линия между компонентами (кроме последнего)
-                            val index = orderedComponents.indexOf(comp)
-                            if (index >= 0 && index < orderedComponents.size - 1) {
-                                HorizontalDivider(
-                                    color = ClientsRowDivider,
-                                    thickness = 1.dp
-                                )
-                            }
                         }
                     }
                 }
@@ -562,6 +580,53 @@ fun ComponentsScreen(
             confirmEnabled = selectedTemplate != null || allTemplates.isNotEmpty()
         )
     }
+    
+    // ===== Диалог выбора иконки компонента =====
+    iconPickerState?.let { state ->
+        val component = iconPickerComponentId?.let { compId ->
+            components.firstOrNull { it.id == compId }
+        }
+        IconPickerDialog(
+            visible = isIconPickerVisible,
+            onDismissRequest = { 
+                isIconPickerVisible = false
+                iconPickerComponentId = null
+                iconPickerState = null
+            },
+            entityType = IconEntityType.COMPONENT,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
+            selectedIconId = component?.iconId,
+            onIconSelected = { newIconId ->
+                iconPickerComponentId?.let { compId ->
+                    vm.updateComponentIcon(compId, newIconId)
+                }
+                isIconPickerVisible = false
+                iconPickerComponentId = null
+                iconPickerState = null
+            }
+        )
+    }
+    
+    // ===== Диалог выбора иконки установки =====
+    iconPickerStateForInstallation?.let { state ->
+        IconPickerDialog(
+            visible = isIconPickerVisibleForInstallation,
+            onDismissRequest = { 
+                isIconPickerVisibleForInstallation = false
+                iconPickerStateForInstallation = null
+            },
+            entityType = IconEntityType.INSTALLATION,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
+            selectedIconId = installation?.iconId,
+            onIconSelected = { newIconId ->
+                vm.updateInstallationIcon(installationId, newIconId)
+                isIconPickerVisibleForInstallation = false
+                iconPickerStateForInstallation = null
+            }
+        )
+    }
 
     // ===== Диалог подтверждения удаления компонента =====
     pendingDeleteId?.let { compId ->
@@ -589,20 +654,30 @@ private fun ComponentRowWithEdit(
     component: ru.wassertech.data.entities.ComponentEntity,
     templateTitle: String,
     isEditMode: Boolean,
+    icon: ru.wassertech.data.entities.IconEntity? = null,
     onDelete: () -> Unit,
+    onChangeIcon: (() -> Unit)? = null,
     isDragging: Boolean,
     reorderableState: ReorderableState?,
+    onToggleEdit: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     EntityRowWithMenu(
         title = component.name,
         subtitle = templateTitle,
         leadingIcon = {
-            Image(
-                painter = painterResource(id = R.drawable.ui_gear),
+            val componentIconLocalPath = icon?.let { iconEntity ->
+                ru.wassertech.data.repository.IconRepository(
+                    androidx.compose.ui.platform.LocalContext.current
+                ).getLocalIconPath(iconEntity)
+            }
+            IconResolver.IconImage(
+                androidResName = icon?.androidResName,
+                entityType = IconEntityType.COMPONENT,
                 contentDescription = "Компонент",
-                modifier = Modifier.size(48.dp),
-                contentScale = ContentScale.Fit
+                size = 48.dp,
+                code = icon?.code, // Передаем code для fallback
+                localImagePath = componentIconLocalPath // Передаем локальный путь к файлу изображения
             )
         },
         trailingIcon = null,
@@ -612,11 +687,13 @@ private fun ComponentRowWithEdit(
         onRestore = null,
         onArchive = null,
         onDelete = onDelete,
-        onEdit = null, // Редактирование компонента пока не поддерживается
+        onEdit = onChangeIcon, // Используем onEdit для изменения иконки
         onMoveToGroup = null,
         availableGroups = emptyList(),
         modifier = modifier,
         reorderableState = reorderableState,
-        showDragHandle = isEditMode && !component.isArchived
+        showDragHandle = isEditMode && !component.isArchived,
+        isDragging = isDragging,
+        onToggleEdit = onToggleEdit
     )
 }

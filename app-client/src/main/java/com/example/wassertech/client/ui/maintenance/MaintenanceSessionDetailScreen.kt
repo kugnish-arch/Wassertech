@@ -30,12 +30,15 @@ import ru.wassertech.feature.reports.ReportAssembler
 import ru.wassertech.feature.reports.HtmlTemplateEngine
 import ru.wassertech.feature.reports.PdfExporter
 import ru.wassertech.feature.reports.ShareUtils
+import ru.wassertech.core.auth.SessionManager
+import ru.wassertech.client.permissions.canGeneratePdf
 import android.util.Log
 
 @Composable
 fun MaintenanceSessionDetailScreen(
     sessionId: String,
-    onNavigateToEdit: (sessionId: String, siteId: String, installationId: String, installationName: String) -> Unit = { _, _, _, _ -> }
+    onNavigateToEdit: (sessionId: String, siteId: String, installationId: String, installationName: String) -> Unit = { _, _, _, _ -> },
+    paddingValues: PaddingValues = PaddingValues(0.dp)
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
@@ -57,6 +60,8 @@ fun MaintenanceSessionDetailScreen(
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
+    val canGenerate = canGeneratePdf(currentUser)
 
     LaunchedEffect(sessionId) {
         withContext(Dispatchers.IO) {
@@ -237,30 +242,32 @@ fun MaintenanceSessionDetailScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
-            // Красный FAB для PDF - показываем CircularProgressIndicator во время экспорта
-            FloatingActionButton(
-                onClick = {
-                    if (!exporting) {
-                        createPdf()
+            // Красный FAB для PDF - показываем только если пользователь может генерировать PDF
+            if (canGenerate) {
+                FloatingActionButton(
+                    onClick = {
+                        if (!exporting) {
+                            createPdf()
+                        }
+                    },
+                    containerColor = Color(0xFFD32F2F), // Красный цвет
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    if (exporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 3.dp,
+                            color = Color.White
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(R.drawable.document_pdf),
+                            contentDescription = "Создать PDF",
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
-                },
-                containerColor = Color(0xFFD32F2F), // Красный цвет
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.size(56.dp)
-            ) {
-                if (exporting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        strokeWidth = 3.dp,
-                        color = Color.White
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(R.drawable.document_pdf),
-                        contentDescription = "Создать PDF",
-                        modifier = Modifier.size(28.dp)
-                    )
                 }
             }
         }

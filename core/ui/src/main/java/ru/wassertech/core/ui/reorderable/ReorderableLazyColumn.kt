@@ -14,7 +14,7 @@ import androidx.compose.ui.zIndex
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.ReorderableLazyListState
 import org.burnoutcrew.reorderable.detectReorder as detectReorderInternal
-import org.burnoutcrew.reorderable.detectReorderAfterLongPress
+import org.burnoutcrew.reorderable.detectReorderAfterLongPress as detectReorderAfterLongPressInternal
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 
@@ -40,6 +40,19 @@ class ReorderableState internal constructor(
 fun Modifier.detectReorder(reorderableState: ReorderableState?): Modifier {
     return if (reorderableState != null) {
         this.then(detectReorderInternal(reorderableState.state))
+    } else {
+        this
+    }
+}
+
+/**
+ * Применяет detectReorderAfterLongPress к модификатору для активации перетаскивания при длительном нажатии на элемент.
+ * Используется для элементов, которые должны активировать перетаскивание при long press, даже когда режим редактирования выключен.
+ */
+fun Modifier.detectReorderAfterLongPress(reorderableState: ReorderableState?): Modifier {
+    return if (reorderableState != null) {
+        // Используем импортированную функцию из библиотеки с алиасом detectReorderAfterLongPressInternal
+        this.then(detectReorderAfterLongPressInternal(reorderableState.state))
     } else {
         this
     }
@@ -104,7 +117,7 @@ fun <T> ReorderableLazyColumn(
         state = reorderableState.listState,
         modifier = modifier
             .reorderable(reorderableState)
-            .detectReorderAfterLongPress(reorderableState),
+            .detectReorderAfterLongPressInternal(reorderableState),
         contentPadding = contentPadding,
         verticalArrangement = verticalArrangement
     ) {

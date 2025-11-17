@@ -19,9 +19,11 @@ import ru.wassertech.client.data.migrations.MIGRATION_6_7   // ← Обновл�
 import ru.wassertech.client.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
 import ru.wassertech.client.data.migrations.MIGRATION_8_9   // ← Добавление полей синхронизации
 import ru.wassertech.client.data.migrations.MIGRATION_9_10  // ← Обновление deleted_records
+import ru.wassertech.client.data.migrations.MIGRATION_10_11  // ← Добавление origin и created_by_user_id
+import ru.wassertech.client.data.migrations.MIGRATION_11_12  // ← Добавление поддержки иконок
 
 @Database(
-    version = 10, // ← Обновлено: обновлена структура deleted_records
+    version = 12, // ← Обновлено: добавление поддержки иконок (icon_packs, icons, icon_id)
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -37,7 +39,9 @@ import ru.wassertech.client.data.migrations.MIGRATION_9_10  // ← Обновл�
         ObservationEntity::class,
         IssueEntity::class,
         DeletedRecordEntity::class,
-        SettingsEntity::class
+        SettingsEntity::class,
+        IconPackEntity::class, // ← Новая сущность для паков иконок
+        IconEntity::class // ← Новая сущность для иконок
     ]
 )
 @TypeConverters(Converters::class)
@@ -52,6 +56,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deletedRecordsDao(): DeletedRecordsDao
     abstract fun settingsDao(): SettingsDao
     abstract fun componentTemplatesDao(): ComponentTemplatesDao
+    abstract fun iconPackDao(): ru.wassertech.client.data.dao.IconPackDao
+    abstract fun iconDao(): ru.wassertech.client.data.dao.IconDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -73,7 +79,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_6_7,    // ← Обновление ComponentType
                         MIGRATION_7_8,   // ← Добавление таблицы settings
                         MIGRATION_8_9,   // ← Добавление полей синхронизации
-                        MIGRATION_9_10  // ← Обновление deleted_records
+                        MIGRATION_9_10,  // ← Обновление deleted_records
+                        MIGRATION_10_11,  // ← Добавление origin и created_by_user_id
+                        MIGRATION_11_12  // ← Добавление поддержки иконок
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

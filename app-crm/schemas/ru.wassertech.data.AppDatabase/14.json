@@ -1,0 +1,1952 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 14,
+    "identityHash": "a97ab0d96996368302ccccec4c2f63c7",
+    "entities": [
+      {
+        "tableName": "clients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `legalName` TEXT, `contactPerson` TEXT, `phone` TEXT, `phone2` TEXT, `email` TEXT, `addressFull` TEXT, `city` TEXT, `region` TEXT, `country` TEXT, `postalCode` TEXT, `latitude` REAL, `longitude` REAL, `taxId` TEXT, `vatNumber` TEXT, `externalId` TEXT, `tagsJson` TEXT, `notes` TEXT, `isCorporate` INTEGER NOT NULL, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `clientGroupId` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "legalName",
+            "columnName": "legalName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "contactPerson",
+            "columnName": "contactPerson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "phone",
+            "columnName": "phone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "phone2",
+            "columnName": "phone2",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "addressFull",
+            "columnName": "addressFull",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "city",
+            "columnName": "city",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "region",
+            "columnName": "region",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "country",
+            "columnName": "country",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "postalCode",
+            "columnName": "postalCode",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "taxId",
+            "columnName": "taxId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "vatNumber",
+            "columnName": "vatNumber",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "externalId",
+            "columnName": "externalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tagsJson",
+            "columnName": "tagsJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isCorporate",
+            "columnName": "isCorporate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clientGroupId",
+            "columnName": "clientGroupId",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_clients_name",
+            "unique": false,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_name` ON `${TABLE_NAME}` (`name`)"
+          },
+          {
+            "name": "index_clients_phone",
+            "unique": false,
+            "columnNames": [
+              "phone"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_phone` ON `${TABLE_NAME}` (`phone`)"
+          },
+          {
+            "name": "index_clients_email",
+            "unique": false,
+            "columnNames": [
+              "email"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_email` ON `${TABLE_NAME}` (`email`)"
+          },
+          {
+            "name": "index_clients_isArchived",
+            "unique": false,
+            "columnNames": [
+              "isArchived"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_isArchived` ON `${TABLE_NAME}` (`isArchived`)"
+          },
+          {
+            "name": "index_clients_sortOrder",
+            "unique": false,
+            "columnNames": [
+              "sortOrder"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_sortOrder` ON `${TABLE_NAME}` (`sortOrder`)"
+          },
+          {
+            "name": "index_clients_clientGroupId",
+            "unique": false,
+            "columnNames": [
+              "clientGroupId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_clientGroupId` ON `${TABLE_NAME}` (`clientGroupId`)"
+          },
+          {
+            "name": "index_clients_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_clients_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clients_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "client_groups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `notes` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_client_groups_title",
+            "unique": false,
+            "columnNames": [
+              "title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_client_groups_title` ON `${TABLE_NAME}` (`title`)"
+          },
+          {
+            "name": "index_client_groups_isArchived",
+            "unique": false,
+            "columnNames": [
+              "isArchived"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_client_groups_isArchived` ON `${TABLE_NAME}` (`isArchived`)"
+          },
+          {
+            "name": "index_client_groups_sortOrder",
+            "unique": false,
+            "columnNames": [
+              "sortOrder"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_client_groups_sortOrder` ON `${TABLE_NAME}` (`sortOrder`)"
+          },
+          {
+            "name": "index_client_groups_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_client_groups_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_client_groups_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_client_groups_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "sites",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `clientId` TEXT NOT NULL, `name` TEXT NOT NULL, `address` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `icon_id` TEXT, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clientId",
+            "columnName": "clientId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderIndex",
+            "columnName": "orderIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconId",
+            "columnName": "icon_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sites_isArchived",
+            "unique": false,
+            "columnNames": [
+              "isArchived"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sites_isArchived` ON `${TABLE_NAME}` (`isArchived`)"
+          },
+          {
+            "name": "index_sites_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sites_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_sites_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sites_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_sites_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sites_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_sites_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sites_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "installations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `siteId` TEXT NOT NULL, `name` TEXT NOT NULL, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `icon_id` TEXT, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteId",
+            "columnName": "siteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderIndex",
+            "columnName": "orderIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconId",
+            "columnName": "icon_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_installations_isArchived",
+            "unique": false,
+            "columnNames": [
+              "isArchived"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_installations_isArchived` ON `${TABLE_NAME}` (`isArchived`)"
+          },
+          {
+            "name": "index_installations_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_installations_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_installations_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_installations_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_installations_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_installations_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_installations_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_installations_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "components",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `installationId` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `templateId` TEXT, `icon_id` TEXT, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installationId",
+            "columnName": "installationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderIndex",
+            "columnName": "orderIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "templateId",
+            "columnName": "templateId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "iconId",
+            "columnName": "icon_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_components_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_components_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_components_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_components_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_components_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_components_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_components_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_components_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "component_templates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT, `defaultParamsJson` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `isHeadComponent` INTEGER NOT NULL, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "defaultParamsJson",
+            "columnName": "defaultParamsJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isHeadComponent",
+            "columnName": "isHeadComponent",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_component_templates_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_templates_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_component_templates_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_templates_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_component_templates_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_templates_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_component_templates_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_templates_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "component_template_fields",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `templateId` TEXT NOT NULL, `key` TEXT NOT NULL, `label` TEXT NOT NULL, `type` TEXT NOT NULL, `unit` TEXT, `isCharacteristic` INTEGER NOT NULL DEFAULT 0, `isRequired` INTEGER NOT NULL, `defaultValueText` TEXT, `defaultValueNumber` REAL, `defaultValueBool` INTEGER, `min` REAL, `max` REAL, `sortOrder` INTEGER NOT NULL, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "templateId",
+            "columnName": "templateId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isCharacteristic",
+            "columnName": "isCharacteristic",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isRequired",
+            "columnName": "isRequired",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultValueText",
+            "columnName": "defaultValueText",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "defaultValueNumber",
+            "columnName": "defaultValueNumber",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "defaultValueBool",
+            "columnName": "defaultValueBool",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "min",
+            "columnName": "min",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "max",
+            "columnName": "max",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_component_template_fields_templateId",
+            "unique": false,
+            "columnNames": [
+              "templateId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_template_fields_templateId` ON `${TABLE_NAME}` (`templateId`)"
+          },
+          {
+            "name": "index_component_template_fields_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_template_fields_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_component_template_fields_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_template_fields_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "maintenance_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `siteId` TEXT NOT NULL, `installationId` TEXT, `startedAtEpoch` INTEGER NOT NULL, `finishedAtEpoch` INTEGER, `technician` TEXT, `notes` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `synced` INTEGER NOT NULL, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteId",
+            "columnName": "siteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installationId",
+            "columnName": "installationId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "startedAtEpoch",
+            "columnName": "startedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAtEpoch",
+            "columnName": "finishedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "technician",
+            "columnName": "technician",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "synced",
+            "columnName": "synced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_maintenance_sessions_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_sessions_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_maintenance_sessions_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_sessions_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_maintenance_sessions_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_sessions_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_maintenance_sessions_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_sessions_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "maintenance_values",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `siteId` TEXT NOT NULL, `installationId` TEXT, `componentId` TEXT NOT NULL, `fieldKey` TEXT NOT NULL, `valueText` TEXT, `valueBool` INTEGER, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `maintenance_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteId",
+            "columnName": "siteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installationId",
+            "columnName": "installationId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "componentId",
+            "columnName": "componentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fieldKey",
+            "columnName": "fieldKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valueText",
+            "columnName": "valueText",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "valueBool",
+            "columnName": "valueBool",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_maintenance_values_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_maintenance_values_siteId",
+            "unique": false,
+            "columnNames": [
+              "siteId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_siteId` ON `${TABLE_NAME}` (`siteId`)"
+          },
+          {
+            "name": "index_maintenance_values_installationId",
+            "unique": false,
+            "columnNames": [
+              "installationId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_installationId` ON `${TABLE_NAME}` (`installationId`)"
+          },
+          {
+            "name": "index_maintenance_values_componentId",
+            "unique": false,
+            "columnNames": [
+              "componentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_componentId` ON `${TABLE_NAME}` (`componentId`)"
+          },
+          {
+            "name": "index_maintenance_values_fieldKey",
+            "unique": false,
+            "columnNames": [
+              "fieldKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_fieldKey` ON `${TABLE_NAME}` (`fieldKey`)"
+          },
+          {
+            "name": "index_maintenance_values_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_maintenance_values_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_maintenance_values_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_maintenance_values_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_maintenance_values_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "maintenance_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "observations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `componentId` TEXT NOT NULL, `fieldKey` TEXT NOT NULL, `valueBool` INTEGER, `valueNumber` REAL, `valueText` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "componentId",
+            "columnName": "componentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fieldKey",
+            "columnName": "fieldKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valueBool",
+            "columnName": "valueBool",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "valueNumber",
+            "columnName": "valueNumber",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "valueText",
+            "columnName": "valueText",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "issues",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `componentId` TEXT, `description` TEXT NOT NULL, `severity` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "componentId",
+            "columnName": "componentId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "deleted_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `entity` TEXT NOT NULL, `recordId` TEXT NOT NULL, `deletedAtEpoch` INTEGER NOT NULL, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entity",
+            "columnName": "entity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordId",
+            "columnName": "recordId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "icon_packs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `code` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `isBuiltin` INTEGER NOT NULL, `isPremium` INTEGER NOT NULL, `origin` TEXT, `created_by_user_id` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isBuiltin",
+            "columnName": "isBuiltin",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPremium",
+            "columnName": "isPremium",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_icon_packs_code",
+            "unique": false,
+            "columnNames": [
+              "code"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icon_packs_code` ON `${TABLE_NAME}` (`code`)"
+          },
+          {
+            "name": "index_icon_packs_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icon_packs_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_icon_packs_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icon_packs_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "icons",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `packId` TEXT NOT NULL, `code` TEXT NOT NULL, `label` TEXT NOT NULL, `entityType` TEXT NOT NULL, `imageUrl` TEXT, `thumbnailUrl` TEXT, `androidResName` TEXT, `isActive` INTEGER NOT NULL, `origin` TEXT, `created_by_user_id` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`packId`) REFERENCES `icon_packs`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packId",
+            "columnName": "packId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityType",
+            "columnName": "entityType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageUrl",
+            "columnName": "imageUrl",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "thumbnailUrl",
+            "columnName": "thumbnailUrl",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "androidResName",
+            "columnName": "androidResName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByUserId",
+            "columnName": "created_by_user_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpoch",
+            "columnName": "createdAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpoch",
+            "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_icons_packId",
+            "unique": false,
+            "columnNames": [
+              "packId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icons_packId` ON `${TABLE_NAME}` (`packId`)"
+          },
+          {
+            "name": "index_icons_code",
+            "unique": false,
+            "columnNames": [
+              "code"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icons_code` ON `${TABLE_NAME}` (`code`)"
+          },
+          {
+            "name": "index_icons_entityType",
+            "unique": false,
+            "columnNames": [
+              "entityType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icons_entityType` ON `${TABLE_NAME}` (`entityType`)"
+          },
+          {
+            "name": "index_icons_isActive",
+            "unique": false,
+            "columnNames": [
+              "isActive"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icons_isActive` ON `${TABLE_NAME}` (`isActive`)"
+          },
+          {
+            "name": "index_icons_origin",
+            "unique": false,
+            "columnNames": [
+              "origin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icons_origin` ON `${TABLE_NAME}` (`origin`)"
+          },
+          {
+            "name": "index_icons_created_by_user_id",
+            "unique": false,
+            "columnNames": [
+              "created_by_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_icons_created_by_user_id` ON `${TABLE_NAME}` (`created_by_user_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "icon_packs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "packId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a97ab0d96996368302ccccec4c2f63c7')"
+    ]
+  }
+}

@@ -63,8 +63,29 @@ private fun MainContent() {
             composable(AuthRoutes.LOGIN) {
                 ru.wassertech.feature.auth.LoginScreen(
                     onLoginSuccess = {
-                        navController.navigate("main") {
+                        // После успешного логина переходим на экран синхронизации
+                        navController.navigate("sync") {
                             popUpTo(AuthRoutes.LOGIN) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+            
+            // Экран синхронизации после логина
+            composable("sync") {
+                ru.wassertech.ui.sync.PostLoginSyncScreen(
+                    onSyncComplete = {
+                        // После успешной синхронизации переходим на основной экран
+                        navController.navigate("main") {
+                            popUpTo("sync") { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onGoOffline = {
+                        // Переходим в оффлайн режим
+                        navController.navigate("main") {
+                            popUpTo("sync") { inclusive = true }
                             launchSingleTop = true
                         }
                     }

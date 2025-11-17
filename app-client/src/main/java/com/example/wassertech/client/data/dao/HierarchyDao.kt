@@ -168,4 +168,30 @@ interface HierarchyDao {
     /** Вставка компонента (для синхронизации) */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComponent(component: ComponentEntity)
+    
+    // ---- Методы для синхронизации push ----
+    
+    /** Получить все объекты с dirtyFlag = true для отправки на сервер */
+    @Query("SELECT * FROM sites WHERE dirtyFlag = 1")
+    suspend fun getDirtySitesNow(): List<SiteEntity>
+    
+    /** Получить все установки с dirtyFlag = true для отправки на сервер */
+    @Query("SELECT * FROM installations WHERE dirtyFlag = 1")
+    suspend fun getDirtyInstallationsNow(): List<InstallationEntity>
+    
+    /** Получить все компоненты с dirtyFlag = true для отправки на сервер */
+    @Query("SELECT * FROM components WHERE dirtyFlag = 1")
+    suspend fun getDirtyComponentsNow(): List<ComponentEntity>
+    
+    /** Пометить объекты как синхронизированные (dirtyFlag = false, syncStatus = 0) */
+    @Query("UPDATE sites SET dirtyFlag = 0, syncStatus = 0 WHERE id IN (:siteIds)")
+    suspend fun markSitesAsSynced(siteIds: List<String>)
+    
+    /** Пометить установки как синхронизированные */
+    @Query("UPDATE installations SET dirtyFlag = 0, syncStatus = 0 WHERE id IN (:installationIds)")
+    suspend fun markInstallationsAsSynced(installationIds: List<String>)
+    
+    /** Пометить компоненты как синхронизированные */
+    @Query("UPDATE components SET dirtyFlag = 0, syncStatus = 0 WHERE id IN (:componentIds)")
+    suspend fun markComponentsAsSynced(componentIds: List<String>)
 }

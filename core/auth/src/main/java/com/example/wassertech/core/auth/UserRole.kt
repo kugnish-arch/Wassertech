@@ -5,18 +5,57 @@ import org.json.JSONObject
 /**
  * Роли пользователей в системе
  */
-enum class UserRole(val displayName: String) {
-    ADMIN("Администратор"),
-    USER("Пользователь"),
-    VIEWER("Наблюдатель"),
-    CLIENT("Клиент");
+/**
+ * Роли пользователей в системе.
+ * Соответствуют серверным ролям: ADMIN, ENGINEER, CLIENT.
+ * USER и VIEWER оставлены для обратной совместимости, но на сервере используются только ADMIN, ENGINEER, CLIENT.
+ */
+enum class UserRole(val displayName: String, val serverValue: String) {
+    ADMIN("Администратор", "ADMIN"),
+    ENGINEER("Инженер", "ENGINEER"),
+    USER("Пользователь", "ENGINEER"), // Для обратной совместимости, маппится на ENGINEER
+    VIEWER("Наблюдатель", "ENGINEER"), // Для обратной совместимости, маппится на ENGINEER
+    CLIENT("Клиент", "CLIENT");
     
     companion object {
+        /**
+         * Преобразует строковое значение роли в enum.
+         * Поддерживает как серверные значения (ADMIN, ENGINEER, CLIENT), так и старые (USER, VIEWER).
+         * По умолчанию возвращает ENGINEER (безопаснее, чем ADMIN).
+         */
         fun fromString(value: String?): UserRole {
             return try {
-                if (value == null) USER else valueOf(value)
+                if (value == null) ENGINEER else {
+                    when (value.uppercase()) {
+                        "ADMIN" -> ADMIN
+                        "ENGINEER" -> ENGINEER
+                        "CLIENT" -> CLIENT
+                        "USER" -> USER // Старое значение, маппится на ENGINEER на сервере
+                        "VIEWER" -> VIEWER // Старое значение, маппится на ENGINEER на сервере
+                        else -> {
+                            // Логируем неожиданное значение, но возвращаем ENGINEER
+                            android.util.Log.w("UserRole", "Неизвестная роль: $value, используем ENGINEER")
+                            ENGINEER
+                        }
+                    }
+                }
             } catch (e: Exception) {
-                USER // По умолчанию
+                android.util.Log.e("UserRole", "Ошибка парсинга роли: $value", e)
+                ENGINEER // По умолчанию ENGINEER (безопаснее, чем ADMIN)
+            }
+        }
+        
+        /**
+         * Возвращает серверное значение роли (для отправки на сервер).
+         * USER и VIEWER преобразуются в ENGINEER.
+         */
+        fun UserRole.toServerValue(): String {
+            return when (this) {
+                ADMIN -> "ADMIN"
+                ENGINEER -> "ENGINEER"
+                USER -> "ENGINEER" // Маппинг на ENGINEER
+                VIEWER -> "ENGINEER" // Маппинг на ENGINEER
+                CLIENT -> "CLIENT"
             }
         }
     }

@@ -21,9 +21,12 @@ import ru.wassertech.data.migrations.MIGRATION_8_9   // ← Добавление
 import ru.wassertech.data.migrations.MIGRATION_9_10  // ← Обновление deleted_records
 import ru.wassertech.data.migrations.MIGRATION_10_11  // ← Объединение шаблонов
 import ru.wassertech.data.migrations.MIGRATION_11_12  // ← Добавление isHeadComponent
+import ru.wassertech.data.migrations.MIGRATION_12_13  // ← Добавление origin и created_by_user_id
+import ru.wassertech.data.migrations.MIGRATION_13_14  // ← Добавление поддержки иконок
+import ru.wassertech.data.migrations.MIGRATION_14_15  // ← Добавление таблицы icon_pack_sync_status
 
 @Database(
-    version = 12, // ← Обновлено: добавление поля isHeadComponent в component_templates
+    version = 15, // ← Обновлено: добавление таблицы icon_pack_sync_status
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -38,7 +41,10 @@ import ru.wassertech.data.migrations.MIGRATION_11_12  // ← Добавлени�
         ObservationEntity::class,
         IssueEntity::class,
         DeletedRecordEntity::class,
-        SettingsEntity::class
+        SettingsEntity::class,
+        IconPackEntity::class, // ← Новая сущность для паков иконок
+        IconEntity::class, // ← Новая сущность для иконок
+        IconPackSyncStatusEntity::class // ← Сущность для отслеживания статуса загрузки
     ]
 )
 @TypeConverters(Converters::class)
@@ -54,6 +60,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun settingsDao(): SettingsDao
     abstract fun componentTemplatesDao(): ComponentTemplatesDao
     abstract fun componentTemplateFieldsDao(): ComponentTemplateFieldsDao
+    abstract fun iconPackDao(): ru.wassertech.data.dao.IconPackDao
+    abstract fun iconDao(): ru.wassertech.data.dao.IconDao
+    abstract fun iconPackSyncStatusDao(): ru.wassertech.data.dao.IconPackSyncStatusDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -77,7 +86,10 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_8_9,   // ← Добавление полей синхронизации
                         MIGRATION_9_10,  // ← Обновление deleted_records
                         MIGRATION_10_11,  // ← Объединение шаблонов (component_templates + component_template_fields)
-                        MIGRATION_11_12  // ← Добавление isHeadComponent
+                        MIGRATION_11_12,  // ← Добавление isHeadComponent
+                        MIGRATION_12_13,  // ← Добавление origin и created_by_user_id
+                        MIGRATION_13_14,  // ← Добавление поддержки иконок
+                        MIGRATION_14_15  // ← Добавление таблицы icon_pack_sync_status
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

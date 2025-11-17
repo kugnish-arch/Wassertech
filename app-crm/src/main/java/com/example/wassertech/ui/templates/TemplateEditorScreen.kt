@@ -253,10 +253,12 @@ fun TemplateEditorScreen(
                         ReorderableLazyColumn(
                             items = localFieldOrder,
                             onMove = { fromIndex, toIndex ->
+                                // Всегда обновляем локальное состояние для корректного отображения перетаскивания
                                 val mutable = localFieldOrder.toMutableList()
                                 val item = mutable.removeAt(fromIndex)
                                 mutable.add(toIndex, item)
                                 localFieldOrder = mutable
+                                // Изменения сохраняются в БД при сохранении шаблона
                             },
                             modifier = Modifier.fillMaxWidth(),
                             key = { it },

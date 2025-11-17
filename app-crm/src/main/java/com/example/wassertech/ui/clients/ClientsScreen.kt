@@ -30,6 +30,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import ru.wassertech.data.entities.ClientEntity
 import ru.wassertech.data.entities.ClientGroupEntity
 import ru.wassertech.core.ui.R
@@ -381,20 +383,22 @@ fun ClientsScreen(
                         ) {
                             if (localOrderGeneral.isEmpty()) {
                                 EmptyGroupPlaceholder(text = "Клиенты отсутствуют", indent = 16.dp)
-                            } else if (isEditMode) {
-                                // Используем ReorderableLazyColumn только в режиме редактирования
+                            } else {
+                                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
                                 // НЕ оборачиваем в Column, чтобы избежать бесконечных ограничений по высоте
                                 ReorderableLazyColumn(
                                     items = localOrderGeneral,
                                     onMove = { fromIndex, toIndex ->
+                                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
                                         val mutable = localOrderGeneral.toMutableList()
                                         val item = mutable.removeAt(fromIndex)
                                         mutable.add(toIndex, item)
                                         localOrderGeneral = mutable
+                                        // Изменения сохраняются в БД только в режиме редактирования (в LaunchedEffect при выходе из режима)
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(max = 400.dp), // Ограничиваем максимальную высоту
+                                        .heightIn(max = 2000.dp), // Большое значение вместо fillMaxHeight для избежания бесконечных ограничений
                                     key = { it }, // clientId: String
                                     contentPadding = PaddingValues(0.dp),
                                     verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -411,25 +415,31 @@ fun ClientsScreen(
                                             onArchive = { onArchiveClient(client.id) },
                                             onRestore = { onRestoreClient(client.id) },
                                             onMoveUp = {
-                                                moveIdWithin(
-                                                    null,
-                                                    client.id,
-                                                    up = true
-                                                )
+                                                if (isEditMode) {
+                                                    moveIdWithin(
+                                                        null,
+                                                        client.id,
+                                                        up = true
+                                                    )
+                                                }
                                             },
                                             onMoveDown = {
-                                                moveIdWithin(
-                                                    null,
-                                                    client.id,
-                                                    up = false
-                                                )
+                                                if (isEditMode) {
+                                                    moveIdWithin(
+                                                        null,
+                                                        client.id,
+                                                        up = false
+                                                    )
+                                                }
                                             },
                                             onMoveToGroup = { targetGroupId: String? ->
-                                                moveIdToGroup(
-                                                    client.id,
-                                                    null,
-                                                    targetGroupId
-                                                )
+                                                if (isEditMode) {
+                                                    moveIdToGroup(
+                                                        client.id,
+                                                        null,
+                                                        targetGroupId
+                                                    )
+                                                }
                                             },
                                             onEditName = {
                                                 editClientId = client.id
@@ -445,6 +455,8 @@ fun ClientsScreen(
                                             },
                                             isDragging = isDragging,
                                             reorderableState = reorderableState,
+                                            onLongClick = null, // Не передаем onLongClick, чтобы не включать режим редактирования при long press
+                                            onToggleEdit = onToggleEdit, // Передаем onToggleEdit для автоматического включения режима редактирования при начале перетаскивания
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .background(Color.White)
@@ -456,50 +468,6 @@ fun ClientsScreen(
                                                 color = ClientsRowDivider,
                                                 thickness = 1.dp
                                             )
-                                        }
-                                    }
-                                }
-                            } else {
-                                // В обычном режиме используем обычный список без drag-n-drop
-                                Column(modifier = Modifier.animateContentSize()) {
-                                    localOrderGeneral.forEachIndexed { index, clientId ->
-                                        val client = generalById[clientId] ?: return@forEachIndexed
-                                        
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            ClientRowWithEdit(
-                                                client = client,
-                                                groupId = null,
-                                                groups = groups,
-                                                isEditMode = isEditMode,
-                                                onClick = { onClientClick(client.id) },
-                                                onArchive = { onArchiveClient(client.id) },
-                                                onRestore = { onRestoreClient(client.id) },
-                                                onMoveUp = { },
-                                                onMoveDown = { },
-                                                onMoveToGroup = { },
-                                                onEditName = {
-                                                    editClientId = client.id
-                                                    editClientName = client.name
-                                                    editClientGroupId = client.clientGroupId
-                                                },
-                                                onDelete = {
-                                                    deleteDialogState = DeleteDialogState(
-                                                        isClient = true,
-                                                        id = client.id,
-                                                        name = client.name
-                                                    )
-                                                },
-                                                isDragging = false,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(Color.White)
-                                            )
-                                            if (index < localOrderGeneral.size - 1) {
-                                                HorizontalDivider(
-                                                    color = ClientsRowDivider,
-                                                    thickness = 1.dp
-                                                )
-                                            }
                                         }
                                     }
                                 }
@@ -556,20 +524,22 @@ fun ClientsScreen(
                                     EmptyGroupPlaceholder(text = "Клиенты отсутствуют", indent = 16.dp)
                                     HorizontalDivider(color = ClientsRowDivider, thickness = 1.dp)
                                 }
-                            } else if (isEditMode) {
-                                // Используем ReorderableLazyColumn только в режиме редактирования
+                            } else {
+                                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
                                 // НЕ оборачиваем в Column, чтобы избежать бесконечных ограничений по высоте
                                 ReorderableLazyColumn(
                                     items = listIds,
                                     onMove = { fromIndex, toIndex ->
+                                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
                                         val mutable = listIds.toMutableList()
                                         val item = mutable.removeAt(fromIndex)
                                         mutable.add(toIndex, item)
                                         localOrderByGroup = localOrderByGroup.toMutableMap().also { it[groupId] = mutable }
+                                        // Изменения сохраняются в БД только в режиме редактирования (в LaunchedEffect при выходе из режима)
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(max = 400.dp), // Ограничиваем максимальную высоту
+                                        .heightIn(max = 2000.dp), // Большое значение вместо fillMaxHeight для избежания бесконечных ограничений
                                     key = { it }, // clientId: String
                                     contentPadding = PaddingValues(0.dp),
                                     verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -586,25 +556,31 @@ fun ClientsScreen(
                                             onArchive = { onArchiveClient(client.id) },
                                             onRestore = { onRestoreClient(client.id) },
                                             onMoveUp = {
-                                                moveIdWithin(
-                                                    groupId,
-                                                    client.id,
-                                                    up = true
-                                                )
+                                                if (isEditMode) {
+                                                    moveIdWithin(
+                                                        groupId,
+                                                        client.id,
+                                                        up = true
+                                                    )
+                                                }
                                             },
                                             onMoveDown = {
-                                                moveIdWithin(
-                                                    groupId,
-                                                    client.id,
-                                                    up = false
-                                                )
+                                                if (isEditMode) {
+                                                    moveIdWithin(
+                                                        groupId,
+                                                        client.id,
+                                                        up = false
+                                                    )
+                                                }
                                             },
                                             onMoveToGroup = { targetGroupId: String? ->
-                                                moveIdToGroup(
-                                                    client.id,
-                                                    groupId,
-                                                    targetGroupId
-                                                )
+                                                if (isEditMode) {
+                                                    moveIdToGroup(
+                                                        client.id,
+                                                        groupId,
+                                                        targetGroupId
+                                                    )
+                                                }
                                             },
                                             onEditName = {
                                                 editClientId = client.id
@@ -620,6 +596,8 @@ fun ClientsScreen(
                                             },
                                             isDragging = isDragging,
                                             reorderableState = reorderableState,
+                                            onLongClick = null, // Не передаем onLongClick, чтобы не включать режим редактирования при long press
+                                            onToggleEdit = onToggleEdit, // Передаем onToggleEdit для автоматического включения режима редактирования при начале перетаскивания
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .background(Color.White)
@@ -631,51 +609,6 @@ fun ClientsScreen(
                                                 color = ClientsRowDivider,
                                                 thickness = 1.dp
                                             )
-                                        }
-                                    }
-                                }
-                            } else {
-                                // В обычном режиме используем обычный список без drag-n-drop
-                                Column(modifier = Modifier.animateContentSize()) {
-                                    val byId = byGroupIdMap[groupId] ?: emptyMap()
-                                    listIds.forEachIndexed { index, cid ->
-                                        val client = byId[cid] ?: return@forEachIndexed
-                                        
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            ClientRowWithEdit(
-                                                client = client,
-                                                groupId = groupId,
-                                                groups = groups,
-                                                isEditMode = isEditMode,
-                                                onClick = { onClientClick(client.id) },
-                                                onArchive = { onArchiveClient(client.id) },
-                                                onRestore = { onRestoreClient(client.id) },
-                                                onMoveUp = { },
-                                                onMoveDown = { },
-                                                onMoveToGroup = { },
-                                                onEditName = {
-                                                    editClientId = client.id
-                                                    editClientName = client.name
-                                                    editClientGroupId = client.clientGroupId
-                                                },
-                                                onDelete = {
-                                                    deleteDialogState = DeleteDialogState(
-                                                        isClient = true,
-                                                        id = client.id,
-                                                        name = client.name
-                                                    )
-                                                },
-                                                isDragging = false,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(Color.White)
-                                            )
-                                            if (index < listIds.size - 1) {
-                                                HorizontalDivider(
-                                                    color = ClientsRowDivider,
-                                                    thickness = 1.dp
-                                                )
-                                            }
                                         }
                                     }
                                 }
@@ -735,6 +668,7 @@ fun ClientsScreen(
                                         },
                                         isDragging = false,
                                         reorderableState = null,
+                                        onLongClick = onToggleEdit,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(Color.White)
@@ -1266,6 +1200,8 @@ private fun ClientRowWithEdit(
     onDelete: () -> Unit = {},
     isDragging: Boolean,
     reorderableState: ReorderableState? = null,
+    onLongClick: (() -> Unit)? = null,
+    onToggleEdit: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Определяем иконку клиента в зависимости от состояния
@@ -1302,6 +1238,7 @@ private fun ClientRowWithEdit(
             onEditName = onEditName,
             onMoveToGroup = onMoveToGroup,
             availableGroups = availableGroups,
+            onLongClick = onLongClick,
             modifier = modifier.background(Color.White)
         )
     } else {
@@ -1337,7 +1274,10 @@ private fun ClientRowWithEdit(
             availableGroups = availableGroups,
             modifier = modifier.background(Color.White),
             reorderableState = reorderableState,
-            showDragHandle = isEditMode && !client.isArchived
+            showDragHandle = isEditMode && !client.isArchived,
+            onLongClick = onLongClick,
+            isDragging = isDragging,
+            onToggleEdit = onToggleEdit
         )
     }
 }
@@ -1361,6 +1301,7 @@ private fun ClientRowWithHighlight(
     onEditName: () -> Unit,
     onMoveToGroup: (String?) -> Unit,
     availableGroups: List<Pair<String, String>>,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -1369,7 +1310,14 @@ private fun ClientRowWithHighlight(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (!isEditMode) {
+                if (!isEditMode && (onClick != null || onLongClick != null)) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onClick() },
+                            onLongPress = { onLongClick?.invoke() }
+                        )
+                    }
+                } else if (!isEditMode) {
                     Modifier.clickable { onClick() }
                 } else {
                     Modifier

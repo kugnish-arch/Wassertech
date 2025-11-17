@@ -13,7 +13,9 @@ import androidx.room.PrimaryKey
     tableName = "component_templates",
     indices = [
         Index("dirtyFlag"),
-        Index("syncStatus")
+        Index("syncStatus"),
+        Index("origin"),
+        Index("created_by_user_id")
     ]
 )
 data class ComponentTemplateEntity(
@@ -32,5 +34,15 @@ data class ComponentTemplateEntity(
     val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
     // Другие поля
     val sortOrder: Int = 0,
-    val isHeadComponent: Boolean = false // Заглавный компонент (отображается в отчете иначе)
-)
+    val isHeadComponent: Boolean = false, // Заглавный компонент (отображается в отчете иначе)
+    // Поля для ролей и владения данными
+    val origin: String? = null, // "CRM" или "CLIENT", по умолчанию "CRM" для старых данных
+    @androidx.room.ColumnInfo(name = "created_by_user_id") val createdByUserId: String? = null // FK → users.id
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     */
+    fun getOriginType(): ru.wassertech.core.auth.OriginType {
+        return ru.wassertech.core.auth.OriginType.fromString(origin)
+    }
+}

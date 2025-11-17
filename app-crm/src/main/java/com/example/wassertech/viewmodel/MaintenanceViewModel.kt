@@ -236,7 +236,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                 technician = technician,
                 notes = notes,
                 synced = false
-            ).markCreatedForSync()
+            ).markCreatedForSync(getApplication())
 
             val values = mutableListOf<MaintenanceValueEntity>()
             _sections.value.forEach { sec ->
@@ -256,7 +256,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                             fieldKey = f.key,
                             valueText = textValue,
                             valueBool = boolValue
-                        ).markCreatedForSync()
+                        ).markCreatedForSync(getApplication())
                     }
                 }
             }
@@ -322,7 +322,7 @@ class MaintenanceViewModel(application: Application) : AndroidViewModel(applicat
                         val markedValue = if (existingValueIds.contains(valueId)) {
                             valueEntity.markUpdatedForSync()
                         } else {
-                            valueEntity.markCreatedForSync()
+                            valueEntity.markCreatedForSync(getApplication())
                         }
                         values += markedValue
                     }

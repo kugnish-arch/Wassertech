@@ -1,5 +1,8 @@
 package ru.wassertech.sync
 
+import android.content.Context
+import ru.wassertech.core.auth.OriginType
+import ru.wassertech.core.auth.SessionManager
 import ru.wassertech.data.entities.*
 import ru.wassertech.data.types.SyncStatus
 
@@ -46,8 +49,9 @@ fun ClientGroupEntity.markCreatedForSync(): ClientGroupEntity {
     )
 }
 
-fun SiteEntity.markCreatedForSync(): SiteEntity {
+fun SiteEntity.markCreatedForSync(context: Context? = null): SiteEntity {
     val now = nowEpoch()
+    val session = context?.let { SessionManager.getInstance(it).getCurrentSession() }
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
         updatedAtEpoch = now,
@@ -55,12 +59,15 @@ fun SiteEntity.markCreatedForSync(): SiteEntity {
         archivedAtEpoch = null,
         deletedAtEpoch = deletedAtEpoch,
         dirtyFlag = true,
-        syncStatus = SyncStatus.QUEUED.value
+        syncStatus = SyncStatus.QUEUED.value,
+        origin = origin ?: (session?.let { OriginType.CRM.name } ?: "CRM"),
+        createdByUserId = createdByUserId ?: session?.userId
     )
 }
 
-fun InstallationEntity.markCreatedForSync(): InstallationEntity {
+fun InstallationEntity.markCreatedForSync(context: Context? = null): InstallationEntity {
     val now = nowEpoch()
+    val session = context?.let { SessionManager.getInstance(it).getCurrentSession() }
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
         updatedAtEpoch = now,
@@ -68,12 +75,15 @@ fun InstallationEntity.markCreatedForSync(): InstallationEntity {
         archivedAtEpoch = null,
         deletedAtEpoch = deletedAtEpoch,
         dirtyFlag = true,
-        syncStatus = SyncStatus.QUEUED.value
+        syncStatus = SyncStatus.QUEUED.value,
+        origin = origin ?: (session?.let { OriginType.CRM.name } ?: "CRM"),
+        createdByUserId = createdByUserId ?: session?.userId
     )
 }
 
-fun ComponentEntity.markCreatedForSync(): ComponentEntity {
+fun ComponentEntity.markCreatedForSync(context: Context? = null): ComponentEntity {
     val now = nowEpoch()
+    val session = context?.let { SessionManager.getInstance(it).getCurrentSession() }
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
         updatedAtEpoch = now,
@@ -81,7 +91,9 @@ fun ComponentEntity.markCreatedForSync(): ComponentEntity {
         archivedAtEpoch = null,
         deletedAtEpoch = deletedAtEpoch,
         dirtyFlag = true,
-        syncStatus = SyncStatus.QUEUED.value
+        syncStatus = SyncStatus.QUEUED.value,
+        origin = origin ?: (session?.let { OriginType.CRM.name } ?: "CRM"),
+        createdByUserId = createdByUserId ?: session?.userId
     )
 }
 
@@ -111,8 +123,9 @@ fun ChecklistFieldEntity.markCreatedForSync(): ChecklistFieldEntity {
     )
 }
 
-fun ComponentTemplateEntity.markCreatedForSync(): ComponentTemplateEntity {
+fun ComponentTemplateEntity.markCreatedForSync(context: Context? = null): ComponentTemplateEntity {
     val now = nowEpoch()
+    val session = context?.let { SessionManager.getInstance(it).getCurrentSession() }
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
         updatedAtEpoch = now,
@@ -120,7 +133,9 @@ fun ComponentTemplateEntity.markCreatedForSync(): ComponentTemplateEntity {
         archivedAtEpoch = null,
         deletedAtEpoch = deletedAtEpoch,
         dirtyFlag = true,
-        syncStatus = SyncStatus.QUEUED.value
+        syncStatus = SyncStatus.QUEUED.value,
+        origin = origin ?: (session?.let { OriginType.CRM.name } ?: "CRM"),
+        createdByUserId = createdByUserId ?: session?.userId
     )
 }
 
@@ -137,8 +152,9 @@ fun ComponentTemplateFieldEntity.markCreatedForSync(): ComponentTemplateFieldEnt
     )
 }
 
-fun MaintenanceSessionEntity.markCreatedForSync(): MaintenanceSessionEntity {
+fun MaintenanceSessionEntity.markCreatedForSync(context: Context? = null): MaintenanceSessionEntity {
     val now = nowEpoch()
+    val session = context?.let { SessionManager.getInstance(it).getCurrentSession() }
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
         updatedAtEpoch = now,
@@ -146,12 +162,15 @@ fun MaintenanceSessionEntity.markCreatedForSync(): MaintenanceSessionEntity {
         archivedAtEpoch = null,
         deletedAtEpoch = deletedAtEpoch,
         dirtyFlag = true,
-        syncStatus = SyncStatus.QUEUED.value
+        syncStatus = SyncStatus.QUEUED.value,
+        origin = origin ?: (session?.let { OriginType.CRM.name } ?: "CRM"),
+        createdByUserId = createdByUserId ?: session?.userId
     )
 }
 
-fun MaintenanceValueEntity.markCreatedForSync(): MaintenanceValueEntity {
+fun MaintenanceValueEntity.markCreatedForSync(context: Context? = null): MaintenanceValueEntity {
     val now = nowEpoch()
+    val session = context?.let { SessionManager.getInstance(it).getCurrentSession() }
     return copy(
         createdAtEpoch = if (createdAtEpoch == 0L) now else createdAtEpoch,
         updatedAtEpoch = now,
@@ -159,7 +178,9 @@ fun MaintenanceValueEntity.markCreatedForSync(): MaintenanceValueEntity {
         archivedAtEpoch = null,
         deletedAtEpoch = deletedAtEpoch,
         dirtyFlag = true,
-        syncStatus = SyncStatus.QUEUED.value
+        syncStatus = SyncStatus.QUEUED.value,
+        origin = origin ?: (session?.let { OriginType.CRM.name } ?: "CRM"),
+        createdByUserId = createdByUserId ?: session?.userId
     )
 }
 

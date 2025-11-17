@@ -27,3 +27,4 @@ interface WassertechApi {
     suspend fun getCurrentUser(): Response<UserMeResponse>
 }
 
+

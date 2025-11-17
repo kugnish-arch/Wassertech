@@ -49,6 +49,10 @@ import androidx.compose.material.icons.filled.Add
 import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
 import ru.wassertech.core.ui.reorderable.ReorderableState
 import ru.wassertech.core.ui.reorderable.detectReorder
+import ru.wassertech.core.ui.icons.IconResolver
+import ru.wassertech.core.ui.icons.IconEntityType
+import ru.wassertech.core.ui.components.IconPickerDialog
+import androidx.compose.material.icons.filled.Image
 
 private data class SiteDeleteDialogState(
     val isSite: Boolean,
@@ -63,21 +67,49 @@ fun SiteRowWithDrag(
     index: Int,
     isArchived: Boolean,
     isCorporate: Boolean,
+    icon: ru.wassertech.data.entities.IconEntity? = null,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
     onDelete: () -> Unit,
-    reorderableState: ReorderableState? = null
+    onChangeIcon: (() -> Unit)? = null,
+    reorderableState: ReorderableState? = null,
+    onClick: (() -> Unit)? = null,
+    isEditing: Boolean = false,
+    isDragging: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null
 ) {
+    var hasTriggeredEditMode by remember { mutableStateOf(false) }
+    
+    // Автоматически включаем режим редактирования, когда начинается перетаскивание
+    // и режим редактирования еще не включен
+    LaunchedEffect(isDragging, isEditing) {
+        if (isDragging && !isEditing && !hasTriggeredEditMode && onToggleEdit != null) {
+            hasTriggeredEditMode = true
+            onToggleEdit()
+        }
+        // Сбрасываем флаг, когда перетаскивание заканчивается или режим редактирования включается
+        if (!isDragging || isEditing) {
+            hasTriggeredEditMode = false
+        }
+    }
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (!isEditing && onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Ручка для перетаскивания (только для неархивных) - визуальная подсказка
-        if (!isArchived) {
+        // Ручка для перетаскивания (только в режиме редактирования и для неархивных) - визуальная подсказка
+        if (isEditing && !isArchived) {
             Icon(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Перетащить",
@@ -94,19 +126,19 @@ fun SiteRowWithDrag(
             )
             Spacer(Modifier.width(8.dp))
         }
-        // Иконка объекта - используем Image вместо Icon для консистентности
-        // Учитываем isCorporate для выбора иконки
-        val siteIconRes = when {
-            isArchived && isCorporate -> R.drawable.object_factory_red
-            isArchived && !isCorporate -> R.drawable.object_house_red
-            isCorporate -> R.drawable.object_factory_blue
-            else -> R.drawable.object_house_blue
+        // Отображаем иконку из БД или дефолтную
+        val localImagePath = icon?.let { iconEntity ->
+            ru.wassertech.data.repository.IconRepository(
+                androidx.compose.ui.platform.LocalContext.current
+            ).getLocalIconPath(iconEntity)
         }
-        Image(
-            painter = painterResource(id = siteIconRes),
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            contentScale = ContentScale.Fit
+        IconResolver.IconImage(
+            androidResName = icon?.androidResName,
+            entityType = IconEntityType.SITE,
+            contentDescription = "Объект",
+            size = 48.dp,
+            code = icon?.code, // Передаем code для fallback
+            localImagePath = localImagePath // Передаем локальный путь к файлу изображения
         )
         Spacer(Modifier.width(12.dp))
         Text(
@@ -115,34 +147,47 @@ fun SiteRowWithDrag(
             color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        // Кнопки действий
-        if (isArchived) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onRestore) {
+        // Кнопки действий (только в режиме редактирования)
+        if (isEditing) {
+            if (isArchived) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onRestore) {
+                        Icon(
+                            Icons.Filled.Unarchive,
+                            contentDescription = "Восстановить объект",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
+                            contentDescription = "Удалить объект",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            } else {
+                // Кнопка изменения иконки
+                onChangeIcon?.let {
+                    IconButton(onClick = it) {
+                        Icon(
+                            Icons.Filled.Image,
+                            contentDescription = "Изменить иконку",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                // Кнопка архивации
+                IconButton(onClick = onArchive) {
                     Icon(
-                        Icons.Filled.Unarchive,
-                        contentDescription = "Восстановить объект",
+                        Icons.Filled.Archive,
+                        contentDescription = "Архивировать объект",
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = ru.wassertech.core.ui.theme.DeleteIcon,
-                        contentDescription = "Удалить объект",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        } else {
-            IconButton(onClick = onArchive) {
-                Icon(
-                    Icons.Filled.Archive,
-                    contentDescription = "Архивировать объект",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
             }
         }
     }
@@ -159,8 +204,27 @@ fun InstallationRowWithDrag(
     onArchive: () -> Unit,
     onRestore: () -> Unit,
     onDelete: () -> Unit,
-    reorderableState: ReorderableState? = null
+    reorderableState: ReorderableState? = null,
+    onClick: (() -> Unit)? = null,
+    isEditing: Boolean = false,
+    isDragging: Boolean = false,
+    onToggleEdit: (() -> Unit)? = null
 ) {
+    var hasTriggeredEditMode by remember { mutableStateOf(false) }
+    
+    // Автоматически включаем режим редактирования, когда начинается перетаскивание
+    // и режим редактирования еще не включен
+    LaunchedEffect(isDragging, isEditing) {
+        if (isDragging && !isEditing && !hasTriggeredEditMode && onToggleEdit != null) {
+            hasTriggeredEditMode = true
+            onToggleEdit()
+        }
+        // Сбрасываем флаг, когда перетаскивание заканчивается или режим редактирования включается
+        if (!isDragging || isEditing) {
+            hasTriggeredEditMode = false
+        }
+    }
+    
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
@@ -173,11 +237,18 @@ fun InstallationRowWithDrag(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (!isEditing && onClick != null) {
+                        Modifier.clickable { onClick() }
+                    } else {
+                        Modifier
+                    }
+                )
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Ручка для перетаскивания (только для неархивных) - визуальная подсказка
-            if (!isArchived) {
+            // Ручка для перетаскивания (только в режиме редактирования и для неархивных) - визуальная подсказка
+            if (isEditing && !isArchived) {
                 Icon(
                     imageVector = Icons.Filled.Menu,
                     contentDescription = "Перетащить",
@@ -208,8 +279,9 @@ fun InstallationRowWithDrag(
                 color = if (isArchived) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            // Кнопки действий
-            if (isArchived) {
+            // Кнопки действий (только в режиме редактирования)
+            if (isEditing) {
+                if (isArchived) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -231,14 +303,15 @@ fun InstallationRowWithDrag(
                         )
                     }
                 }
-            } else {
-                IconButton(onClick = onArchive) {
-                    Icon(
-                        Icons.Filled.Archive,
-                        contentDescription = "Архивировать установку",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
-                    )
+                } else {
+                    IconButton(onClick = onArchive) {
+                        Icon(
+                            Icons.Filled.Archive,
+                            contentDescription = "Архивировать установку",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -353,9 +426,33 @@ fun ClientDetailScreen(
             allInstallations = installationsMap
         }
     }
+    
+    // Загружаем иконки для всех сайтов
+    var siteIcons by remember {
+        mutableStateOf<Map<String, ru.wassertech.data.entities.IconEntity?>>(emptyMap())
+    }
+    LaunchedEffect(sitesToShow) {
+        scope.launch(Dispatchers.IO) {
+            val iconsMap = mutableMapOf<String, ru.wassertech.data.entities.IconEntity?>()
+            sitesToShow.forEach { site ->
+                if (site.iconId != null) {
+                    val icon = vm.getIcon(site.iconId)
+                    iconsMap[site.id] = icon
+                } else {
+                    iconsMap[site.id] = null
+                }
+            }
+            siteIcons = iconsMap
+        }
+    }
 
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<SiteDeleteDialogState?>(null) }
+    
+    // Состояние для IconPickerDialog
+    var isIconPickerVisible by remember { mutableStateOf(false) }
+    var iconPickerState by remember { mutableStateOf<ru.wassertech.core.ui.icons.IconPickerUiState?>(null) }
+    var iconPickerSiteId by remember { mutableStateOf<String?>(null) }
 
     // Диалоги
     var showAddSite by remember { mutableStateOf(false) }
@@ -492,42 +589,47 @@ fun ClientDetailScreen(
                 }
 
                 // ======= Список объектов/установок =======
-                if (isEditing) {
-                    // Режим редактирования: drag-and-drop для объектов и установок
-                    ReorderableLazyColumn(
-                        items = localOrder,
-                        onMove = { fromIndex, toIndex ->
+                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
+                ReorderableLazyColumn(
+                    items = localOrder,
+                    onMove = { fromIndex, toIndex ->
+                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
+                        if (localOrder.isNotEmpty() && fromIndex in localOrder.indices && toIndex in localOrder.indices) {
                             val mutable = localOrder.toMutableList()
                             val item = mutable.removeAt(fromIndex)
                             mutable.add(toIndex, item)
                             localOrder = mutable
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                        key = { it },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) { siteId, isDragging, reorderableState ->
-                        val site = sitesToShow.find { it.id == siteId } ?: return@ReorderableLazyColumn
-                        val index = localOrder.indexOf(siteId)
-                        val installations = allInstallations[siteId] ?: emptyList()
-                        val installationOrder =
-                            localInstallationOrders[siteId] ?: installations.map { it.id }
+                        }
+                        // Изменения сохраняются в БД только в режиме редактирования
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    key = { it },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) { siteId, isDragging, reorderableState ->
+                    val site = sitesToShow.find { it.id == siteId } ?: return@ReorderableLazyColumn
+                    val index = localOrder.indexOf(siteId)
+                    val installations = allInstallations[siteId] ?: emptyList()
+                    val installationOrder =
+                        localInstallationOrders[siteId] ?: installations.map { it.id }
 
-                        ElevatedCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
-                        ) {
-                            Column {
-                                // Рядок объекта с ручкой для drag-and-drop
-                                SiteRowWithDrag(
-                                    site = site,
-                                    index = index,
-                                    isArchived = site.isArchived,
-                                    isCorporate = isCorporate,
-                                    onMoveUp = {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = Color(0xFFFFFFFF) // Почти белый фон для карточек
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Увеличенная тень
+                    ) {
+                        Column {
+                            // Рядок объекта с ручкой для drag-and-drop
+                            SiteRowWithDrag(
+                                site = site,
+                                index = index,
+                                isArchived = site.isArchived,
+                                isCorporate = isCorporate,
+                                icon = siteIcons[site.id],
+                                onMoveUp = {
+                                    if (isEditing) {
                                         val pos = localOrder.indexOf(siteId)
                                         if (pos > 0) {
                                             val list = localOrder.toMutableList()
@@ -535,8 +637,10 @@ fun ClientDetailScreen(
                                                 list[pos]; list[pos] = tmp
                                             localOrder = list
                                         }
-                                    },
-                                    onMoveDown = {
+                                    }
+                                },
+                                onMoveDown = {
+                                    if (isEditing) {
                                         val pos = localOrder.indexOf(siteId)
                                         if (pos >= 0 && pos < localOrder.lastIndex) {
                                             val list = localOrder.toMutableList()
@@ -544,75 +648,103 @@ fun ClientDetailScreen(
                                                 list[pos]; list[pos] = tmp
                                             localOrder = list
                                         }
-                                    },
-                                    onArchive = { vm.archiveSite(siteId) },
-                                    onRestore = { vm.restoreSite(siteId) },
-                                    onDelete = {
-                                        deleteDialogState = SiteDeleteDialogState(
-                                            isSite = true,
-                                            id = siteId,
-                                            name = site.name
-                                        )
-                                    },
-                                    reorderableState = reorderableState
-                                )
-
-                                // Установки внутри объекта (показываем все в режиме редактирования, включая архивные)
-                                val installationsToShow =
-                                    if (site.isArchived) emptyList() else installations
-                                // Обновляем локальный порядок, если в нем отсутствуют некоторые установки
-                                LaunchedEffect(siteId, installations.size) {
-                                    if (isEditing) {
-                                        val currentOrder =
-                                            localInstallationOrders[siteId] ?: emptyList()
-                                        val allIds = installations.map { it.id }
-                                        // Добавляем отсутствующие установки в конец
-                                        val newOrder =
-                                            (currentOrder + allIds.filter { it !in currentOrder }).distinct()
-                                        if (newOrder != currentOrder) {
-                                            localInstallationOrders =
-                                                localInstallationOrders.toMutableMap().apply {
-                                                    put(siteId, newOrder)
-                                                }
+                                    }
+                                },
+                                onArchive = { vm.archiveSite(siteId) },
+                                onRestore = { vm.restoreSite(siteId) },
+                                onDelete = {
+                                    deleteDialogState = SiteDeleteDialogState(
+                                        isSite = true,
+                                        id = siteId,
+                                        name = site.name
+                                    )
+                                },
+                                onChangeIcon = if (isEditing) {
+                                    {
+                                        scope.launch {
+                                            iconPickerSiteId = siteId
+                                            iconPickerState = vm.loadIconPacksAndIconsFor(IconEntityType.SITE)
+                                            isIconPickerVisible = true
                                         }
                                     }
+                                } else null,
+                                reorderableState = reorderableState,
+                                onClick = if (!isEditing) { { onOpenSite(siteId) } } else null,
+                                isEditing = isEditing,
+                                isDragging = isDragging,
+                                onToggleEdit = onToggleEdit
+                            )
+
+                            // Установки внутри объекта
+                            val installationsToShow =
+                                if (site.isArchived) emptyList() else installations
+                            // Обновляем локальный порядок, если в нем отсутствуют некоторые установки
+                            // НЕ обновляем во время перетаскивания объекта, чтобы избежать прыжков карточек установок
+                            LaunchedEffect(siteId, installations.size, isDragging) {
+                                if (!isDragging) {
+                                    val currentOrder =
+                                        localInstallationOrders[siteId] ?: emptyList()
+                                    val allIds = installations.map { it.id }
+                                    // Добавляем отсутствующие установки в конец
+                                    val newOrder =
+                                        (currentOrder + allIds.filter { it !in currentOrder }).distinct()
+                                    if (newOrder != currentOrder) {
+                                        localInstallationOrders =
+                                            localInstallationOrders.toMutableMap().apply {
+                                                put(siteId, newOrder)
+                                            }
+                                    }
                                 }
-                                if (installationOrder.isNotEmpty() && installationsToShow.isNotEmpty()) {
-                                    // Используем ReorderableLazyColumn для установок внутри объекта
-                                    ReorderableLazyColumn(
-                                        items = installationOrder.filter { instId -> installations.any { it.id == instId } },
-                                        onMove = { fromIndex, toIndex ->
-                                            val filteredOrder = installationOrder.filter { instId -> installations.any { it.id == instId } }
-                                            val mutable = filteredOrder.toMutableList()
+                            }
+                            if (installationOrder.isNotEmpty() && installationsToShow.isNotEmpty()) {
+                                // Используем ReorderableLazyColumn для установок внутри объекта
+                                // Фильтруем список установок, чтобы показывать только существующие
+                                // Используем стабильный список, который не пересчитывается во время перетаскивания объекта
+                                // Используем key для стабильности - список будет пересчитываться только когда изменяется siteId или список установок
+                                val installationIdsSet = remember(installations) { installations.map { it.id }.toSet() }
+                                val filteredInstallationOrder = remember(siteId, installationOrder, installationIdsSet) {
+                                    installationOrder.filter { instId -> instId in installationIdsSet }
+                                }
+                                ReorderableLazyColumn(
+                                    items = filteredInstallationOrder,
+                                    onMove = { fromIndex, toIndex ->
+                                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
+                                        // Используем текущее значение installationOrder и installations из замыкания
+                                        val currentFilteredOrder = installationOrder.filter { instId -> installations.any { it.id == instId } }
+                                        if (currentFilteredOrder.isNotEmpty() && fromIndex in currentFilteredOrder.indices && toIndex in currentFilteredOrder.indices) {
+                                            val mutable = currentFilteredOrder.toMutableList()
                                             val item = mutable.removeAt(fromIndex)
                                             mutable.add(toIndex, item)
                                             // Восстанавливаем полный порядок с учетом отфильтрованных элементов
                                             val fullOrder = installationOrder.toMutableList()
-                                            val filteredIds = filteredOrder.toSet()
+                                            val filteredIds = currentFilteredOrder.toSet()
                                             val nonFilteredIds = fullOrder.filter { it !in filteredIds }
                                             val newOrder = mutable + nonFilteredIds
                                             localInstallationOrders = localInstallationOrders.toMutableMap().apply {
                                                 put(siteId, newOrder)
                                             }
-                                        },
-                                        modifier = Modifier
-                                            .padding(
-                                                start = 16.dp,
-                                                end = 16.dp,
-                                                bottom = 8.dp
-                                            )
-                                            .heightIn(max = 400.dp),
-                                        key = { it },
-                                        contentPadding = PaddingValues(0.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) { instId, _, installationReorderableState ->
-                                        val inst = installations.find { it.id == instId } ?: return@ReorderableLazyColumn
-                                        val instIndex = installationOrder.indexOf(instId)
-                                        InstallationRowWithDrag(
-                                            installation = inst,
-                                            index = instIndex,
-                                            isArchived = inst.isArchived,
-                                            onMoveUp = {
+                                        }
+                                        // Изменения сохраняются в БД только в режиме редактирования
+                                    },
+                                    modifier = Modifier
+                                        .padding(
+                                            start = 16.dp,
+                                            end = 16.dp,
+                                            bottom = 8.dp
+                                        )
+                                        .heightIn(max = 400.dp),
+                                    key = { it },
+                                    contentPadding = PaddingValues(0.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) { instId, isDraggingInstallation, installationReorderableState ->
+                                    val inst = installations.find { it.id == instId } ?: return@ReorderableLazyColumn
+                                    val instIndex = installationOrder.indexOf(instId)
+                                    InstallationRowWithDrag(
+                                        installation = inst,
+                                        index = instIndex,
+                                        isArchived = inst.isArchived,
+                                        onMoveUp = {
+                                            if (isEditing) {
                                                 val pos = installationOrder.indexOf(instId)
                                                 if (pos > 0) {
                                                     val list = installationOrder.toMutableList()
@@ -621,8 +753,10 @@ fun ClientDetailScreen(
                                                         put(siteId, list)
                                                     }
                                                 }
-                                            },
-                                            onMoveDown = {
+                                            }
+                                        },
+                                        onMoveDown = {
+                                            if (isEditing) {
                                                 val pos = installationOrder.indexOf(instId)
                                                 if (pos >= 0 && pos < installationOrder.lastIndex) {
                                                     val list = installationOrder.toMutableList()
@@ -631,146 +765,23 @@ fun ClientDetailScreen(
                                                         put(siteId, list)
                                                     }
                                                 }
-                                            },
-                                            onArchive = { vm.archiveInstallation(instId) },
-                                            onRestore = { vm.restoreInstallation(instId) },
-                                            onDelete = {
-                                                deleteDialogState = SiteDeleteDialogState(
-                                                    isSite = false,
-                                                    id = instId,
-                                                    name = inst.name
-                                                )
-                                            },
-                                            reorderableState = installationReorderableState
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Обычный режим: раскрывающиеся объекты + установки
-                    LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(ru.wassertech.core.ui.theme.ExpandableMenuBackground) // Светло-серый фон для разворачивающихся меню
-                    ) {
-                        items(sitesToShow, key = { it.id }) { s ->
-                            val isExpanded = expandedSites.contains(s.id)
-                            ElevatedCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.elevatedCardColors(
-                                    containerColor = ru.wassertech.core.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
-                                ),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                            ) {
-                                Column {
-                                    ListItem(
-                                        modifier = Modifier.clickable { onOpenSite(s.id) },
-                                        leadingContent = {
-                                            // Выбираем иконку объекта в зависимости от типа клиента и архивации
-                                            val siteIconRes = when {
-                                                s.isArchived == true && isCorporate -> R.drawable.object_factory_red
-                                                s.isArchived == true && !isCorporate -> R.drawable.object_house_red
-                                                isCorporate -> R.drawable.object_factory_blue
-                                                else -> R.drawable.object_house_blue
                                             }
-                                            Image(
-                                                painter = painterResource(id = siteIconRes),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(48.dp),
-                                                contentScale = ContentScale.Fit
+                                        },
+                                        onArchive = { vm.archiveInstallation(instId) },
+                                        onRestore = { vm.restoreInstallation(instId) },
+                                        onDelete = {
+                                            deleteDialogState = SiteDeleteDialogState(
+                                                isSite = false,
+                                                id = instId,
+                                                name = inst.name
                                             )
                                         },
-                                        headlineContent = { Text(s.name) },
-                                        trailingContent = {
-                                            IconButton(onClick = {
-                                                expandedSites =
-                                                    if (isExpanded) expandedSites - s.id else expandedSites + s.id
-                                            }) {
-                                                Icon(
-                                                    imageVector = if (isExpanded) ru.wassertech.core.ui.theme.NavigationIcons.CollapseMenuIcon else ru.wassertech.core.ui.theme.NavigationIcons.ExpandMenuIcon,
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        }
+                                        reorderableState = installationReorderableState,
+                                        onClick = if (!isEditing) { { onOpenInstallation(instId) } } else null,
+                                        isEditing = isEditing,
+                                        isDragging = isDraggingInstallation,
+                                        onToggleEdit = onToggleEdit
                                     )
-                                    // Анимированное содержимое установок
-                                    AnimatedVisibility(
-                                        visible = isExpanded,
-                                        enter = expandVertically(
-                                            animationSpec = tween(300),
-                                            expandFrom = Alignment.Top
-                                        ) + fadeIn(animationSpec = tween(300)),
-                                        exit = shrinkVertically(
-                                            animationSpec = tween(300),
-                                            shrinkTowards = Alignment.Top
-                                        ) + fadeOut(animationSpec = tween(300))
-                                    ) {
-                                        val installationsFlow =
-                                            vm.installations(s.id, includeArchived = false)
-                                        val installations by installationsFlow.collectAsState(
-                                            initial = emptyList()
-                                        )
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            if (installations.isEmpty()) {
-                                                Text(
-                                                    "Нет установок",
-                                                    style = MaterialTheme.typography.bodyMedium
-                                                )
-                                            } else {
-                                                installations.forEach { inst ->
-                                                    ElevatedCard(
-                                                        onClick = { onOpenInstallation(inst.id) },
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        colors = CardDefaults.elevatedCardColors(
-                                                            containerColor = ru.wassertech.core.ui.theme.ExpandableMenuCardBackground // Белый фон для карточек в разворачивающихся списках
-                                                        ),
-                                                        elevation = CardDefaults.cardElevation(
-                                                            defaultElevation = 4.dp
-                                                        ) // Увеличенная тень
-                                                    ) {
-                                                        Row(
-                                                            Modifier
-                                                                .fillMaxWidth()
-                                                                .padding(12.dp),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            // Иконка установки
-                                                            Image(
-                                                                painter = painterResource(id = R.drawable.equipment_filter_triple),
-                                                                contentDescription = null,
-                                                                modifier = Modifier.size(48.dp),
-                                                                contentScale = ContentScale.Fit
-                                                            )
-                                                            Spacer(Modifier.width(12.dp))
-                                                            Text(
-                                                                inst.name,
-                                                                style = MaterialTheme.typography.titleMedium,
-                                                                modifier = Modifier.weight(1f)
-                                                            )
-                                                            // Стрелочка справа (такая же как на экране "Клиенты")
-                                                            Icon(
-                                                                imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
-                                                                contentDescription = "Перейти к установке",
-                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                                    alpha = 0.6f
-                                                                ),
-                                                                modifier = Modifier.size(20.dp)
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -994,6 +1005,37 @@ fun ClientDetailScreen(
                 }
             )
         }
-
+        
+        // ===== Диалог выбора иконки объекта =====
+        iconPickerState?.let { state ->
+            val site = iconPickerSiteId?.let { siteId ->
+                sitesToShow.firstOrNull { it.id == siteId }
+            }
+            IconPickerDialog(
+                visible = isIconPickerVisible,
+                onDismissRequest = { 
+                    isIconPickerVisible = false
+                    iconPickerSiteId = null
+                },
+                entityType = IconEntityType.SITE,
+                packs = state.packs,
+                iconsByPack = state.iconsByPack,
+                selectedIconId = site?.iconId,
+                onIconSelected = { newIconId ->
+                    iconPickerSiteId?.let { siteId ->
+                        vm.updateSiteIcon(siteId, newIconId)
+                        // Обновляем локальное состояние иконки
+                        scope.launch(Dispatchers.IO) {
+                            val icon = if (newIconId != null) vm.getIcon(newIconId) else null
+                            siteIcons = siteIcons.toMutableMap().apply {
+                                put(siteId, icon)
+                            }
+                        }
+                    }
+                    isIconPickerVisible = false
+                    iconPickerSiteId = null
+                }
+            )
+        }
     }
 }

@@ -9,7 +9,9 @@ import androidx.room.*
         Index("siteId"),
         Index("installationId"),
         Index("componentId"),
-        Index("fieldKey")
+        Index("fieldKey"),
+        Index("origin"),
+        Index("created_by_user_id")
     ],
     foreignKeys = [
         ForeignKey(
@@ -28,5 +30,15 @@ data class MaintenanceValueEntity(
     val componentId: String,
     val fieldKey: String,        // ключ поля из шаблона
     val valueText: String?,      // для TEXT / NUMBER (храним строкой)
-    val valueBool: Boolean?      // для CHECKBOX
-)
+    val valueBool: Boolean?,     // для CHECKBOX
+    // Поля для ролей и владения данными
+    val origin: String? = null, // "CRM" или "CLIENT", по умолчанию "CRM" для старых данных
+    @ColumnInfo(name = "created_by_user_id") val createdByUserId: String? = null // FK → users.id
+) {
+    /**
+     * Получает OriginType (по умолчанию CRM для старых данных).
+     */
+    fun getOriginType(): ru.wassertech.core.auth.OriginType {
+        return ru.wassertech.core.auth.OriginType.fromString(origin)
+    }
+}
