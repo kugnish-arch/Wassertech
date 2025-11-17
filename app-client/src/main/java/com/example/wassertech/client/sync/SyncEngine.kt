@@ -254,12 +254,18 @@ class SyncEngine(private val context: Context) {
         if (response.icons.isNotEmpty()) {
             Log.d(TAG, "Получено иконок с сервера: ${response.icons.size}")
             var appliedCount = 0
+            var skippedCount = 0
             response.icons.forEach { dto ->
                 val entity = dto.toEntity()
-                database.iconDao().upsert(entity)
-                appliedCount++
+                if (entity != null) {
+                    database.iconDao().upsert(entity)
+                    appliedCount++
+                } else {
+                    skippedCount++
+                    Log.w(TAG, "Пропуск иконки ${dto.id}: отсутствует packId или code")
+                }
             }
-            Log.d(TAG, "Обработано иконок: применено=$appliedCount")
+            Log.d(TAG, "Обработано иконок: применено=$appliedCount, пропущено=$skippedCount")
         }
         
         // Обрабатываем удаления
@@ -698,21 +704,28 @@ class SyncEngine(private val context: Context) {
         updatedAtEpoch = updatedAtEpoch
     )
     
-    private fun SyncIconDto.toEntity() = ru.wassertech.client.data.entities.IconEntity(
-        id = id,
-        packId = packId,
-        code = code,
-        label = label,
-        entityType = entityType,
-        imageUrl = imageUrl,
-        thumbnailUrl = thumbnailUrl,
-        androidResName = androidResName,
-        isActive = isActive,
-        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
-        createdByUserId = createdByUserId,
-        createdAtEpoch = createdAtEpoch,
-        updatedAtEpoch = updatedAtEpoch
-    )
+    private fun SyncIconDto.toEntity(): ru.wassertech.client.data.entities.IconEntity? {
+        // Пропускаем иконки без packId или code, так как они обязательны
+        val validPackId = packId ?: return null
+        val validCode = code.ifBlank { return null }
+        val validEntityType = entityType ?: "ANY"
+        
+        return ru.wassertech.client.data.entities.IconEntity(
+            id = id,
+            packId = validPackId,
+            code = validCode,
+            label = label,
+            entityType = validEntityType,
+            imageUrl = imageUrl,
+            thumbnailUrl = thumbnailUrl,
+            androidResName = androidResName,
+            isActive = isActive,
+            origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+            createdByUserId = createdByUserId,
+            createdAtEpoch = createdAtEpoch,
+            updatedAtEpoch = updatedAtEpoch
+        )
+    }
     
     /**
      * Результат синхронизации

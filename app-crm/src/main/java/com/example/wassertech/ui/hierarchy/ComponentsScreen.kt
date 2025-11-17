@@ -48,6 +48,7 @@ import ru.wassertech.viewmodel.ClientsViewModelFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import ru.wassertech.ui.common.AppFloatingActionButton
 import ru.wassertech.ui.common.FABTemplate
@@ -209,7 +210,7 @@ fun ComponentsScreen(
     
     // Состояние для IconPickerDialog (для установки)
     var isIconPickerVisibleForInstallation by remember { mutableStateOf(false) }
-    var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.viewmodel.IconPickerUiState?>(null) }
+    var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.core.ui.icons.IconPickerUiState?>(null) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
@@ -266,9 +267,13 @@ fun ComponentsScreen(
                         ) {
                             // Иконка установки из БД
                             val installationIcon by vm.icon(installation?.iconId).collectAsState(initial = null)
-                            val installationIconLocalPath = installationIcon?.let { icon ->
-                                ru.wassertech.data.repository.IconRepository(context).getLocalIconPath(icon)
-                            }
+                            val iconRepository = remember { ru.wassertech.data.repository.IconRepository(context) }
+                            val installationIconLocalPath by remember(installationIcon?.id) {
+                                kotlinx.coroutines.flow.flow {
+                                    val path = installationIcon?.id?.let { iconRepository.getLocalIconPath(it) }
+                                    emit(path)
+                                }
+                            }.collectAsState(initial = null)
                             IconResolver.IconImage(
                                 androidResName = installationIcon?.androidResName,
                                 entityType = IconEntityType.INSTALLATION,
@@ -666,11 +671,14 @@ private fun ComponentRowWithEdit(
         title = component.name,
         subtitle = templateTitle,
         leadingIcon = {
-            val componentIconLocalPath = icon?.let { iconEntity ->
-                ru.wassertech.data.repository.IconRepository(
-                    androidx.compose.ui.platform.LocalContext.current
-                ).getLocalIconPath(iconEntity)
-            }
+            val context = LocalContext.current
+            val iconRepository = remember { ru.wassertech.data.repository.IconRepository(context) }
+            val componentIconLocalPath by remember(icon?.id) {
+                kotlinx.coroutines.flow.flow {
+                    val path = icon?.id?.let { iconRepository.getLocalIconPath(it) }
+                    emit(path)
+                }
+            }.collectAsState(initial = null)
             IconResolver.IconImage(
                 androidResName = icon?.androidResName,
                 entityType = IconEntityType.COMPONENT,

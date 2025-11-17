@@ -165,15 +165,17 @@ fun IconPackDetailScreen(
                         }
                         
                         // Сетка иконок
-                        val iconUiModels = remember(filteredIcons) {
-                            filteredIcons.map { icon ->
+                        var iconUiModels by remember(filteredIcons) { mutableStateOf<List<IconUiModel>>(emptyList()) }
+                        LaunchedEffect(filteredIcons) {
+                            iconUiModels = filteredIcons.map { icon ->
+                                val localPath = viewModel.getLocalIconPath(icon)
                                 IconUiModel(
                                     id = icon.id,
                                     title = icon.label,
                                     entityType = icon.entityType,
                                     androidResName = icon.androidResName,
                                     imageUrl = icon.imageUrl,
-                                    localImagePath = viewModel.getLocalIconPath(icon)
+                                    localImagePath = localPath
                                 )
                             }
                         }

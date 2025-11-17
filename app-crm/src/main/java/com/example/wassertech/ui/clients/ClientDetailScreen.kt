@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import ru.wassertech.ui.common.EditDoneBottomBar
 import ru.wassertech.ui.common.BarAction
 import ru.wassertech.data.entities.SiteEntity
@@ -127,11 +128,14 @@ fun SiteRowWithDrag(
             Spacer(Modifier.width(8.dp))
         }
         // Отображаем иконку из БД или дефолтную
-        val localImagePath = icon?.let { iconEntity ->
-            ru.wassertech.data.repository.IconRepository(
-                androidx.compose.ui.platform.LocalContext.current
-            ).getLocalIconPath(iconEntity)
-        }
+        val context = LocalContext.current
+        val iconRepository = remember { ru.wassertech.data.repository.IconRepository(context) }
+        val localImagePath by remember(icon?.id) {
+            kotlinx.coroutines.flow.flow {
+                val path = icon?.id?.let { iconRepository.getLocalIconPath(it) }
+                emit(path)
+            }
+        }.collectAsState(initial = null)
         IconResolver.IconImage(
             androidResName = icon?.androidResName,
             entityType = IconEntityType.SITE,

@@ -175,14 +175,14 @@ class IconPacksViewModel(application: Application) : AndroidViewModel(applicatio
     /**
      * Получает локальный путь к изображению иконки.
      */
-    fun getLocalIconPath(icon: IconEntity): String? {
-        return iconRepository.getLocalIconPath(icon)
+    suspend fun getLocalIconPath(icon: IconEntity): String? {
+        return iconRepository.getLocalIconPath(icon.id)
     }
     
     /**
      * Проверяет, загружена ли иконка локально.
      */
-    fun isIconDownloaded(iconId: String): Boolean {
+    suspend fun isIconDownloaded(iconId: String): Boolean {
         return iconRepository.isIconDownloaded(iconId)
     }
 }

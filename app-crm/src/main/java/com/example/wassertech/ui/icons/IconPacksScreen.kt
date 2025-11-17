@@ -97,8 +97,9 @@ fun IconPacksScreen(
                             .firstOrNull { it.packId == pack.id }
                         
                         // Получаем локальный путь к превью-иконке, если она загружена
-                        val previewIconLocalPath = remember(pack.id, previewIcon?.id) {
-                            previewIcon?.let { icon ->
+                        var previewIconLocalPath by remember(pack.id, previewIcon?.id) { mutableStateOf<String?>(null) }
+                        LaunchedEffect(pack.id, previewIcon?.id) {
+                            previewIconLocalPath = previewIcon?.let { icon ->
                                 viewModel.getLocalIconPath(icon)
                             }
                         }

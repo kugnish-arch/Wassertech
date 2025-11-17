@@ -83,7 +83,7 @@ fun ClientIconPacksScreen(
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = uiState.error,
+                                text = uiState.error ?: "Неизвестная ошибка",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error
                             )

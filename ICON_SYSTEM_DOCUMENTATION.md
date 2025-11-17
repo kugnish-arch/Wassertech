@@ -6,6 +6,22 @@
 1. **Встроенными ресурсами Android** (`androidResName`) - хранятся в `res/drawable/`
 2. **Загружаемыми с сервера** (`imageUrl`) - загружаются и сохраняются локально в файловой системе
 
+## Архитектура (после рефакторинга)
+
+Система иконок организована в несколько слоёв:
+
+- **`core:ui.icons`** - общие интерфейсы и модели:
+  - `IconDataSource` - интерфейс для работы с иконками
+  - `IconPickerUiState` - состояние для диалога выбора иконок
+  - `IconEntityType` - типы сущностей
+  - `IconResolver` - разрешение и отображение иконок
+
+- **`core:ui.components`** - UI-компоненты:
+  - `IconPickerDialog` - диалог выбора иконок
+  - `IconGrid`, `IconPackCard`, `IconPackBadgeRow` - вспомогательные компоненты
+
+- **`app-crm/data/repository/IconRepository`** и **`app-client/data/repository/IconRepository`** - реализации `IconDataSource` для каждого приложения
+
 ## Архитектура системы
 
 ### 1. Структура данных
@@ -77,38 +93,53 @@
 
 ### 3. Загрузка изображений с сервера
 
-#### IconRepository
+#### IconDataSource (интерфейс)
 
-**Класс**: `ru.wassertech.data.repository.IconRepository`
+**Интерфейс**: `ru.wassertech.core.ui.icons.IconDataSource`
+
+Определяет контракт для работы с иконками:
+- `getLocalIconPath(iconId: String)` - получить локальный путь к изображению
+- `isIconDownloaded(iconId: String)` - проверить, загружена ли иконка
+- `downloadIconImage(iconId: String, imageUrl: String)` - загрузить изображение
+- `downloadPackImages(packId: String, onProgress)` - загрузить все изображения пака
+- `getPackSyncStatus(packId: String)` - получить статус синхронизации пака
+- `clearPackImages(packId: String)` - удалить локальные файлы пака
+
+#### IconRepository (реализация)
+
+**Класс**: `ru.wassertech.data.repository.IconRepository` (app-crm) или `ru.wassertech.client.data.repository.IconRepository` (app-client)
+
+Реализует интерфейс `IconDataSource` для конкретного приложения.
 
 **Директория хранения**:
 - Путь: `context.filesDir/icons/`
 - Формат файла: `{iconId}_image.png`
 - Пример: `/data/data/ru.wassertech.crm/files/icons/1d662fab-e711-4af0-8690-eb430f6d1e59_image.png`
 
-**Методы**:
+**Основные методы (через интерфейс IconDataSource)**:
 
-1. **`getIconsDirectory()`** - получает директорию для хранения иконок (создает, если не существует)
+1. **`getLocalIconPath(iconId: String)`** - возвращает абсолютный путь к локальному файлу, если он существует, иначе `null`
 
-2. **`getIconFile(iconId: String, type: String = "image")`** - получает объект `File` для иконки
-   - `type` может быть "image" или "thumbnail"
+2. **`isIconDownloaded(iconId: String)`** - проверяет, загружена ли иконка локально
 
-3. **`getLocalIconPath(icon: IconEntity)`** - возвращает абсолютный путь к локальному файлу, если он существует, иначе `null`
-
-4. **`isIconDownloaded(iconId: String)`** - проверяет, загружена ли иконка локально
-
-5. **`downloadIconImage(icon: IconEntity)`** - загружает изображение с сервера:
-   - Использует `imageUrl` из `IconEntity`
+3. **`downloadIconImage(iconId: String, imageUrl: String)`** - загружает изображение с сервера:
    - Исправляет URL (заменяет `/publicuploads/` на `/uploads/`)
    - Если URL относительный, добавляет базовый URL из `ApiConfig`
    - Использует OkHttp с токеном авторизации
-   - Сохраняет файл в `getIconFile(icon.id, "image")`
+   - Сохраняет файл в `{iconId}_image.png`
 
-6. **`downloadPackImages(packId: String, onProgress: ((Int, Int) -> Unit)?)`** - загружает все изображения из пака:
+4. **`downloadPackImages(packId: String, onProgress: ((Int, Int) -> Unit)?)`** - загружает все изображения из пака:
    - Пропускает иконки без `imageUrl`
    - Пропускает иконки с `androidResName` (встроенные ресурсы)
    - Пропускает уже загруженные иконки
-   - Обновляет статус синхронизации в `icon_pack_sync_status`
+   - Обновляет статус синхронизации в `icon_pack_sync_status` (только в app-crm)
+
+**Внутренние методы (для обратной совместимости)**:
+
+- `getIconsDirectory()` - получает директорию для хранения иконок
+- `getIconFile(iconId: String, type: String)` - получает объект `File` для иконки
+- `getLocalIconPath(icon: IconEntity)` - @deprecated, используйте `getLocalIconPath(iconId: String)`
+- `downloadIconImage(icon: IconEntity)` - @deprecated, используйте `downloadIconImage(iconId: String, imageUrl: String)`
 
 **Логика загрузки**:
 ```kotlin
@@ -181,19 +212,34 @@ data class IconUiData(
 )
 ```
 
-**Создание `IconUiData`** (в `HierarchyViewModel.loadIconPacksAndIconsFor()`):
+**Создание `IconPickerUiState`** (в `HierarchyViewModel.loadIconPacksAndIconsFor()` или аналогичных методах):
 ```kotlin
-icons.map { icon ->
-    IconUiData(
-        id = icon.id,
-        packId = icon.packId,
-        label = icon.label,
-        entityType = icon.entityType,
-        androidResName = icon.androidResName,
-        code = icon.code,
-        localImagePath = iconRepository.getLocalIconPath(icon)
-    )
+val packs = iconPackDao.getAll()
+val allIcons = iconDao.getAllActive()
+val filteredIcons = allIcons.filter { icon ->
+    icon.entityType == "ANY" || icon.entityType == entityType.name
 }
+val iconsByPack = filteredIcons.groupBy { it.packId }
+
+IconPickerUiState(
+    packs = packs.map { 
+        IconPackUiData(id = it.id, name = it.name)
+    },
+    iconsByPack = iconsByPack.mapValues { (_, icons) ->
+        icons.map { icon ->
+            val localPath = iconRepository.getLocalIconPath(icon.id)
+            IconUiData(
+                id = icon.id,
+                packId = icon.packId,
+                label = icon.label,
+                entityType = icon.entityType,
+                androidResName = icon.androidResName,
+                code = icon.code,
+                localImagePath = localPath
+            )
+        }
+    }
+)
 ```
 
 **Отображение в диалоге**:
@@ -280,16 +326,48 @@ IconResolver.IconImage(
    - Если изображения не загружаются, можно использовать библиотеку Coil для загрузки по `imageUrl` напрямую
    - Требует изменения `IconResolver.IconImage()`
 
+## Использование в приложениях
+
+### В app-crm:
+
+```kotlin
+// В ViewModel
+val iconRepository = IconRepository(context) // реализует IconDataSource
+
+suspend fun loadIconPacksAndIconsFor(entityType: IconEntityType): IconPickerUiState {
+    val packs = iconPackDao.getAll()
+    val allIcons = iconDao.getAllActive()
+    val filteredIcons = allIcons.filter { icon ->
+        icon.entityType == "ANY" || icon.entityType == entityType.name
+    }
+    val iconsByPack = filteredIcons.groupBy { it.packId }
+    return IconPickerUiState(
+        packs = packs.map { IconPackUiData(id = it.id, name = it.name) },
+        iconsByPack = iconsByPack.mapValues { (_, icons) ->
+            icons.map { icon ->
+                val localPath = iconRepository.getLocalIconPath(icon.id)
+                IconUiData(..., localImagePath = localPath)
+            }
+        }
+    )
+}
+```
+
+### В app-client:
+
+Аналогично app-crm, но использует `ru.wassertech.client.data.repository.IconRepository`.
+
 ## Заключение
 
 Система иконок поддерживает два способа отображения:
 1. **Встроенные ресурсы** - через `androidResName` (требуют добавления в проект)
 2. **Загружаемые изображения** - через `imageUrl` (требуют загрузки через `IconRepository`)
 
-Текущая проблема связана с тем, что:
-- `androidResName` не заполнен на сервере
-- Изображения не загружены локально (или `imageUrl` отсутствует)
-- Fallback по `code` не находит ресурсы, так как они не добавлены в проект
+**Архитектура после рефакторинга:**
+- ✅ Общие интерфейсы и модели в `core:ui.icons`
+- ✅ Реализации в app-модулях через `IconDataSource`
+- ✅ Единый API для обоих приложений
+- ✅ Обратная совместимость сохранена
 
-**Решение**: Загрузить изображения через `IconRepository.downloadPackImages()` или добавить drawable ресурсы в проект.
+**Для загрузки изображений:** Используйте `IconRepository.downloadPackImages(packId)` или добавьте drawable ресурсы в проект.
 

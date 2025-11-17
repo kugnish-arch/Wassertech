@@ -39,6 +39,7 @@ import ru.wassertech.core.auth.SessionManager
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -93,7 +94,7 @@ fun SiteDetailScreen(
     
     // Состояние для IconPickerDialog (для установок)
     var isIconPickerVisibleForInstallation by remember { mutableStateOf(false) }
-    var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.viewmodel.IconPickerUiState?>(null) }
+    var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.core.ui.icons.IconPickerUiState?>(null) }
     var iconPickerInstallationId by remember { mutableStateOf<String?>(null) }
 
     val installations: List<InstallationEntity> by vm.installations(siteId)
@@ -167,9 +168,13 @@ fun SiteDetailScreen(
                             )
                         }
                         // Логирование параметров перед передачей в IconImage
-                        val localImagePath = siteIcon?.let { icon ->
-                            ru.wassertech.data.repository.IconRepository(context).getLocalIconPath(icon)
-                        }
+                        val iconRepository = remember { ru.wassertech.data.repository.IconRepository(context) }
+                        val localImagePath by remember(siteIcon?.id) {
+                            kotlinx.coroutines.flow.flow {
+                                val path = siteIcon?.id?.let { iconRepository.getLocalIconPath(it) }
+                                emit(path)
+                            }
+                        }.collectAsState(initial = null)
                         LaunchedEffect(siteIcon?.id, siteIcon?.androidResName, siteIcon?.code, localImagePath) {
                             android.util.Log.d("SiteDetailScreen", 
                                 "IconImage params: androidResName=${siteIcon?.androidResName}, code=${siteIcon?.code}, localImagePath=$localImagePath, siteIcon.id=${siteIcon?.id}"
@@ -389,11 +394,14 @@ private fun InstallationRowWithEdit(
         title = installation.name,
         subtitle = null,
         leadingIcon = {
-            val installationIconLocalPath = icon?.let { iconEntity ->
-                ru.wassertech.data.repository.IconRepository(
-                    androidx.compose.ui.platform.LocalContext.current
-                ).getLocalIconPath(iconEntity)
-            }
+            val context = LocalContext.current
+            val iconRepository = remember { ru.wassertech.data.repository.IconRepository(context) }
+            val installationIconLocalPath by remember(icon?.id) {
+                kotlinx.coroutines.flow.flow {
+                    val path = icon?.id?.let { iconRepository.getLocalIconPath(it) }
+                    emit(path)
+                }
+            }.collectAsState(initial = null)
             IconResolver.IconImage(
                 androidResName = icon?.androidResName,
                 entityType = IconEntityType.INSTALLATION,

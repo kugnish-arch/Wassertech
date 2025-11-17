@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import ru.wassertech.client.ui.settings.SettingsScreen
 import ru.wassertech.client.ui.sites.SitesScreen
@@ -104,10 +105,10 @@ fun HomeScreen(
                     }
                 }
                 1 -> SettingsScreen(
-                    navController = navController,
+                    navController = navController as? NavHostController,
                     onLogout = {
                         // Навигация на экран логина с очисткой стека
-                        navController?.navigate(AuthRoutes.LOGIN) {
+                        (navController as? NavHostController)?.navigate(AuthRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }
                         }
                     }

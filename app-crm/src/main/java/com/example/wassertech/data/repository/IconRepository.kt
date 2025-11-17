@@ -70,7 +70,7 @@ class IconRepository(private val context: Context) : IconDataSource {
      * Получить локальный путь к изображению иконки.
      * @deprecated Используйте getLocalIconPath(iconId: String)
      */
-    fun getLocalIconPath(icon: IconEntity): String? {
+    suspend fun getLocalIconPath(icon: IconEntity): String? {
         return getLocalIconPath(icon.id)
     }
     
@@ -303,26 +303,28 @@ class IconRepository(private val context: Context) : IconDataSource {
     /**
      * Удалить локальные файлы иконок пака.
      */
-    override suspend fun clearPackImages(packId: String) = withContext(Dispatchers.IO) {
-        try {
-            val icons = iconDao.getAllByPackId(packId)
-            icons.forEach { icon ->
-                val file = getIconFile(icon.id, "image")
-                if (file.exists()) {
-                    file.delete()
+    override suspend fun clearPackImages(packId: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                val icons = iconDao.getAllByPackId(packId)
+                icons.forEach { icon ->
+                    val file = getIconFile(icon.id, "image")
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                    val thumbFile = getIconFile(icon.id, "thumbnail")
+                    if (thumbFile.exists()) {
+                        thumbFile.delete()
+                    }
                 }
-                val thumbFile = getIconFile(icon.id, "thumbnail")
-                if (thumbFile.exists()) {
-                    thumbFile.delete()
-                }
+                
+                // Удаляем статус синхронизации
+                syncStatusDao.deleteByPackId(packId)
+                
+                Log.d(TAG, "Локальные файлы пака $packId удалены")
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при удалении локальных файлов пака $packId", e)
             }
-            
-            // Удаляем статус синхронизации
-            syncStatusDao.deleteByPackId(packId)
-            
-            Log.d(TAG, "Локальные файлы пака $packId удалены")
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка при удалении локальных файлов пака $packId", e)
         }
     }
 }

@@ -92,7 +92,7 @@ fun ClientIconPackDetailScreen(
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = uiState.error,
+                                text = uiState.error ?: "Неизвестная ошибка",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -132,18 +132,20 @@ fun ClientIconPackDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Заголовок с информацией о паке
-                        ScreenTitleWithSubtitle(
-                            title = pack.name,
-                            subtitle = pack.description ?: "${allIcons.size} ${if (allIcons.size == 1) "иконка" else if (allIcons.size in 2..4) "иконки" else "иконок"}"
-                        )
-                        
-                        // Бейджи статусов (адаптированные для клиента)
-                        if (pack.isBuiltin) {
-                            IconPackBadgeRow(
-                                isSystem = true,
-                                isVisibleInClient = null,
-                                isDefaultForAllClients = null
+                        pack?.let {
+                            ScreenTitleWithSubtitle(
+                                title = it.name,
+                                subtitle = it.description ?: "${allIcons.size} ${if (allIcons.size == 1) "иконка" else if (allIcons.size in 2..4) "иконки" else "иконок"}"
                             )
+                            
+                            // Бейджи статусов (адаптированные для клиента)
+                            if (it.isBuiltin) {
+                                IconPackBadgeRow(
+                                    isSystem = true,
+                                    isVisibleInClient = null,
+                                    isDefaultForAllClients = null
+                                )
+                            }
                         }
                         
                         // Информационный текст для клиента

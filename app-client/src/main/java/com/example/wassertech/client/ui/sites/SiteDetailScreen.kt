@@ -181,15 +181,16 @@ fun SiteDetailScreen(
                                             icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
                                         }
                                         val iconsByPack = filteredIcons.groupBy { it.packId }
-                                        iconPickerStateForSite = Pair(
-                                            packs.map { 
+                                        iconPickerStateForSite = IconPickerUiState(
+                                            packs = packs.map { 
                                                 ru.wassertech.core.ui.components.IconPackUiData(
                                                     id = it.id,
                                                     name = it.name
                                                 )
                                             },
-                                            iconsByPack.mapValues { (_, icons) ->
+                                            iconsByPack = iconsByPack.mapValues { (_, icons) ->
                                                 icons.map { icon ->
+                                                    val localPath = iconRepository.getLocalIconPath(icon.id)
                                                     ru.wassertech.core.ui.components.IconUiData(
                                                         id = icon.id,
                                                         packId = icon.packId,
@@ -197,7 +198,7 @@ fun SiteDetailScreen(
                                                         entityType = icon.entityType,
                                                         androidResName = icon.androidResName,
                                                         code = icon.code, // Передаем code для fallback
-                                                        localImagePath = null // В app-client загрузка изображений не реализована
+                                                        localImagePath = localPath // Загружаем локальный путь через IconRepository
                                                     )
                                                 }
                                             }
@@ -270,21 +271,24 @@ fun SiteDetailScreen(
                                                 icon.entityType == "ANY" || icon.entityType == IconEntityType.INSTALLATION.name
                                             }
                                             val iconsByPack = filteredIcons.groupBy { it.packId }
-                                            iconPickerStateForInstallation = Pair(
-                                                packs.map { 
+                                            iconPickerStateForInstallation = IconPickerUiState(
+                                                packs = packs.map { 
                                                     ru.wassertech.core.ui.components.IconPackUiData(
                                                         id = it.id,
                                                         name = it.name
                                                     )
                                                 },
-                                                iconsByPack.mapValues { (_, icons) ->
+                                                iconsByPack = iconsByPack.mapValues { (_, icons) ->
                                                     icons.map { icon ->
+                                                        val localPath = iconRepository.getLocalIconPath(icon.id)
                                                         ru.wassertech.core.ui.components.IconUiData(
                                                             id = icon.id,
                                                             packId = icon.packId,
                                                             label = icon.label,
                                                             entityType = icon.entityType,
-                                                            androidResName = icon.androidResName
+                                                            androidResName = icon.androidResName,
+                                                            code = icon.code,
+                                                            localImagePath = localPath
                                                         )
                                                     }
                                                 }
@@ -456,7 +460,7 @@ fun SiteDetailScreen(
     }
     
     // Диалог выбора иконки объекта
-    iconPickerStateForSite?.let { (packs, iconsByPack) ->
+    iconPickerStateForSite?.let { state ->
         IconPickerDialog(
             visible = isIconPickerVisibleForSite,
             onDismissRequest = { 
@@ -464,8 +468,8 @@ fun SiteDetailScreen(
                 iconPickerStateForSite = null
             },
             entityType = IconEntityType.SITE,
-            packs = packs,
-            iconsByPack = iconsByPack,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
             selectedIconId = site?.iconId,
             onIconSelected = { newIconId ->
                 site?.let { siteToUpdate ->
@@ -486,7 +490,7 @@ fun SiteDetailScreen(
     }
     
     // Диалог выбора иконки установки
-    iconPickerStateForInstallation?.let { (packs, iconsByPack) ->
+    iconPickerStateForInstallation?.let { state ->
         val installation = iconPickerInstallationId?.let { instId ->
             installations.firstOrNull { it.id == instId }
         }
@@ -498,8 +502,8 @@ fun SiteDetailScreen(
                 iconPickerStateForInstallation = null
             },
             entityType = IconEntityType.INSTALLATION,
-            packs = packs,
-            iconsByPack = iconsByPack,
+            packs = state.packs,
+            iconsByPack = state.iconsByPack,
             selectedIconId = installation?.iconId,
             onIconSelected = { newIconId ->
                 iconPickerInstallationId?.let { instId ->
