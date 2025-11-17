@@ -36,6 +36,7 @@ import ru.wassertech.feature.reports.ReportAssembler
 import ru.wassertech.feature.reports.HtmlTemplateEngine
 import ru.wassertech.feature.reports.PdfExporter
 import ru.wassertech.feature.reports.ShareUtils
+import ru.wassertech.repository.ReportsRepository
 import android.util.Log;
 
 @Composable
@@ -208,6 +209,33 @@ fun MaintenanceSessionDetailScreen(
                     "PDF создан успешно",
                     duration = SnackbarDuration.Short
                 )
+                
+                // Пытаемся загрузить отчёт на сервер (в фоне, не блокируя UX)
+                Log.d("PDF", "Attempting to upload report to server...")
+                try {
+                    val reportsRepository = ReportsRepository(context)
+                    val uploadResult = reportsRepository.uploadReportForSession(
+                        sessionId = sessionId,
+                        pdfFile = out,
+                        fileName = fileName
+                    )
+                    
+                    uploadResult.onSuccess { report ->
+                        Log.d("PDF", "Report uploaded successfully: id=${report.id}")
+                        // Показываем ненавязчивое сообщение об успешной загрузке
+                        snackbarHostState.showSnackbar(
+                            "Отчёт отправлен на сервер",
+                            duration = SnackbarDuration.Short
+                        )
+                    }.onFailure { error ->
+                        Log.w("PDF", "Failed to upload report to server", error)
+                        // Не показываем ошибку пользователю - PDF уже сохранён локально
+                        // Это не критическая ошибка, можно работать дальше
+                    }
+                } catch (e: Exception) {
+                    Log.w("PDF", "Exception while uploading report", e)
+                    // Игнорируем ошибки загрузки - PDF уже есть локально
+                }
             } catch (t: Throwable) {
                 Log.e("PDF", "Error creating PDF", t)
                 val errorMsg = when {

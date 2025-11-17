@@ -11,6 +11,7 @@ data class SyncIconPackDto(
     val code: String,
     val name: String,
     val description: String? = null,
+    val folder: String? = null, // Подпапка для иконок (например, "water", "car", "home")
     @SerializedName("isBuiltin")
     @JsonAdapter(BooleanFromIntTypeAdapter::class)
     val isBuiltin: Boolean = false,

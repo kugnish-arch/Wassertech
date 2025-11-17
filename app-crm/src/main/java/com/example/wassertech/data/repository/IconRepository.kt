@@ -301,6 +301,58 @@ class IconRepository(private val context: Context) : IconDataSource {
     }
     
     /**
+     * Загрузить изображения для нескольких паков.
+     * 
+     * @param packIds Список ID паков для загрузки
+     * @param onProgress Колбэк для отслеживания прогресса: (currentPack, totalPacks, currentIcon, totalIcons)
+     * @return Result.success(Unit) при успехе, Result.failure при ошибке
+     */
+    suspend fun downloadIconPacks(
+        packIds: List<String>,
+        onProgress: ((currentPack: Int, totalPacks: Int, currentIcon: Int, totalIcons: Int) -> Unit)?
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            if (packIds.isEmpty()) {
+                return@withContext Result.success(Unit)
+            }
+            
+            val totalPacks = packIds.size
+            var currentPackIndex = 0
+            
+            // Подсчитываем общее количество иконок для прогресса
+            var totalIcons = 0
+            packIds.forEach { packId ->
+                val icons = iconDao.getAllByPackId(packId)
+                totalIcons += icons.count { icon ->
+                    icon.imageUrl.isNullOrBlank().not() && icon.androidResName.isNullOrBlank()
+                }
+            }
+            
+            var currentIconIndex = 0
+            
+            packIds.forEach { packId ->
+                currentPackIndex++
+                
+                // Загружаем пак с прогрессом
+                val result = downloadPackImages(packId) { downloaded, total ->
+                    currentIconIndex = downloaded
+                    onProgress?.invoke(currentPackIndex, totalPacks, currentIconIndex, totalIcons)
+                }
+                
+                if (result.isFailure) {
+                    Log.w(TAG, "Ошибка при загрузке пака $packId: ${result.exceptionOrNull()?.message}")
+                }
+            }
+            
+            Log.d(TAG, "Загрузка паков завершена: $currentPackIndex/$totalPacks")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при загрузке паков", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * Удалить локальные файлы иконок пака.
      */
     override suspend fun clearPackImages(packId: String) {

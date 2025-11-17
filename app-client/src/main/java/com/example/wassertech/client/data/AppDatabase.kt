@@ -21,9 +21,11 @@ import ru.wassertech.client.data.migrations.MIGRATION_8_9   // ← Добавл�
 import ru.wassertech.client.data.migrations.MIGRATION_9_10  // ← Обновление deleted_records
 import ru.wassertech.client.data.migrations.MIGRATION_10_11  // ← Добавление origin и created_by_user_id
 import ru.wassertech.client.data.migrations.MIGRATION_11_12  // ← Добавление поддержки иконок
+import ru.wassertech.client.data.migrations.MIGRATION_12_13  // ← Добавление поля folder в icon_packs
+import ru.wassertech.client.data.migrations.MIGRATION_13_14  // ← Добавление таблицы reports
 
 @Database(
-    version = 12, // ← Обновлено: добавление поддержки иконок (icon_packs, icons, icon_id)
+    version = 14, // ← Обновлено: добавление таблицы reports
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -41,7 +43,8 @@ import ru.wassertech.client.data.migrations.MIGRATION_11_12  // ← Добавл
         DeletedRecordEntity::class,
         SettingsEntity::class,
         IconPackEntity::class, // ← Новая сущность для паков иконок
-        IconEntity::class // ← Новая сущность для иконок
+        IconEntity::class, // ← Новая сущность для иконок
+        ReportEntity::class // ← Новая сущность для отчётов
     ]
 )
 @TypeConverters(Converters::class)
@@ -58,6 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun componentTemplatesDao(): ComponentTemplatesDao
     abstract fun iconPackDao(): ru.wassertech.client.data.dao.IconPackDao
     abstract fun iconDao(): ru.wassertech.client.data.dao.IconDao
+    abstract fun reportsDao(): ru.wassertech.client.data.dao.ReportsDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -81,7 +85,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_8_9,   // ← Добавление полей синхронизации
                         MIGRATION_9_10,  // ← Обновление deleted_records
                         MIGRATION_10_11,  // ← Добавление origin и created_by_user_id
-                        MIGRATION_11_12  // ← Добавление поддержки иконок
+                        MIGRATION_11_12,  // ← Добавление поддержки иконок
+                        MIGRATION_12_13,  // ← Добавление поля folder в icon_packs
+                        MIGRATION_13_14  // ← Добавление таблицы reports
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

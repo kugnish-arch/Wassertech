@@ -17,6 +17,7 @@ object AppRoutes {
     const val TEMPLATE_EDITOR = "template_editor/{templateId}"
     const val CLIENT_ICON_PACKS = "client_icon_packs"
     const val CLIENT_ICON_PACK_DETAIL = "client_icon_packs/{packId}"
+    const val REPORTS = "reports"
     
     fun sites(clientId: String) = "sites/$clientId"
     fun siteDetail(siteId: String) = "site/$siteId"

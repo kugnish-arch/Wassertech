@@ -25,6 +25,7 @@ data class IconPackEntity(
     val code: String, // Уникальный код пака (например, "ui", "water_treatment", "boiler")
     val name: String, // Название пака (например, "UI Icons", "Water Treatment")
     val description: String? = null, // Описание пака
+    val folder: String? = null, // Подпапка для иконок (например, "water", "car", "home")
     @ColumnInfo(name = "isBuiltin") val isBuiltin: Boolean = false, // Встроенный пак (нельзя удалить)
     @ColumnInfo(name = "isPremium") val isPremium: Boolean = false, // Премиум пак (требует подписки)
     // Поля для ролей и владения данными

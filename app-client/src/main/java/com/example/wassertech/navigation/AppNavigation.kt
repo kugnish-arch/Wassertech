@@ -18,6 +18,7 @@ import ru.wassertech.client.ui.common.AppScaffold
 import ru.wassertech.client.ui.maintenance.MaintenanceHistoryScreen
 import ru.wassertech.client.ui.icons.ClientIconPacksScreen
 import ru.wassertech.client.ui.icons.ClientIconPackDetailScreen
+import ru.wassertech.client.ui.reports.ReportsScreen
 
 /**
  * Навигационный граф приложения
@@ -217,6 +218,16 @@ fun AppNavigation(
                 ClientIconPackDetailScreen(
                     packId = packId,
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+        }
+        
+        // Экран списка отчётов
+        composable(AppRoutes.REPORTS) {
+            AppScaffold(navController = navController) { paddingValues ->
+                ReportsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    paddingValues = paddingValues
                 )
             }
         }

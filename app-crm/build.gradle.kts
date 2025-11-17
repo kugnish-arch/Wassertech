@@ -12,7 +12,7 @@ plugins {
 }
 
 // Базовая версия приложения (можно менять вручную)
-val baseVersionName = "1.1.1"
+val baseVersionName = "1.1.3"
 
 // Файл для хранения build number
 val versionPropertiesFile = file("version.properties")

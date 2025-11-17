@@ -24,9 +24,10 @@ import ru.wassertech.data.migrations.MIGRATION_11_12  // ← Добавлени�
 import ru.wassertech.data.migrations.MIGRATION_12_13  // ← Добавление origin и created_by_user_id
 import ru.wassertech.data.migrations.MIGRATION_13_14  // ← Добавление поддержки иконок
 import ru.wassertech.data.migrations.MIGRATION_14_15  // ← Добавление таблицы icon_pack_sync_status
+import ru.wassertech.data.migrations.MIGRATION_15_16  // ← Добавление поля folder в icon_packs
 
 @Database(
-    version = 15, // ← Обновлено: добавление таблицы icon_pack_sync_status
+    version = 16, // ← Обновлено: добавление поля folder в icon_packs
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -89,7 +90,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_11_12,  // ← Добавление isHeadComponent
                         MIGRATION_12_13,  // ← Добавление origin и created_by_user_id
                         MIGRATION_13_14,  // ← Добавление поддержки иконок
-                        MIGRATION_14_15  // ← Добавление таблицы icon_pack_sync_status
+                        MIGRATION_14_15,  // ← Добавление таблицы icon_pack_sync_status
+                        MIGRATION_15_16  // ← Добавление поля folder в icon_packs
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

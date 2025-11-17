@@ -30,18 +30,33 @@ class IconPacksViewModel(application: Application) : AndroidViewModel(applicatio
      * UI состояние для списка паков.
      */
     data class IconPacksUiState(
-        val packs: List<IconPackWithIconCount> = emptyList(),
+        val packs: List<IconPackWithStatus> = emptyList(),
         val isLoading: Boolean = false,
         val error: String? = null,
-        val downloadProgress: Map<String, Pair<Int, Int>> = emptyMap() // packId -> (downloaded, total)
+        val selectedPackIds: Set<String> = emptySet(),
+        val isDownloading: Boolean = false,
+        val downloadProgress: DownloadProgress? = null // Прогресс загрузки выбранных паков
     )
     
     /**
-     * Пак с подсчитанным количеством иконок.
+     * Пак с подсчитанным количеством иконок и статусами.
      */
-    data class IconPackWithIconCount(
+    data class IconPackWithStatus(
         val pack: IconPackEntity,
-        val iconsCount: Int
+        val iconsCount: Int,
+        val isDownloaded: Boolean = false, // Пак полностью загружен
+        val hasUpdate: Boolean = false, // На сервере есть обновление
+        val lastDownloadedEpoch: Long = 0 // Время последней загрузки
+    )
+    
+    /**
+     * Прогресс загрузки нескольких паков.
+     */
+    data class DownloadProgress(
+        val currentPack: Int,
+        val totalPacks: Int,
+        val currentIcon: Int,
+        val totalIcons: Int
     )
     
     /**
@@ -65,7 +80,7 @@ class IconPacksViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     /**
-     * Загружает все паки с подсчётом количества иконок.
+     * Загружает все паки с подсчётом количества иконок и статусами.
      */
     fun loadPacks() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -73,23 +88,42 @@ class IconPacksViewModel(application: Application) : AndroidViewModel(applicatio
                 _packsState.value = _packsState.value.copy(isLoading = true, error = null)
                 
                 val packs = iconPackDao.getAll()
+                val selectedPackIds = _packsState.value.selectedPackIds
+                
                 // Используем getAllByPackId для подсчета всех иконок (включая неактивные)
                 // так как в экране просмотра паков нужно показывать все иконки
-                val packsWithCounts = packs.map { pack ->
+                val packsWithStatus = packs.map { pack ->
                     val count = iconDao.getAllByPackId(pack.id).size
-                    IconPackWithIconCount(pack, count)
+                    val status = syncStatusDao.getByPackId(pack.id)
+                    
+                    val isDownloaded = status?.isDownloaded == true && 
+                                      status.downloadedIcons == status.totalIcons &&
+                                      status.totalIcons > 0
+                    
+                    val lastDownloadedEpoch = status?.lastSyncEpoch ?: 0L
+                    val hasUpdate = pack.updatedAtEpoch > lastDownloadedEpoch && lastDownloadedEpoch > 0
+                    
+                    IconPackWithStatus(
+                        pack = pack,
+                        iconsCount = count,
+                        isDownloaded = isDownloaded,
+                        hasUpdate = hasUpdate,
+                        lastDownloadedEpoch = lastDownloadedEpoch
+                    )
                 }
                 
                 _packsState.value = IconPacksUiState(
-                    packs = packsWithCounts,
+                    packs = packsWithStatus,
                     isLoading = false,
-                    error = null
+                    error = null,
+                    selectedPackIds = selectedPackIds
                 )
             } catch (e: Exception) {
                 _packsState.value = IconPacksUiState(
                     packs = emptyList(),
                     isLoading = false,
-                    error = "Ошибка при загрузке паков: ${e.message}"
+                    error = "Ошибка при загрузке паков: ${e.message}",
+                    selectedPackIds = _packsState.value.selectedPackIds
                 )
             }
         }
@@ -137,32 +171,82 @@ class IconPacksViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     /**
-     * Загружает изображения для конкретного пака.
+     * Переключает выбор пака.
      */
-    fun downloadPackImages(packId: String) {
+    fun togglePackSelection(packId: String) {
+        val currentSelected = _packsState.value.selectedPackIds.toMutableSet()
+        if (currentSelected.contains(packId)) {
+            currentSelected.remove(packId)
+        } else {
+            currentSelected.add(packId)
+        }
+        _packsState.value = _packsState.value.copy(selectedPackIds = currentSelected)
+    }
+    
+    /**
+     * Очищает выбор паков.
+     */
+    fun clearSelection() {
+        _packsState.value = _packsState.value.copy(selectedPackIds = emptySet())
+    }
+    
+    /**
+     * Загружает изображения для выбранных паков.
+     */
+    fun downloadSelectedPacks() {
+        val selectedPackIds = _packsState.value.selectedPackIds.toList()
+        if (selectedPackIds.isEmpty()) {
+            return
+        }
+        
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val currentProgress = _packsState.value.downloadProgress.toMutableMap()
-                currentProgress[packId] = Pair(0, 0)
-                _packsState.value = _packsState.value.copy(downloadProgress = currentProgress)
+                _packsState.value = _packsState.value.copy(
+                    isDownloading = true,
+                    downloadProgress = DownloadProgress(0, selectedPackIds.size, 0, 0)
+                )
                 
-                val result = iconRepository.downloadPackImages(packId) { downloaded, total ->
-                    val updatedProgress = _packsState.value.downloadProgress.toMutableMap()
-                    updatedProgress[packId] = Pair(downloaded, total)
-                    _packsState.value = _packsState.value.copy(downloadProgress = updatedProgress)
+                val result = iconRepository.downloadIconPacks(selectedPackIds) { currentPack, totalPacks, currentIcon, totalIcons ->
+                    _packsState.value = _packsState.value.copy(
+                        downloadProgress = DownloadProgress(currentPack, totalPacks, currentIcon, totalIcons)
+                    )
                 }
                 
                 if (result.isSuccess) {
                     // Обновляем список паков после загрузки
                     loadPacks()
+                    // Очищаем выбор
+                    _packsState.value = _packsState.value.copy(
+                        selectedPackIds = emptySet(),
+                        isDownloading = false,
+                        downloadProgress = null
+                    )
                 } else {
                     val errorMsg = result.exceptionOrNull()?.message ?: "Ошибка загрузки"
-                    _packsState.value = _packsState.value.copy(error = errorMsg)
+                    _packsState.value = _packsState.value.copy(
+                        error = errorMsg,
+                        isDownloading = false,
+                        downloadProgress = null
+                    )
                 }
             } catch (e: Exception) {
-                _packsState.value = _packsState.value.copy(error = "Ошибка: ${e.message}")
+                _packsState.value = _packsState.value.copy(
+                    error = "Ошибка: ${e.message}",
+                    isDownloading = false,
+                    downloadProgress = null
+                )
             }
         }
+    }
+    
+    /**
+     * Загружает изображения для конкретного пака (для обратной совместимости).
+     */
+    fun downloadPackImages(packId: String) {
+        val currentSelected = _packsState.value.selectedPackIds.toMutableSet()
+        currentSelected.add(packId)
+        _packsState.value = _packsState.value.copy(selectedPackIds = currentSelected)
+        downloadSelectedPacks()
     }
     
     /**

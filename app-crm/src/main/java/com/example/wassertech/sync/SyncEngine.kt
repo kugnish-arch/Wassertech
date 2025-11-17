@@ -1313,6 +1313,7 @@ class SyncEngine(private val context: Context) {
         code = code,
         name = name,
         description = description,
+        folder = folder,
         isBuiltin = isBuiltin,
         isPremium = isPremium,
         origin = origin ?: "CRM", // По умолчанию CRM для старых данных
