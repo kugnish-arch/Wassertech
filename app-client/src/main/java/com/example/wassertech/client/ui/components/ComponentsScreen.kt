@@ -105,6 +105,25 @@ fun ComponentsScreen(
         else -> null
     }
     
+    // Логирование для отладки подзаголовка
+    LaunchedEffect(site, client, siteSubtitle) {
+        android.util.Log.d("ComponentsScreen", "Site: ${site?.name}, Client: $clientName, Subtitle: $siteSubtitle")
+    }
+    
+    // Логирование ID клиента и ID создателя установки для отладки FAB
+    LaunchedEffect(installation, currentUser) {
+        val currentInstallation = installation
+        val currentUserId = currentUser?.userId
+        val currentClientId = currentUser?.clientId
+        if (currentInstallation != null) {
+            android.util.Log.d("ComponentsScreen", "Installation ID: ${currentInstallation.id}")
+            android.util.Log.d("ComponentsScreen", "Installation createdByUserId: ${currentInstallation.createdByUserId}")
+            android.util.Log.d("ComponentsScreen", "Current user ID: $currentUserId")
+            android.util.Log.d("ComponentsScreen", "Current user clientId: $currentClientId")
+            android.util.Log.d("ComponentsScreen", "FAB should show: ${currentUserId != null && currentInstallation.createdByUserId == currentUserId}")
+        }
+    }
+    
     // Получаем шаблоны компонентов для отображения названий
     val templates by db.componentTemplatesDao().observeAll().collectAsState(initial = emptyList())
     val templateTitleById = remember(templates) {

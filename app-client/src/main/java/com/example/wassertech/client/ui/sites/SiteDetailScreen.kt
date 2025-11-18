@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -90,6 +91,58 @@ fun SiteDetailScreen(
     }.collectAsState(initial = emptyList())
     val isCorporate = client.firstOrNull()?.isCorporate ?: false
     val isSiteArchived = site?.isArchived == true
+    val clientName = client.firstOrNull()?.name
+    
+    // Логирование загрузки клиента
+    LaunchedEffect(clientId, client) {
+        android.util.Log.d("SiteDetailScreen", "=== Client Loading ===")
+        android.util.Log.d("SiteDetailScreen", "clientId: $clientId")
+        android.util.Log.d("SiteDetailScreen", "client list size: ${client.size}")
+        android.util.Log.d("SiteDetailScreen", "clientName: $clientName")
+        if (clientId != null && client.isEmpty()) {
+            // Проверяем, может быть клиент архивирован или есть проблема с запросом
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val clientDirect = db.clientDao().getClient(clientId)
+                    android.util.Log.d("SiteDetailScreen", "Direct getClient result: ${clientDirect != null}")
+                    if (clientDirect != null) {
+                        android.util.Log.d("SiteDetailScreen", "Direct client name: ${clientDirect.name}")
+                        android.util.Log.d("SiteDetailScreen", "Direct client isArchived: ${clientDirect.isArchived}")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("SiteDetailScreen", "Error getting client directly", e)
+                }
+            }
+        }
+    }
+    
+    // Формируем подзаголовок
+    val siteSubtitle: String? = clientName?.let { "Клиент: $it" }
+    
+    // Логирование ID клиента и ID создателя объекта для отладки
+    LaunchedEffect(site, currentUser, clientName, siteSubtitle) {
+        val currentSite = site
+        val currentUserId = currentUser?.userId
+        val currentClientId = currentUser?.clientId
+        android.util.Log.d("SiteDetailScreen", "=== LaunchedEffect ===")
+        android.util.Log.d("SiteDetailScreen", "clientName: $clientName")
+        android.util.Log.d("SiteDetailScreen", "siteSubtitle: $siteSubtitle")
+        if (currentSite != null) {
+            android.util.Log.d("SiteDetailScreen", "Site ID: ${currentSite.id}")
+            android.util.Log.d("SiteDetailScreen", "Site createdByUserId: ${currentSite.createdByUserId}")
+            android.util.Log.d("SiteDetailScreen", "Current user ID: $currentUserId")
+            android.util.Log.d("SiteDetailScreen", "Current user clientId: $currentClientId")
+            android.util.Log.d("SiteDetailScreen", "Site clientId: ${currentSite.clientId}")
+            android.util.Log.d("SiteDetailScreen", "Site effectiveOwnerClientId: ${currentSite.effectiveOwnerClientId()}")
+            val shouldShowFab = currentUserId != null && currentSite.createdByUserId == currentUserId
+            android.util.Log.d("SiteDetailScreen", "FAB should show: $shouldShowFab")
+            android.util.Log.d("SiteDetailScreen", "currentUser != null: ${currentUser != null}")
+            android.util.Log.d("SiteDetailScreen", "currentSite != null: ${currentSite != null}")
+            android.util.Log.d("SiteDetailScreen", "createdByUserId == userId: ${currentSite.createdByUserId == currentUserId}")
+        } else {
+            android.util.Log.d("SiteDetailScreen", "Site is null!")
+        }
+    }
     
     var showAddDialog by remember { mutableStateOf(false) }
     var newInstallationName by remember { mutableStateOf("") }
@@ -108,6 +161,21 @@ fun SiteDetailScreen(
     var isIconPickerVisibleForInstallation by remember { mutableStateOf(false) }
     var iconPickerStateForInstallation by remember { mutableStateOf<IconPickerUiState?>(null) }
     var iconPickerInstallationId by remember { mutableStateOf<String?>(null) }
+    
+    // Логирование для FAB (вынесено наружу)
+    LaunchedEffect(site, currentUser) {
+        val currentSite = site
+        val shouldShowFab = currentUser != null && currentSite != null && currentSite.createdByUserId == currentUser.userId
+        android.util.Log.d("SiteDetailScreen", "=== FAB LaunchedEffect ===")
+        android.util.Log.d("SiteDetailScreen", "shouldShowFab: $shouldShowFab")
+        android.util.Log.d("SiteDetailScreen", "currentSite != null: ${currentSite != null}")
+        android.util.Log.d("SiteDetailScreen", "currentUser != null: ${currentUser != null}")
+        if (currentSite != null && currentUser != null) {
+            android.util.Log.d("SiteDetailScreen", "createdByUserId: ${currentSite.createdByUserId}")
+            android.util.Log.d("SiteDetailScreen", "userId: ${currentUser.userId}")
+            android.util.Log.d("SiteDetailScreen", "match: ${currentSite.createdByUserId == currentUser.userId}")
+        }
+    }
     
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -134,7 +202,7 @@ fun SiteDetailScreen(
                 .padding(
                     start = padding.calculateStartPadding(layoutDir),
                     end = padding.calculateEndPadding(layoutDir),
-                    top = 0.dp,
+                    top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding()
                 )
         ) {
@@ -175,16 +243,24 @@ fun SiteDetailScreen(
                             localImagePath = siteLocalImagePath // Передаем локальный путь к файлу изображения
                         )
                         Spacer(Modifier.width(8.dp))
-                        // Используем ScreenTitleWithSubtitle для текстовой части заголовка
-                        ScreenTitleWithSubtitle(
-                            title = siteName,
-                            subtitle = null,
-                            titleStyle = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                            subtitleStyle = MaterialTheme.typography.bodySmall,
-                            titleColor = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor,
-                            subtitleColor = Color.White, // Белый цвет для подзаголовка на графитовом фоне
-                            modifier = Modifier.weight(1f)
-                        )
+                        // Заголовок и подзаголовок объекта
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = siteName,
+                                style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                                color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                            )
+                            if (siteSubtitle != null && siteSubtitle.isNotBlank()) {
+                                Text(
+                                    text = siteSubtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White
+                                )
+                            }
+                        }
                         // Кнопки действий для объекта
                         val siteForEdit = site
                         if (currentUser != null && siteForEdit != null) {
