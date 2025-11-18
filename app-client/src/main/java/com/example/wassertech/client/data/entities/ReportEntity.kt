@@ -33,3 +33,4 @@ data class ReportEntity(
     val isDownloaded: Boolean = false // Файл скачан или нет
 )
 
+

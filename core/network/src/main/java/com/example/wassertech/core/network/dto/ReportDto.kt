@@ -19,3 +19,4 @@ data class ReportDto(
     @SerializedName("isArchived") val isArchived: Int = 0 // 0 = активен, 1 = архивирован
 )
 
+

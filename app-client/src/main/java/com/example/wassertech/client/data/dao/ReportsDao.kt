@@ -86,3 +86,4 @@ interface ReportsDao {
     suspend fun updateReportDownloadStatus(reportId: String, localFilePath: String)
 }
 
+
