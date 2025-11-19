@@ -23,9 +23,10 @@ import ru.wassertech.client.data.migrations.MIGRATION_10_11  // ← Добавл
 import ru.wassertech.client.data.migrations.MIGRATION_11_12  // ← Добавление поддержки иконок
 import ru.wassertech.client.data.migrations.MIGRATION_12_13  // ← Добавление поля folder в icon_packs
 import ru.wassertech.client.data.migrations.MIGRATION_13_14  // ← Добавление таблицы reports
+import ru.wassertech.client.data.migrations.MIGRATION_14_15  // ← Добавление таблицы user_membership
 
 @Database(
-    version = 14, // ← Обновлено: добавление таблицы reports
+    version = 15, // ← Обновлено: добавление таблицы user_membership
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -44,7 +45,8 @@ import ru.wassertech.client.data.migrations.MIGRATION_13_14  // ← Добавл
         SettingsEntity::class,
         IconPackEntity::class, // ← Новая сущность для паков иконок
         IconEntity::class, // ← Новая сущность для иконок
-        ReportEntity::class // ← Новая сущность для отчётов
+        ReportEntity::class, // ← Новая сущность для отчётов
+        UserMembershipEntity::class // ← Сущность для контроля доступа пользователей
     ]
 )
 @TypeConverters(Converters::class)
@@ -62,6 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun iconPackDao(): ru.wassertech.client.data.dao.IconPackDao
     abstract fun iconDao(): ru.wassertech.client.data.dao.IconDao
     abstract fun reportsDao(): ru.wassertech.client.data.dao.ReportsDao
+    abstract fun userMembershipDao(): ru.wassertech.client.data.dao.UserMembershipDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -87,10 +90,11 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11,  // ← Добавление origin и created_by_user_id
                         MIGRATION_11_12,  // ← Добавление поддержки иконок
                         MIGRATION_12_13,  // ← Добавление поля folder в icon_packs
-                        MIGRATION_13_14  // ← Добавление таблицы reports
+                        MIGRATION_13_14,  // ← Добавление таблицы reports
+                        MIGRATION_14_15  // ← Добавление таблицы user_membership
                     )
-                    // В проде обычно не используем destructive-опции, оставляю как у тебя:
-                    //.fallbackToDestructiveMigration()
+                    // Fallback для очистки базы при ошибке миграции (для клиентского приложения это безопасно)
+                    .fallbackToDestructiveMigration()
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = db

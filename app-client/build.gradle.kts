@@ -68,6 +68,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:network"))
     implementation(project(":core:auth"))
+    implementation(project(":core:screens"))
     
     // Feature modules
     implementation(project(":feature:auth"))

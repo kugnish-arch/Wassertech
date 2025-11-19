@@ -1,5 +1,7 @@
 package ru.wassertech.core.network.dto
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * Запрос на отправку локальных изменений на сервер
  */
@@ -12,5 +14,6 @@ data class SyncPushRequest(
     val maintenance_values: List<SyncMaintenanceValueDto> = emptyList(),
     val component_templates: List<SyncComponentTemplateDto> = emptyList(),
     val component_template_fields: List<SyncChecklistFieldDto> = emptyList(), // Используем SyncChecklistFieldDto для совместимости структуры
+    @SerializedName("user_membership") val userMembership: List<ru.wassertech.core.network.dto.sync.SyncUserMembershipDto> = emptyList(),
     val deleted: List<DeletedRecordDto> = emptyList()
 )

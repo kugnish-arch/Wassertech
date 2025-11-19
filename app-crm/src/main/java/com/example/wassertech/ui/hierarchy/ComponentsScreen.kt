@@ -58,6 +58,12 @@ import ru.wassertech.core.ui.icons.IconEntityType
 import ru.wassertech.core.ui.components.IconPickerDialog
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import ru.wassertech.core.screens.hierarchy.InstallationComponentsScreenShared
+import ru.wassertech.core.screens.hierarchy.ui.InstallationComponentsUiState
+import ru.wassertech.ui.hierarchy.HierarchyUiStateMapper
+import ru.wassertech.data.repository.IconRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 @Composable
@@ -211,23 +217,58 @@ fun ComponentsScreen(
     // Состояние для IconPickerDialog (для установки)
     var isIconPickerVisibleForInstallation by remember { mutableStateOf(false) }
     var iconPickerStateForInstallation by remember { mutableStateOf<ru.wassertech.core.ui.icons.IconPickerUiState?>(null) }
+    
+    // Иконки для компонентов
+    val iconRepository = remember { IconRepository(context) }
+    var componentIcons by remember {
+        mutableStateOf<Map<String, ru.wassertech.data.entities.IconEntity?>>(emptyMap())
+    }
+    LaunchedEffect(components) {
+        scope.launch(Dispatchers.IO) {
+            val iconsMap = mutableMapOf<String, ru.wassertech.data.entities.IconEntity?>()
+            components.forEach { component ->
+                if (component.iconId != null) {
+                    val icon = vm.getIcon(component.iconId)
+                    iconsMap[component.id] = icon
+                } else {
+                    iconsMap[component.id] = null
+                }
+            }
+            componentIcons = iconsMap
+        }
+    }
+    
+    // Преобразуем в UI State для shared-экрана
+    var uiState by remember {
+        mutableStateOf<InstallationComponentsUiState?>(null)
+    }
+    LaunchedEffect(components, componentIcons, templateTitleById) {
+        scope.launch(Dispatchers.IO) {
+            val items = components.map { component ->
+                val icon = componentIcons[component.id]
+                val templateName = component.templateId?.let { templateTitleById[it] }
+                withContext(Dispatchers.IO) {
+                    HierarchyUiStateMapper.run {
+                        component.toComponentItemUi(iconRepository, icon, templateName)
+                    }
+                }
+            }
+            uiState = InstallationComponentsUiState(
+                installationId = installationId,
+                installationName = installation?.name ?: "Установка",
+                siteName = site?.name,
+                clientName = clientName,
+                components = items,
+                canAddComponent = true, // В CRM всегда можно добавлять
+                canEditInstallation = true,
+                isLoading = false
+            )
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
-        floatingActionButton = {
-            AppFloatingActionButton(
-                template = FABTemplate(
-                    icon = Icons.Filled.Add,
-                    containerColor = Color(0xFFD32F2F), // Красный цвет
-                    contentColor = Color.White,
-                    onClick = {
-                        showAdd = true
-                        newName = TextFieldValue("")
-                        selectedTemplate = allTemplates.firstOrNull()
-                    }
-                )
-            )
-        }
+        // FAB теперь в shared-экране
         // Ботомбар убран - используется переключатель в топбаре
     ) { padding ->
         val layoutDirection = LocalLayoutDirection.current
@@ -379,70 +420,35 @@ fun ComponentsScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // ===== Список компонентов (отрисовываем в порядке localOrder) =====
-            val componentsById = remember(components) { components.associateBy { it.id } }
-            val orderedComponents = remember(localOrder, componentsById) {
-                localOrder.mapNotNull { componentsById[it] }
-            }
-
-            if (orderedComponents.isEmpty()) {
-                AppEmptyState(
-                    icon = Icons.Filled.Lightbulb,
-                    title = "Нет компонентов",
-                    description = "Нажмите кнопку «+», чтобы добавить компонент к этой установке."
-                )
-            } else {
-                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
-                ReorderableLazyColumn(
-                    items = orderedComponents,
-                    onMove = { fromIndex, toIndex ->
-                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
-                        val mutable = localOrder.toMutableList()
-                        val item = mutable.removeAt(fromIndex)
-                        mutable.add(toIndex, item)
-                        localOrder = mutable
-                        // Изменения сохраняются в БД только в режиме редактирования
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f), // Используем weight вместо heightIn для правильного заполнения пространства
-                    key = { it.id },
-                    contentPadding = PaddingValues(0.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) { comp, isDragging, reorderableState ->
-                    val tmplTitle = comp.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
-                    val componentIcon by vm.icon(comp.iconId).collectAsState(initial = null)
-                    
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        ComponentRowWithEdit(
-                            component = comp,
-                            templateTitle = tmplTitle,
-                            isEditMode = isEditing,
-                            icon = componentIcon,
-                            onDelete = { pendingDeleteId = comp.id },
-                            onChangeIcon = {
-                                scope.launch {
-                                    iconPickerComponentId = comp.id
-                                    iconPickerState = vm.loadIconPacksAndIconsFor(IconEntityType.COMPONENT)
-                                    isIconPickerVisible = true
-                                }
-                            },
-                            isDragging = isDragging,
-                            reorderableState = reorderableState,
-                            onToggleEdit = onToggleEdit,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.White)
-                        )
-                        // Разделительная линия между компонентами (кроме последнего)
-                        val index = orderedComponents.indexOf(comp)
-                        if (index >= 0 && index < orderedComponents.size - 1) {
-                            HorizontalDivider(
-                                color = ClientsRowDivider,
-                                thickness = 1.dp
-                            )
-                        }
-                    }
+            // ===== Список компонентов через shared-экран =====
+            uiState?.let { state ->
+                Box(modifier = Modifier.weight(1f)) {
+                    InstallationComponentsScreenShared(
+                        state = state,
+                        onComponentClick = null, // Компоненты не кликабельны в CRM
+                        onAddComponentClick = {
+                            showAdd = true
+                            newName = TextFieldValue("")
+                            selectedTemplate = allTemplates.firstOrNull()
+                        },
+                        onComponentArchive = { _ -> }, // Архивирование не используется для компонентов в CRM
+                        onComponentRestore = { _ -> }, // Восстановление не используется для компонентов в CRM
+                        onComponentDelete = { componentId ->
+                            pendingDeleteId = componentId
+                        },
+                        onChangeComponentIcon = { componentId ->
+                            scope.launch {
+                                iconPickerComponentId = componentId
+                                iconPickerState = vm.loadIconPacksAndIconsFor(IconEntityType.COMPONENT)
+                                isIconPickerVisible = true
+                            }
+                        },
+                        onComponentsReordered = { newOrder ->
+                            vm.reorderComponents(installationId, newOrder)
+                        },
+                        isEditing = isEditing,
+                        onToggleEdit = onToggleEdit
+                    )
                 }
             }
         }

@@ -51,6 +51,14 @@ import ru.wassertech.client.data.repository.IconRepository
 import androidx.compose.material.icons.filled.Image
 import kotlinx.coroutines.flow.map
 import java.util.UUID
+import ru.wassertech.core.screens.hierarchy.SiteInstallationsScreenShared
+import ru.wassertech.core.screens.hierarchy.ui.SiteInstallationsUiState
+import ru.wassertech.core.screens.hierarchy.ui.InstallationItemUi
+import ru.wassertech.client.ui.hierarchy.ClientHierarchyUiStateMapper
+import ru.wassertech.client.data.entities.toUserMembershipInfoList
+import ru.wassertech.core.auth.HierarchyPermissionChecker
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 /**
  * Экран деталей объекта для app-client.
@@ -72,6 +80,18 @@ fun SiteDetailScreen(
     
     // Получаем текущую сессию пользователя
     val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
+    
+    // Получаем user_membership для текущего пользователя
+    val membershipsRaw by remember(currentUser?.userId) {
+        if (currentUser?.userId != null) {
+            db.userMembershipDao().observeForUser(currentUser.userId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(emptyList<ru.wassertech.client.data.entities.UserMembershipEntity>())
+        }
+    }.collectAsState(initial = emptyList())
+    val memberships = remember(membershipsRaw) {
+        membershipsRaw.toUserMembershipInfoList()
+    }
     
     // Получаем данные объекта
     val site by db.hierarchyDao().observeSite(siteId).collectAsState(initial = null)
@@ -162,6 +182,56 @@ fun SiteDetailScreen(
     var iconPickerStateForInstallation by remember { mutableStateOf<IconPickerUiState?>(null) }
     var iconPickerInstallationId by remember { mutableStateOf<String?>(null) }
     
+    // Загружаем иконки для всех установок
+    var installationIcons by remember {
+        mutableStateOf<Map<String, ru.wassertech.client.data.entities.IconEntity?>>(emptyMap())
+    }
+    LaunchedEffect(installations) {
+        scope.launch(Dispatchers.IO) {
+            val iconsMap = mutableMapOf<String, ru.wassertech.client.data.entities.IconEntity?>()
+            installations.forEach { installation ->
+                if (installation.iconId != null) {
+                    val icon = db.iconDao().getById(installation.iconId)
+                    iconsMap[installation.id] = icon
+                } else {
+                    iconsMap[installation.id] = null
+                }
+            }
+            installationIcons = iconsMap
+        }
+    }
+    
+    // Преобразуем в UI State с учётом прав доступа
+    var uiState by remember {
+        mutableStateOf<SiteInstallationsUiState?>(null)
+    }
+    LaunchedEffect(installations, installationIcons, currentUser, memberships, site) {
+        if (currentUser != null && site != null) {
+            scope.launch(Dispatchers.IO) {
+                val currentUserNonNull = currentUser!!
+                val currentSite = site!!
+                val installationItems = installations.mapNotNull { installation ->
+                    val icon = installationIcons[installation.id]
+                    withContext(Dispatchers.IO) {
+                        ClientHierarchyUiStateMapper.run {
+                            installation.toInstallationItemUi(iconRepository, currentUserNonNull, memberships, currentSite, icon)
+                        }
+                    }
+                }
+                val canAddInstallation = currentSite.createdByUserId == currentUserNonNull.userId
+                uiState = SiteInstallationsUiState(
+                    siteId = siteId,
+                    siteName = siteName,
+                    clientName = clientName,
+                    installations = installationItems,
+                    canAddInstallation = canAddInstallation,
+                    canEditSite = canEditSite(currentUserNonNull, currentSite),
+                    isLoading = false
+                )
+            }
+        }
+    }
+    
     // Логирование для FAB (вынесено наружу)
     LaunchedEffect(site, currentUser) {
         val currentSite = site
@@ -177,262 +247,215 @@ fun SiteDetailScreen(
         }
     }
     
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            // Показываем FAB только если пользователь является создателем объекта
-            val currentSite = site
-            if (currentUser != null && currentSite != null && currentSite.createdByUserId == currentUser.userId) {
-                FloatingActionButton(
-                    onClick = {
-                        showAddDialog = true
-                        newInstallationName = ""
-                    },
-                    containerColor = Color(0xFFD32F2F),
-                    contentColor = Color.White
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        // Заголовок объекта (отдельно, так как содержит кнопки редактирования)
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+            ),
+            shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Загружаем иконку объекта
+                val siteIcon by db.iconDao().observeAllActive().map { icons ->
+                    site?.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
+                }.collectAsState(initial = null)
+                
+                // Загружаем локальный путь к изображению иконки объекта
+                val siteLocalImagePath by remember(site?.iconId) {
+                    kotlinx.coroutines.flow.flow {
+                        val path = site?.iconId?.let { iconRepository.getLocalIconPath(it) }
+                        emit(path)
+                    }
+                }.collectAsState(initial = null)
+                
+                IconResolver.IconImage(
+                    androidResName = siteIcon?.androidResName,
+                    entityType = IconEntityType.SITE,
+                    contentDescription = "Объект",
+                    size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2,
+                    code = siteIcon?.code,
+                    localImagePath = siteLocalImagePath
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Добавить установку")
+                    Text(
+                        text = siteName,
+                        style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                    )
+                    if (siteSubtitle != null && siteSubtitle.isNotBlank()) {
+                        Text(
+                            text = siteSubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White
+                        )
+                    }
+                }
+                // Кнопки действий для объекта
+                val siteForEdit = site
+                if (currentUser != null && siteForEdit != null) {
+                    if (canChangeIconForSite(currentUser, siteForEdit)) {
+                        IconButton(onClick = {
+                            scope.launch(Dispatchers.IO) {
+                                val packs = db.iconPackDao().getAll()
+                                val allIcons = db.iconDao().getAllActive()
+                                val filteredIcons = allIcons.filter { icon ->
+                                    icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
+                                }
+                                val iconsByPack = filteredIcons.groupBy { it.packId }
+                                val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
+                                    icons.map { icon ->
+                                        var localPath = iconRepository.getLocalIconPath(icon.id)
+                                        if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
+                                            val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
+                                            if (downloadResult.isSuccess) {
+                                                localPath = iconRepository.getLocalIconPath(icon.id)
+                                            }
+                                        }
+                                        ru.wassertech.core.ui.components.IconUiData(
+                                            id = icon.id,
+                                            packId = icon.packId,
+                                            label = icon.label,
+                                            entityType = icon.entityType,
+                                            androidResName = icon.androidResName,
+                                            code = icon.code,
+                                            localImagePath = localPath
+                                        )
+                                    }
+                                }
+                                iconPickerStateForSite = IconPickerUiState(
+                                    packs = packs.map { 
+                                        ru.wassertech.core.ui.components.IconPackUiData(
+                                            id = it.id,
+                                            name = it.name
+                                        )
+                                    },
+                                    iconsByPack = iconsByPackWithPaths
+                                )
+                                isIconPickerVisibleForSite = true
+                            }
+                        }) {
+                            Icon(
+                                Icons.Filled.Image,
+                                contentDescription = "Изменить иконку",
+                                tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                            )
+                        }
+                    }
+                    if (canEditSite(currentUser, siteForEdit)) {
+                        IconButton(onClick = {
+                            editSiteId = siteForEdit.id
+                            editSiteName = siteForEdit.name
+                            editSiteAddress = siteForEdit.address ?: ""
+                        }) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "Редактировать объект",
+                                tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                            )
+                        }
+                    }
                 }
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    start = padding.calculateStartPadding(layoutDir),
-                    end = padding.calculateEndPadding(layoutDir),
-                    top = padding.calculateTopPadding(),
-                    bottom = padding.calculateBottomPadding()
-                )
-        ) {
-            // Заголовок объекта
-            Column(modifier = Modifier.fillMaxWidth()) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
-                    ),
-                    shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Загружаем иконку объекта
-                        val siteIcon by db.iconDao().observeAllActive().map { icons ->
-                            site?.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
-                        }.collectAsState(initial = null)
-                        
-                        // Загружаем локальный путь к изображению иконки объекта
-                        val siteLocalImagePath by remember(site?.iconId) {
-                            kotlinx.coroutines.flow.flow {
-                                val path = site?.iconId?.let { iconRepository.getLocalIconPath(it) }
-                                emit(path)
-                            }
-                        }.collectAsState(initial = null)
-                        
-                        IconResolver.IconImage(
-                            androidResName = siteIcon?.androidResName,
-                            entityType = IconEntityType.SITE,
-                            contentDescription = "Объект",
-                            size = ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2,
-                            code = siteIcon?.code, // Передаем code для fallback
-                            localImagePath = siteLocalImagePath // Передаем локальный путь к файлу изображения
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        // Заголовок и подзаголовок объекта
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = siteName,
-                                style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                                color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
-                            )
-                            if (siteSubtitle != null && siteSubtitle.isNotBlank()) {
-                                Text(
-                                    text = siteSubtitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                        // Кнопки действий для объекта
-                        val siteForEdit = site
-                        if (currentUser != null && siteForEdit != null) {
-                            // Кнопка изменения иконки (только если можно менять иконку)
-                            if (canChangeIconForSite(currentUser, siteForEdit)) {
-                                IconButton(onClick = {
-                                    scope.launch(Dispatchers.IO) {
-                                        val packs = db.iconPackDao().getAll()
-                                        val allIcons = db.iconDao().getAllActive()
-                                        val filteredIcons = allIcons.filter { icon ->
-                                            icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
-                                        }
-                                        val iconsByPack = filteredIcons.groupBy { it.packId }
-                                        
-                                        // Загружаем localImagePath для каждой иконки (suspend функция)
-                                        // Если файл не существует и есть imageUrl, загружаем изображение
-                                        val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
-                                            icons.map { icon ->
-                                                var localPath = iconRepository.getLocalIconPath(icon.id)
-                                                
-                                                // Если файл не существует и есть imageUrl, загружаем изображение
-                                                if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
-                                                    val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
-                                                    if (downloadResult.isSuccess) {
-                                                        localPath = iconRepository.getLocalIconPath(icon.id)
-                                                    }
-                                                }
-                                                
-                                                ru.wassertech.core.ui.components.IconUiData(
-                                                    id = icon.id,
-                                                    packId = icon.packId,
-                                                    label = icon.label,
-                                                    entityType = icon.entityType,
-                                                    androidResName = icon.androidResName,
-                                                    code = icon.code, // Передаем code для fallback
-                                                    localImagePath = localPath // Загружаем локальный путь через IconRepository
-                                                )
-                                            }
-                                        }
-                                        
-                                        iconPickerStateForSite = IconPickerUiState(
-                                            packs = packs.map { 
-                                                ru.wassertech.core.ui.components.IconPackUiData(
-                                                    id = it.id,
-                                                    name = it.name
-                                                )
-                                            },
-                                            iconsByPack = iconsByPackWithPaths
+        HorizontalDivider(
+            color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
+            thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
+        )
+        
+        // Используем shared-экран для списка установок
+        uiState?.let { state ->
+            SiteInstallationsScreenShared(
+                state = state.copy(
+                    clientName = null // Убираем clientName из заголовка, так как он уже есть в отдельном заголовке
+                ),
+                onInstallationClick = onOpenInstallation,
+                onAddInstallationClick = {
+                    showAddDialog = true
+                    newInstallationName = ""
+                },
+                onInstallationArchive = { installationId ->
+                    scope.launch(Dispatchers.IO) {
+                        db.hierarchyDao().archiveInstallation(installationId)
+                    }
+                },
+                onInstallationRestore = { installationId ->
+                    scope.launch(Dispatchers.IO) {
+                        db.hierarchyDao().restoreInstallation(installationId)
+                    }
+                },
+                onInstallationDelete = { installationId ->
+                    deleteInstallationId = installationId
+                },
+                onChangeInstallationIcon = { installationId ->
+                    if (currentUser != null && site != null) {
+                        val installation = installations.find { it.id == installationId }
+                        if (installation != null && canChangeIconForInstallation(currentUser, installation, site)) {
+                            scope.launch(Dispatchers.IO) {
+                                val packs = db.iconPackDao().getAll()
+                                val allIcons = db.iconDao().getAllActive()
+                                val filteredIcons = allIcons.filter { icon ->
+                                    icon.entityType == "ANY" || icon.entityType == IconEntityType.INSTALLATION.name
+                                }
+                                val iconsByPack = filteredIcons.groupBy { it.packId }
+                                iconPickerStateForInstallation = IconPickerUiState(
+                                    packs = packs.map { 
+                                        ru.wassertech.core.ui.components.IconPackUiData(
+                                            id = it.id,
+                                            name = it.name
                                         )
-                                        isIconPickerVisibleForSite = true
-                                    }
-                                }) {
-                                    Icon(
-                                        Icons.Filled.Image,
-                                        contentDescription = "Изменить иконку",
-                                        tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
-                                    )
-                                }
-                            }
-                            // Кнопка редактирования объекта
-                            if (canEditSite(currentUser, siteForEdit)) {
-                                IconButton(onClick = {
-                                    editSiteId = siteForEdit.id
-                                    editSiteName = siteForEdit.name
-                                    editSiteAddress = siteForEdit.address ?: ""
-                                }) {
-                                    Icon(
-                                        Icons.Filled.Edit,
-                                        contentDescription = "Редактировать объект",
-                                        tint = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                HorizontalDivider(
-                    color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
-                    thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
-                )
-            }
-            
-            // Список установок
-            if (installations.isEmpty()) {
-                EmptyGroupPlaceholder(
-                    text = "У этого объекта пока нет установок",
-                    indent = 16.dp
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(0.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    items(installations, key = { it.id }) { installation ->
-                        // Загружаем иконку установки
-                        val installationIcon by db.iconDao().observeAllActive().map { icons ->
-                            installation.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
-                        }.collectAsState(initial = null)
-                        
-                        // Загружаем локальный путь к изображению иконки установки
-                        val installationLocalImagePath by remember(installation.iconId) {
-                            kotlinx.coroutines.flow.flow {
-                                val path = installation.iconId?.let { iconRepository.getLocalIconPath(it) }
-                                emit(path)
-                            }
-                        }.collectAsState(initial = null)
-                        
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            InstallationRow(
-                                installation = installation,
-                                icon = installationIcon,
-                                localImagePath = installationLocalImagePath,
-                                onClick = { onOpenInstallation(installation.id) },
-                                onEdit = if (currentUser != null && canEditInstallation(currentUser, installation, site)) {
-                                    { /* TODO: Реализовать редактирование установки */ }
-                                } else null,
-                                onChangeIcon = if (currentUser != null && canChangeIconForInstallation(currentUser, installation, site)) {
-                                    {
-                                        scope.launch(Dispatchers.IO) {
-                                            val packs = db.iconPackDao().getAll()
-                                            val allIcons = db.iconDao().getAllActive()
-                                            val filteredIcons = allIcons.filter { icon ->
-                                                icon.entityType == "ANY" || icon.entityType == IconEntityType.INSTALLATION.name
-                                            }
-                                            val iconsByPack = filteredIcons.groupBy { it.packId }
-                                            iconPickerStateForInstallation = IconPickerUiState(
-                                                packs = packs.map { 
-                                                    ru.wassertech.core.ui.components.IconPackUiData(
-                                                        id = it.id,
-                                                        name = it.name
-                                                    )
-                                                },
-                                                iconsByPack = iconsByPack.mapValues { (_, icons) ->
-                                                    icons.map { icon ->
-                                                        val localPath = iconRepository.getLocalIconPath(icon.id)
-                                                        ru.wassertech.core.ui.components.IconUiData(
-                                                            id = icon.id,
-                                                            packId = icon.packId,
-                                                            label = icon.label,
-                                                            entityType = icon.entityType,
-                                                            androidResName = icon.androidResName,
-                                                            code = icon.code,
-                                                            localImagePath = localPath
-                                                        )
-                                                    }
-                                                }
+                                    },
+                                    iconsByPack = iconsByPack.mapValues { (_, icons) ->
+                                        icons.map { icon ->
+                                            val localPath = iconRepository.getLocalIconPath(icon.id)
+                                            ru.wassertech.core.ui.components.IconUiData(
+                                                id = icon.id,
+                                                packId = icon.packId,
+                                                label = icon.label,
+                                                entityType = icon.entityType,
+                                                androidResName = icon.androidResName,
+                                                code = icon.code,
+                                                localImagePath = localPath
                                             )
-                                            iconPickerInstallationId = installation.id
-                                            isIconPickerVisibleForInstallation = true
                                         }
                                     }
-                                } else null,
-                                onDelete = if (currentUser != null && canDeleteInstallation(currentUser, installation, site)) {
-                                    { deleteInstallationId = installation.id }
-                                } else null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color.White)
-                            )
-                            // Разделительная линия между установками (кроме последней)
-                            val index = installations.indexOf(installation)
-                            if (index >= 0 && index < installations.size - 1) {
-                                HorizontalDivider(
-                                    color = ClientsRowDivider,
-                                    thickness = 1.dp
                                 )
+                                iconPickerInstallationId = installationId
+                                isIconPickerVisibleForInstallation = true
                             }
                         }
                     }
-                }
-            }
+                },
+                onInstallationsReordered = { newOrder ->
+                    scope.launch(Dispatchers.IO) {
+                        val currentInstallations = db.hierarchyDao().observeInstallations(siteId).first()
+                        val ordered = newOrder.mapIndexedNotNull { idx, id ->
+                            currentInstallations.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+                        }
+                        if (ordered.isNotEmpty()) {
+                            db.hierarchyDao().reorderInstallations(ordered)
+                        }
+                    }
+                },
+                onStartMaintenance = null,
+                onOpenMaintenanceHistory = null,
+                isEditing = false,
+                onToggleEdit = null
+            )
         }
     }
     
@@ -473,6 +496,15 @@ fun SiteDetailScreen(
                                     createdByUserId = session?.userId
                                 )
                                 db.hierarchyDao().upsertInstallation(newInstallation)
+                                
+                                // Автоматически создаём membership для созданной установки
+                                if (session?.userId != null) {
+                                    ru.wassertech.client.data.UserMembershipHelper.createInstallationMembership(
+                                        context = context,
+                                        installationId = newInstallation.id,
+                                        userId = session.userId
+                                    )
+                                }
                             }
                             showAddDialog = false
                             newInstallationName = ""
@@ -557,6 +589,12 @@ fun SiteDetailScreen(
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             db.hierarchyDao().deleteInstallation(installationId)
+                            
+                            // Архивируем все membership записи для удалённой установки
+                            ru.wassertech.client.data.UserMembershipHelper.archiveInstallationMemberships(
+                                context = context,
+                                installationId = installationId
+                            )
                         }
                         deleteInstallationId = null
                     },

@@ -14,11 +14,13 @@ import ru.wassertech.core.network.interceptor.NetworkException
 import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.dao.SettingsDao
 import ru.wassertech.data.entities.*
+import ru.wassertech.data.entities.UserMembershipEntity
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.data.types.SyncStatus
 import ru.wassertech.core.network.dto.SyncIconPackDto
 import ru.wassertech.core.network.dto.SyncIconDto
+import ru.wassertech.core.network.dto.sync.SyncUserMembershipDto
 
 /**
  * Движок синхронизации данных с сервером через REST API
@@ -304,7 +306,8 @@ class SyncEngine(private val context: Context) {
                     "clients", "sites", "installations", "components",
                     "maintenance_sessions", "maintenance_values",
                     "component_templates", "component_template_fields",
-                    "icon_packs", "icons" // Добавляем икон-паки и иконки
+                    "icon_packs", "icons", // Добавляем икон-паки и иконки
+                    "user_membership" // Добавляем user_membership для контроля доступа
                 )
                 
                 Log.d(TAG, "Вызываю syncPull(since=$lastSyncTimestampSec, entities=$entities)")
@@ -461,6 +464,14 @@ class SyncEngine(private val context: Context) {
             )
         }
         
+        // Собираем dirty user_membership записи
+        val dirtyMemberships = database.userMembershipDao().getDirtyMembershipsNow()
+        val userMembership = dirtyMemberships.map { it.toSyncDto() }
+        
+        if (userMembership.isNotEmpty()) {
+            Log.d(TAG, "Найдено dirty user_membership записей для отправки: ${userMembership.size}")
+        }
+        
         return SyncPushRequest(
             clients = clients,
             sites = sites,
@@ -470,6 +481,7 @@ class SyncEngine(private val context: Context) {
             maintenance_values = values,
             component_templates = componentTemplates,
             component_template_fields = componentTemplateFieldsDto,
+            userMembership = userMembership,
             deleted = deleted
         )
     }
@@ -581,6 +593,29 @@ class SyncEngine(private val context: Context) {
         if (fieldErrorIds.isNotEmpty()) {
             database.componentTemplateFieldsDao().markComponentTemplateFieldsAsConflict(fieldErrorIds.toList())
             Log.w(TAG, "Помечено как конфликт полей шаблонов компонентов: ${fieldErrorIds.size}")
+        }
+        
+        // User membership
+        request.userMembership.forEach { dto ->
+            val errorIds = errorIdsByType["user_membership"] ?: emptySet()
+            // Для user_membership используем составной ключ, поэтому проверяем по всем трём полям
+            val membershipKey = "${dto.userId}:${dto.scope}:${dto.targetId}"
+            val hasError = errorIds.any { it == membershipKey || it == dto.targetId }
+            
+            if (!hasError) {
+                database.userMembershipDao().markAsSynced(dto.userId, dto.scope, dto.targetId)
+            } else {
+                database.userMembershipDao().markAsConflict(dto.userId, dto.scope, dto.targetId)
+            }
+        }
+        if (request.userMembership.isNotEmpty()) {
+            val successCount = request.userMembership.count { dto ->
+                val errorIds = errorIdsByType["user_membership"] ?: emptySet()
+                val membershipKey = "${dto.userId}:${dto.scope}:${dto.targetId}"
+                !errorIds.any { it == membershipKey || it == dto.targetId }
+            }
+            val errorCount = request.userMembership.size - successCount
+            Log.d(TAG, "Обработано user_membership: успешно=$successCount, ошибок=$errorCount")
         }
         
         // Обрабатываем удаления: помечаем как синхронизированные после успешного push
@@ -710,6 +745,23 @@ class SyncEngine(private val context: Context) {
             Log.d(TAG, "Обработано иконок: применено=$appliedCount, пропущено=$skippedCount")
         }
         
+        // Обрабатываем user_membership
+        val userMembershipList = response.userMembership
+        if (userMembershipList != null && userMembershipList.isNotEmpty()) {
+            Log.d(TAG, "Получено user_membership записей с сервера: ${userMembershipList.size}")
+            var appliedCount = 0
+            userMembershipList.forEach { dto ->
+                try {
+                    val entity = dto.toEntity()
+                    database.userMembershipDao().upsert(entity)
+                    appliedCount++
+                } catch (e: Exception) {
+                    Log.e(TAG, "Ошибка при обработке user_membership: userId=${dto.userId}, scope=${dto.scope}, targetId=${dto.targetId}, error=${e.message}", e)
+                }
+            }
+            Log.d(TAG, "Обработано user_membership записей: применено=$appliedCount")
+        }
+        
         // Обрабатываем удаления
         // ВАЖНО: обрабатываем удаления ПОСЛЕ обработки основных списков,
         // чтобы не удалить записи, которые просто архивированы (сервер может отправлять их в deleted)
@@ -731,6 +783,8 @@ class SyncEngine(private val context: Context) {
             response.component_template_fields.forEach { existingIds.add(it.id) }
             response.iconPacks.forEach { existingIds.add(it.id) }
             response.icons.forEach { existingIds.add(it.id) }
+            // Для user_membership используем составной ключ (userId, scope, targetId)
+            // поэтому не добавляем в existingIds
             
             var deletedCount = 0
             var skippedCount = 0
@@ -1428,6 +1482,30 @@ class SyncEngine(private val context: Context) {
             deleted = response.deleted.size
         )
     }
+    
+    // Маппинг UserMembershipEntity ↔ SyncUserMembershipDto
+    private fun UserMembershipEntity.toSyncDto() = ru.wassertech.core.network.dto.sync.SyncUserMembershipDto(
+        id = null, // Составной ключ не требует id
+        userId = userId,
+        scope = scope,
+        targetId = targetId,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch,
+        isArchived = isArchived,
+        archivedAtEpoch = archivedAtEpoch
+    )
+    
+    private fun ru.wassertech.core.network.dto.sync.SyncUserMembershipDto.toEntity() = UserMembershipEntity(
+        userId = userId,
+        scope = scope,
+        targetId = targetId,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch,
+        isArchived = isArchived,
+        archivedAtEpoch = archivedAtEpoch,
+        dirtyFlag = false, // При получении с сервера - не dirty
+        syncStatus = SyncStatus.SYNCED.value
+    )
 }
 
 /**

@@ -25,9 +25,10 @@ import ru.wassertech.data.migrations.MIGRATION_12_13  // ← Добавлени�
 import ru.wassertech.data.migrations.MIGRATION_13_14  // ← Добавление поддержки иконок
 import ru.wassertech.data.migrations.MIGRATION_14_15  // ← Добавление таблицы icon_pack_sync_status
 import ru.wassertech.data.migrations.MIGRATION_15_16  // ← Добавление поля folder в icon_packs
+import ru.wassertech.data.migrations.MIGRATION_16_17  // ← Добавление таблицы user_membership
 
 @Database(
-    version = 16, // ← Обновлено: добавление поля folder в icon_packs
+    version = 17, // ← Обновлено: добавление таблицы user_membership
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -45,7 +46,8 @@ import ru.wassertech.data.migrations.MIGRATION_15_16  // ← Добавлени�
         SettingsEntity::class,
         IconPackEntity::class, // ← Новая сущность для паков иконок
         IconEntity::class, // ← Новая сущность для иконок
-        IconPackSyncStatusEntity::class // ← Сущность для отслеживания статуса загрузки
+        IconPackSyncStatusEntity::class, // ← Сущность для отслеживания статуса загрузки
+        UserMembershipEntity::class // ← Сущность для контроля доступа пользователей
     ]
 )
 @TypeConverters(Converters::class)
@@ -64,6 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun iconPackDao(): ru.wassertech.data.dao.IconPackDao
     abstract fun iconDao(): ru.wassertech.data.dao.IconDao
     abstract fun iconPackSyncStatusDao(): ru.wassertech.data.dao.IconPackSyncStatusDao
+    abstract fun userMembershipDao(): ru.wassertech.data.dao.UserMembershipDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -91,7 +94,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_12_13,  // ← Добавление origin и created_by_user_id
                         MIGRATION_13_14,  // ← Добавление поддержки иконок
                         MIGRATION_14_15,  // ← Добавление таблицы icon_pack_sync_status
-                        MIGRATION_15_16  // ← Добавление поля folder в icon_packs
+                        MIGRATION_15_16,  // ← Добавление поля folder в icon_packs
+                        MIGRATION_16_17  // ← Добавление таблицы user_membership
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

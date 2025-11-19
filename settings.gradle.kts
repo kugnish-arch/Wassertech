@@ -26,6 +26,7 @@ rootProject.name = "Wassertech"
 include(":core:ui")
 include(":core:network")
 include(":core:auth")
+include(":core:screens")
 
 // Feature modules
 include(":feature:auth")

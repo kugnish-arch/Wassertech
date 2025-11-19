@@ -23,7 +23,9 @@ import ru.wassertech.client.data.entities.SiteEntity
 import ru.wassertech.client.data.entities.InstallationEntity
 import ru.wassertech.client.data.entities.ComponentEntity
 import ru.wassertech.client.data.entities.SettingsEntity
+import ru.wassertech.client.data.entities.UserMembershipEntity
 import ru.wassertech.client.data.types.ComponentType
+import ru.wassertech.core.network.dto.sync.SyncUserMembershipDto
 
 /**
  * Движок синхронизации для app-client.
@@ -282,6 +284,23 @@ class SyncEngine(private val context: Context) {
         response.components.forEachIndexed { index, dto ->
             Log.d(TAG, "  [$index] Применяю компонент: id=${dto.id}, name='${dto.name}', installationId=${dto.installationId}")
             applyComponentToRoom(dto)
+        }
+        
+        // Обрабатываем user_membership
+        val userMembershipList = response.userMembership
+        if (userMembershipList != null && userMembershipList.isNotEmpty()) {
+            Log.d(TAG, "Обработка user_membership: ${userMembershipList.size}")
+            var appliedCount = 0
+            userMembershipList.forEach { dto ->
+                try {
+                    val entity = dto.toEntity()
+                    database.userMembershipDao().upsert(entity)
+                    appliedCount++
+                } catch (e: Exception) {
+                    Log.e(TAG, "Ошибка при обработке user_membership: userId=${dto.userId}, scope=${dto.scope}, targetId=${dto.targetId}, error=${e.message}", e)
+                }
+            }
+            Log.d(TAG, "Обработано user_membership записей: применено=$appliedCount")
         }
         
         // Обрабатываем паки иконок
@@ -700,6 +719,14 @@ class SyncEngine(private val context: Context) {
         
         Log.d(TAG, "Найдено dirty записей: sites=${sites.size}, installations=${installations.size}, components=${components.size}")
         
+        // Собираем dirty user_membership записи
+        val dirtyMemberships = database.userMembershipDao().getDirtyMembershipsNow()
+        val userMembership = dirtyMemberships.map { it.toSyncDto() }
+        
+        if (userMembership.isNotEmpty()) {
+            Log.d(TAG, "Найдено dirty user_membership записей для отправки: ${userMembership.size}")
+        }
+        
         return SyncPushRequest(
             clients = emptyList(), // Клиенты не создаются в app-client
             sites = sites,
@@ -709,6 +736,7 @@ class SyncEngine(private val context: Context) {
             maintenance_values = emptyList(), // Пока не реализовано
             component_templates = emptyList(), // Пока не реализовано
             component_template_fields = emptyList(), // Пока не реализовано
+            userMembership = userMembership,
             deleted = emptyList() // Пока не реализовано
         )
     }
@@ -753,6 +781,29 @@ class SyncEngine(private val context: Context) {
         if (componentSuccessIds.isNotEmpty()) {
             database.hierarchyDao().markComponentsAsSynced(componentSuccessIds)
             Log.d(TAG, "Помечено как синхронизировано компонентов: ${componentSuccessIds.size}")
+        }
+        
+        // Обрабатываем user_membership
+        request.userMembership.forEach { dto ->
+            val errorIds = errorIdsByType["user_membership"] ?: emptySet()
+            // Для user_membership используем составной ключ, поэтому проверяем по всем трём полям
+            val membershipKey = "${dto.userId}:${dto.scope}:${dto.targetId}"
+            val hasError = errorIds.any { it == membershipKey || it == dto.targetId }
+            
+            if (!hasError) {
+                database.userMembershipDao().markAsSynced(dto.userId, dto.scope, dto.targetId)
+            } else {
+                database.userMembershipDao().markAsConflict(dto.userId, dto.scope, dto.targetId)
+            }
+        }
+        if (request.userMembership.isNotEmpty()) {
+            val successCount = request.userMembership.count { dto ->
+                val errorIds = errorIdsByType["user_membership"] ?: emptySet()
+                val membershipKey = "${dto.userId}:${dto.scope}:${dto.targetId}"
+                !errorIds.any { it == membershipKey || it == dto.targetId }
+            }
+            val errorCount = request.userMembership.size - successCount
+            Log.d(TAG, "Обработано user_membership: успешно=$successCount, ошибок=$errorCount")
         }
     }
     
@@ -838,6 +889,30 @@ class SyncEngine(private val context: Context) {
             updatedAtEpoch = updatedAtEpoch
         )
     }
+    
+    // Маппинг UserMembershipEntity ↔ SyncUserMembershipDto
+    private fun UserMembershipEntity.toSyncDto() = SyncUserMembershipDto(
+        id = null, // Составной ключ не требует id
+        userId = userId,
+        scope = scope,
+        targetId = targetId,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch,
+        isArchived = isArchived,
+        archivedAtEpoch = archivedAtEpoch
+    )
+    
+    private fun SyncUserMembershipDto.toEntity() = UserMembershipEntity(
+        userId = userId,
+        scope = scope,
+        targetId = targetId,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch,
+        isArchived = isArchived,
+        archivedAtEpoch = archivedAtEpoch,
+        dirtyFlag = false, // При получении с сервера - не dirty
+        syncStatus = 0 // SYNCED
+    )
     
     /**
      * Результат синхронизации

@@ -17,6 +17,7 @@ data class SyncPullResponse(
     val component_template_fields: List<SyncChecklistFieldDto> = emptyList(), // Используем SyncChecklistFieldDto для совместимости структуры
     @SerializedName("icon_packs") val iconPacks: List<SyncIconPackDto> = emptyList(),
     val icons: List<SyncIconDto> = emptyList(),
+    @SerializedName("user_membership") val userMembership: List<ru.wassertech.core.network.dto.sync.SyncUserMembershipDto>? = null,
     val deleted: List<DeletedRecordDto> = emptyList()
 )
 

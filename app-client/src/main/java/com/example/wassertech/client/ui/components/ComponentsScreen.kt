@@ -48,6 +48,11 @@ import ru.wassertech.client.data.repository.IconRepository
 import androidx.compose.material.icons.filled.Image
 import kotlinx.coroutines.flow.map
 import java.util.UUID
+import ru.wassertech.core.screens.hierarchy.InstallationComponentsScreenShared
+import ru.wassertech.core.screens.hierarchy.ui.InstallationComponentsUiState
+import ru.wassertech.client.ui.hierarchy.ClientHierarchyUiStateMapper
+import ru.wassertech.client.data.entities.toUserMembershipInfoList
+import kotlinx.coroutines.withContext
 
 /**
  * Экран компонентов установки для app-client.
@@ -128,6 +133,71 @@ fun ComponentsScreen(
     val templates by db.componentTemplatesDao().observeAll().collectAsState(initial = emptyList())
     val templateTitleById = remember(templates) {
         templates.associate { it.id to it.name }
+    }
+    
+    // Получаем membership для текущего пользователя
+    val memberships by remember(currentUser?.userId) {
+        if (currentUser?.userId != null) {
+            db.userMembershipDao().observeForUser(currentUser.userId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
+    val membershipsInfo = remember(memberships) {
+        memberships.toUserMembershipInfoList()
+    }
+    
+    // Загружаем иконки для всех компонентов
+    var componentIcons by remember {
+        mutableStateOf<Map<String, ru.wassertech.client.data.entities.IconEntity?>>(emptyMap())
+    }
+    LaunchedEffect(components) {
+        scope.launch(Dispatchers.IO) {
+            val iconsMap = mutableMapOf<String, ru.wassertech.client.data.entities.IconEntity?>()
+            components.forEach { component ->
+                if (component.iconId != null) {
+                    val icon = db.iconDao().getById(component.iconId)
+                    iconsMap[component.id] = icon
+                } else {
+                    iconsMap[component.id] = null
+                }
+            }
+            componentIcons = iconsMap
+        }
+    }
+    
+    // Преобразуем в UI State с учётом прав доступа
+    var uiState by remember {
+        mutableStateOf<InstallationComponentsUiState?>(null)
+    }
+    LaunchedEffect(components, componentIcons, currentUser, membershipsInfo, installation, site, templateTitleById) {
+        if (currentUser != null && installation != null) {
+            scope.launch(Dispatchers.IO) {
+                val currentUserNonNull = currentUser!!
+                val currentInstallation = installation!!
+                val currentSite = site
+                val componentItems = components.mapNotNull { component ->
+                    val icon = componentIcons[component.id]
+                    val templateName = component.templateId?.let { templateTitleById[it] }
+                    withContext(Dispatchers.IO) {
+                        ClientHierarchyUiStateMapper.run {
+                            component.toComponentItemUi(iconRepository, currentUserNonNull, membershipsInfo, currentInstallation, currentSite, icon, templateName)
+                        }
+                    }
+                }
+                val canAddComponent = currentInstallation.createdByUserId == currentUserNonNull.userId
+                uiState = InstallationComponentsUiState(
+                    installationId = installationId,
+                    installationName = currentInstallation.name,
+                    siteName = site?.name,
+                    clientName = clientName,
+                    components = componentItems,
+                    canAddComponent = canAddComponent,
+                    canEditInstallation = false, // В app-client не редактируем установки
+                    isLoading = false
+                )
+            }
+        }
     }
     
     var showAddDialog by remember { mutableStateOf(false) }
@@ -240,108 +310,85 @@ fun ComponentsScreen(
             
             Spacer(Modifier.height(8.dp))
             
-            // Список компонентов
-            if (components.isEmpty()) {
-                AppEmptyState(
-                    icon = Icons.Filled.Lightbulb,
-                    title = "Нет компонентов",
-                    description = "Нажмите кнопку «+», чтобы добавить компонент к этой установке."
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(0.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    items(components, key = { it.id }) { component ->
-                        val templateTitle = component.templateId?.let { templateTitleById[it] } ?: "Без шаблона"
-                        
-                        // Загружаем иконку компонента
-                        val componentIcon by db.iconDao().observeAllActive().map { icons ->
-                            component.iconId?.let { iconId -> icons.firstOrNull { it.id == iconId } }
-                        }.collectAsState(initial = null)
-                        
-                        // Загружаем локальный путь к изображению иконки
-                        val localImagePath by remember(component.iconId) {
-                            kotlinx.coroutines.flow.flow {
-                                val path = component.iconId?.let { iconRepository.getLocalIconPath(it) }
-                                emit(path)
-                            }
-                        }.collectAsState(initial = null)
-                        
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            ComponentRow(
-                                component = component,
-                                templateTitle = templateTitle,
-                                icon = componentIcon,
-                                localImagePath = localImagePath,
-                                onChangeIcon = if (currentUser != null && canChangeIconForComponent(currentUser, component, site)) {
-                                    {
-                                        scope.launch(Dispatchers.IO) {
-                                            val packs = db.iconPackDao().getAll()
-                                            val allIcons = db.iconDao().getAllActive()
-                                            val filteredIcons = allIcons.filter { icon ->
-                                                icon.entityType == "ANY" || icon.entityType == IconEntityType.COMPONENT.name
-                                            }
-                                            val iconsByPack = filteredIcons.groupBy { it.packId }
-                                            
-                                            // Загружаем localImagePath для каждой иконки (suspend функция)
-                                            // Если файл не существует и есть imageUrl, загружаем изображение
-                                            val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
-                                                icons.map { icon ->
-                                                    var localPath = iconRepository.getLocalIconPath(icon.id)
-                                                    
-                                                    // Если файл не существует и есть imageUrl, загружаем изображение
-                                                    if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
-                                                        val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
-                                                        if (downloadResult.isSuccess) {
-                                                            localPath = iconRepository.getLocalIconPath(icon.id)
-                                                        }
-                                                    }
-                                                    
-                                                    ru.wassertech.core.ui.components.IconUiData(
-                                                        id = icon.id,
-                                                        packId = icon.packId,
-                                                        label = icon.label,
-                                                        entityType = icon.entityType,
-                                                        androidResName = icon.androidResName,
-                                                        code = icon.code, // Передаем code для fallback
-                                                        localImagePath = localPath // Загружаем локальный путь через IconRepository
-                                                    )
-                                                }
-                                            }
-                                            
-                                            iconPickerState = IconPickerUiState(
-                                                packs = packs.map { 
-                                                    ru.wassertech.core.ui.components.IconPackUiData(
-                                                        id = it.id,
-                                                        name = it.name
-                                                    )
-                                                },
-                                                iconsByPack = iconsByPackWithPaths
-                                            )
-                                            iconPickerComponentId = component.id
-                                            isIconPickerVisible = true
+            // Используем shared-экран для списка компонентов
+            uiState?.let { state ->
+                Box(modifier = Modifier.fillMaxSize()) {
+                    InstallationComponentsScreenShared(
+                        state = state.copy(
+                            siteName = null, // Убираем siteName из заголовка, так как он уже есть в отдельном заголовке
+                            clientName = null // Убираем clientName из заголовка, так как он уже есть в отдельном заголовке
+                        ),
+                        onComponentClick = null, // Компоненты не кликабельны в app-client
+                        onAddComponentClick = {
+                            showAddDialog = true
+                            newComponentName = ""
+                            selectedTemplate = templates.firstOrNull()
+                        },
+                        onComponentArchive = { _ -> }, // Архивирование не используется для компонентов в app-client
+                        onComponentRestore = { _ -> }, // Восстановление не используется для компонентов в app-client
+                        onComponentDelete = { componentId ->
+                            deleteComponentId = componentId
+                        },
+                        onChangeComponentIcon = { componentId ->
+                            if (currentUser != null && site != null) {
+                                val component = components.find { it.id == componentId }
+                                if (component != null && canChangeIconForComponent(currentUser, component, site)) {
+                                    scope.launch(Dispatchers.IO) {
+                                        val packs = db.iconPackDao().getAll()
+                                        val allIcons = db.iconDao().getAllActive()
+                                        val filteredIcons = allIcons.filter { icon ->
+                                            icon.entityType == "ANY" || icon.entityType == IconEntityType.COMPONENT.name
                                         }
+                                        val iconsByPack = filteredIcons.groupBy { it.packId }
+                                        val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
+                                            icons.map { icon ->
+                                                var localPath = iconRepository.getLocalIconPath(icon.id)
+                                                if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
+                                                    val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
+                                                    if (downloadResult.isSuccess) {
+                                                        localPath = iconRepository.getLocalIconPath(icon.id)
+                                                    }
+                                                }
+                                                ru.wassertech.core.ui.components.IconUiData(
+                                                    id = icon.id,
+                                                    packId = icon.packId,
+                                                    label = icon.label,
+                                                    entityType = icon.entityType,
+                                                    androidResName = icon.androidResName,
+                                                    code = icon.code,
+                                                    localImagePath = localPath
+                                                )
+                                            }
+                                        }
+                                        iconPickerState = IconPickerUiState(
+                                            packs = packs.map { 
+                                                ru.wassertech.core.ui.components.IconPackUiData(
+                                                    id = it.id,
+                                                    name = it.name
+                                                )
+                                            },
+                                            iconsByPack = iconsByPackWithPaths
+                                        )
+                                        iconPickerComponentId = componentId
+                                        isIconPickerVisible = true
                                     }
-                                } else null,
-                                onDelete = if (currentUser != null && canDeleteComponent(currentUser, component, site)) {
-                                    { deleteComponentId = component.id }
-                                } else null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color.White)
-                            )
-                            // Разделительная линия между компонентами (кроме последнего)
-                            val index = components.indexOf(component)
-                            if (index >= 0 && index < components.size - 1) {
-                                HorizontalDivider(
-                                    color = ClientsRowDivider,
-                                    thickness = 1.dp
-                                )
+                                }
                             }
-                        }
-                    }
+                        },
+                        onComponentsReordered = { newOrder ->
+                            scope.launch(Dispatchers.IO) {
+                                val currentComponents = db.hierarchyDao().observeComponents(installationId).first()
+                                val ordered = newOrder.mapIndexedNotNull { idx, id ->
+                                    currentComponents.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+                                }
+                                if (ordered.isNotEmpty()) {
+                                    db.hierarchyDao().reorderComponents(ordered)
+                                }
+                            }
+                        },
+                        isEditing = false,
+                        onToggleEdit = null
+                    )
                 }
             }
         }

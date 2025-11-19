@@ -56,6 +56,11 @@ import kotlinx.coroutines.flow.map
 // Временно используем стандартные Material3 компоненты
 // TODO: Вынести AppFloatingActionButton и CommonAddDialog в core:ui или создать локальные версии
 import java.util.UUID
+import ru.wassertech.core.screens.hierarchy.ClientSitesScreenShared
+import ru.wassertech.core.screens.hierarchy.ui.ClientSitesUiState
+import ru.wassertech.client.ui.hierarchy.ClientHierarchyUiStateMapper
+import ru.wassertech.client.data.entities.toUserMembershipInfoList
+import ru.wassertech.core.auth.HierarchyPermissionChecker
 
 /**
  * Экран списка объектов для app-client.
@@ -81,6 +86,18 @@ fun SitesScreen(
     
     // Получаем текущую сессию пользователя
     val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
+    
+    // Получаем user_membership для текущего пользователя
+    val membershipsRaw by remember(currentUser?.userId) {
+        if (currentUser?.userId != null) {
+            db.userMembershipDao().observeForUser(currentUser.userId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(emptyList<ru.wassertech.client.data.entities.UserMembershipEntity>())
+        }
+    }.collectAsState(initial = emptyList())
+    val memberships = remember(membershipsRaw) {
+        membershipsRaw.toUserMembershipInfoList()
+    }
     
     // Получаем список объектов для текущего клиента (включая архивные в режиме редактирования)
     val sites by if (isEditing) {
@@ -111,32 +128,7 @@ fun SitesScreen(
     var iconPickerState by remember { mutableStateOf<IconPickerUiState?>(null) }
     var iconPickerSiteId by remember { mutableStateOf<String?>(null) }
     
-    // Локальный порядок сайтов (для drag-and-drop)
-    var localOrder by remember(clientId, sites) { mutableStateOf(sites.map { it.id }) }
-    LaunchedEffect(sites, isEditing) {
-        if (!isEditing) {
-            localOrder = sites.map { it.id }
-        } else {
-            // При входе в режим редактирования инициализируем порядок
-            localOrder = sites.map { it.id }
-        }
-    }
-    
-    // Сохранение порядка при выходе из режима редактирования
-    LaunchedEffect(isEditing) {
-        if (!isEditing && localOrder.isNotEmpty()) {
-            // Сохраняем порядок сайтов
-            scope.launch(Dispatchers.IO) {
-                val currentSites = db.hierarchyDao().observeSitesIncludingArchived(clientId).first()
-                val ordered = localOrder.mapIndexedNotNull { idx, id ->
-                    currentSites.firstOrNull { it.id == id }?.copy(orderIndex = idx)
-                }
-                if (ordered.isNotEmpty()) {
-                    db.hierarchyDao().reorderSites(ordered)
-                }
-            }
-        }
-    }
+    // Локальный порядок теперь управляется shared-экраном
     
     // Загружаем иконки для всех сайтов
     var siteIcons by remember {
@@ -157,221 +149,124 @@ fun SitesScreen(
         }
     }
     
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            if (currentUser != null && canCreateEntity(currentUser)) {
-                FloatingActionButton(
-                    onClick = {
-                        showAddDialog = true
-                        newSiteName = ""
-                        newSiteAddress = ""
-                    },
-                    containerColor = Color(0xFFD32F2F),
-                    contentColor = Color.White
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Добавить объект")
-                }
-            }
-        }
-    ) { _ ->
-        val layoutDir = LocalLayoutDirection.current
-        val combinedPadding = PaddingValues(
-            top = paddingValues.calculateTopPadding(),
-            start = paddingValues.calculateStartPadding(layoutDir),
-            end = paddingValues.calculateEndPadding(layoutDir),
-            bottom = paddingValues.calculateBottomPadding()
-        )
-        
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    start = combinedPadding.calculateStartPadding(layoutDir),
-                    end = combinedPadding.calculateEndPadding(layoutDir),
-                    top = 0.dp,
-                    bottom = combinedPadding.calculateBottomPadding()
-                )
-        ) {
-            // Заголовок экрана
-            Column(modifier = Modifier.fillMaxWidth()) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
-                    ),
-                    shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = clientName,
-                            style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
-                            color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
-                        )
-                        Spacer(Modifier.weight(1f))
+    // Преобразуем в UI State с учётом прав доступа
+    var uiState by remember {
+        mutableStateOf<ClientSitesUiState?>(null)
+    }
+    LaunchedEffect(sites, siteIcons, currentUser, memberships) {
+        if (currentUser != null) {
+            scope.launch(Dispatchers.IO) {
+                val siteItems = sites.mapNotNull { site ->
+                    val icon = siteIcons[site.id]
+                    withContext(Dispatchers.IO) {
+                        ClientHierarchyUiStateMapper.run {
+                            site.toSiteItemUi(iconRepository, currentUser, memberships, icon)
+                        }
                     }
                 }
-                HorizontalDivider(
-                    color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
-                    thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
+                // Для CLIENT роли пользователь может создавать объекты, если он является клиентом
+                val canAddSite = currentUser.isClient() && currentUser.clientId != null
+                uiState = ClientSitesUiState(
+                    clientId = clientId,
+                    clientName = clientName,
+                    isCorporate = isCorporate,
+                    sites = siteItems,
+                    includeArchived = isEditing,
+                    canAddSite = canAddSite,
+                    canEditClient = false,
+                    isLoading = false
                 )
             }
-            
-            // Список объектов
-            if (sites.isEmpty() && !isEditing) {
-                AppEmptyState(
-                    icon = Icons.Filled.Lightbulb,
-                    title = "Нет объектов",
-                    description = "Создайте объект, чтобы добавить установки и компоненты."
-                )
-            } else if (localOrder.isNotEmpty()) {
-                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
-                ReorderableLazyColumn(
-                    items = localOrder,
-                    onMove = { fromIndex, toIndex ->
-                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
-                        if (localOrder.isNotEmpty() && fromIndex in localOrder.indices && toIndex in localOrder.indices) {
-                            val mutable = localOrder.toMutableList()
-                            val item = mutable.removeAt(fromIndex)
-                            mutable.add(toIndex, item)
-                            localOrder = mutable
-                        }
-                        // Изменения сохраняются в БД только в режиме редактирования (при выходе)
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    key = { it },
-                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) { siteId, isDragging, reorderableState ->
-                    val site = sites.find { it.id == siteId } ?: return@ReorderableLazyColumn
-                    val index = localOrder.indexOf(siteId)
-                    val siteIcon = siteIcons[site.id]
-                    
-                    // Загружаем локальный путь к изображению иконки
-                    val localImagePath by remember(site.iconId) {
-                        kotlinx.coroutines.flow.flow {
-                            val path = site.iconId?.let { iconRepository.getLocalIconPath(it) }
-                            emit(path)
-                        }
-                    }.collectAsState(initial = null)
-                    
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        SiteRowWithDrag(
-                            site = site,
-                            index = index,
-                            isArchived = site.isArchived == true,
-                            isCorporate = isCorporate,
-                            icon = siteIcon,
-                            localImagePath = localImagePath,
-                            onMoveUp = {
-                                if (isEditing) {
-                                    val pos = localOrder.indexOf(siteId)
-                                    if (pos > 0) {
-                                        val list = localOrder.toMutableList()
-                                        val tmp = list[pos - 1]; list[pos - 1] = list[pos]; list[pos] = tmp
-                                        localOrder = list
-                                    }
-                                }
-                            },
-                            onMoveDown = {
-                                if (isEditing) {
-                                    val pos = localOrder.indexOf(siteId)
-                                    if (pos >= 0 && pos < localOrder.lastIndex) {
-                                        val list = localOrder.toMutableList()
-                                        val tmp = list[pos + 1]; list[pos + 1] = list[pos]; list[pos] = tmp
-                                        localOrder = list
-                                    }
-                                }
-                            },
-                            onArchive = {
-                                scope.launch(Dispatchers.IO) {
-                                    db.hierarchyDao().archiveSite(siteId)
-                                }
-                            },
-                            onRestore = {
-                                scope.launch(Dispatchers.IO) {
-                                    db.hierarchyDao().restoreSite(siteId)
-                                }
-                            },
-                            onDelete = {
-                                deleteSiteId = siteId
-                            },
-                            onChangeIcon = if (currentUser != null && canChangeIconForSite(currentUser, site)) {
-                                {
-                                    scope.launch(Dispatchers.IO) {
-                                        val packs = db.iconPackDao().getAll()
-                                        val allIcons = db.iconDao().getAllActive()
-                                        val filteredIcons = allIcons.filter { icon ->
-                                            icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
+        }
+    }
+    
+    // Используем shared-экран
+    uiState?.let { state ->
+        ClientSitesScreenShared(
+            state = state,
+            onSiteClick = onOpenSite,
+            onAddSiteClick = {
+                showAddDialog = true
+                newSiteName = ""
+                newSiteAddress = ""
+            },
+            onSiteArchive = { siteId ->
+                scope.launch(Dispatchers.IO) {
+                    db.hierarchyDao().archiveSite(siteId)
+                }
+            },
+            onSiteRestore = { siteId ->
+                scope.launch(Dispatchers.IO) {
+                    db.hierarchyDao().restoreSite(siteId)
+                }
+            },
+            onSiteDelete = { siteId ->
+                deleteSiteId = siteId
+            },
+            onChangeSiteIcon = { siteId ->
+                if (currentUser != null) {
+                    val site = sites.find { it.id == siteId }
+                    if (site != null && canChangeIconForSite(currentUser, site)) {
+                        scope.launch(Dispatchers.IO) {
+                            val packs = db.iconPackDao().getAll()
+                            val allIcons = db.iconDao().getAllActive()
+                            val filteredIcons = allIcons.filter { icon ->
+                                icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
+                            }
+                            val iconsByPack = filteredIcons.groupBy { it.packId }
+                            
+                            val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
+                                icons.map { icon ->
+                                    var localPath = iconRepository.getLocalIconPath(icon.id)
+                                    
+                                    if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
+                                        val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
+                                        if (downloadResult.isSuccess) {
+                                            localPath = iconRepository.getLocalIconPath(icon.id)
                                         }
-                                        val iconsByPack = filteredIcons.groupBy { it.packId }
-                                        
-                                        // Загружаем localImagePath для каждой иконки (suspend функция)
-                                        // Если файл не существует и есть imageUrl, загружаем изображение
-                                        val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
-                                            icons.map { icon ->
-                                                var localPath = iconRepository.getLocalIconPath(icon.id)
-                                                
-                                                // Если файл не существует и есть imageUrl, загружаем изображение
-                                                if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
-                                                    val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
-                                                    if (downloadResult.isSuccess) {
-                                                        localPath = iconRepository.getLocalIconPath(icon.id)
-                                                    }
-                                                }
-                                                
-                                                ru.wassertech.core.ui.components.IconUiData(
-                                                    id = icon.id,
-                                                    packId = icon.packId,
-                                                    label = icon.label,
-                                                    entityType = icon.entityType,
-                                                    androidResName = icon.androidResName,
-                                                    code = icon.code,
-                                                    localImagePath = localPath
-                                                )
-                                            }
-                                        }
-                                        
-                                        iconPickerState = IconPickerUiState(
-                                            packs = packs.map { 
-                                                ru.wassertech.core.ui.components.IconPackUiData(
-                                                    id = it.id,
-                                                    name = it.name
-                                                )
-                                            },
-                                            iconsByPack = iconsByPackWithPaths
-                                        )
-                                        iconPickerSiteId = siteId
-                                        isIconPickerVisible = true
                                     }
+                                    
+                                    ru.wassertech.core.ui.components.IconUiData(
+                                        id = icon.id,
+                                        packId = icon.packId,
+                                        label = icon.label,
+                                        entityType = icon.entityType,
+                                        androidResName = icon.androidResName,
+                                        code = icon.code,
+                                        localImagePath = localPath
+                                    )
                                 }
-                            } else null,
-                            reorderableState = reorderableState,
-                            onClick = if (!isEditing) { { onOpenSite(site.id) } } else null,
-                            isEditing = isEditing,
-                            isDragging = isDragging,
-                            onToggleEdit = onToggleEdit,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.White)
-                        )
-                        // Разделительная линия между объектами (кроме последнего)
-                        val indexInList = localOrder.indexOf(siteId)
-                        if (indexInList >= 0 && indexInList < localOrder.size - 1) {
-                            HorizontalDivider(
-                                color = ClientsRowDivider,
-                                thickness = 1.dp
+                            }
+                            
+                            iconPickerState = IconPickerUiState(
+                                packs = packs.map { 
+                                    ru.wassertech.core.ui.components.IconPackUiData(
+                                        id = it.id,
+                                        name = it.name
+                                    )
+                                },
+                                iconsByPack = iconsByPackWithPaths
                             )
+                            iconPickerSiteId = siteId
+                            isIconPickerVisible = true
                         }
                     }
                 }
-            }
-        }
+            },
+            onSitesReordered = { newOrder ->
+                scope.launch(Dispatchers.IO) {
+                    val currentSites = db.hierarchyDao().observeSitesIncludingArchived(clientId).first()
+                    val ordered = newOrder.mapIndexedNotNull { idx, id ->
+                        currentSites.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+                    }
+                    if (ordered.isNotEmpty()) {
+                        db.hierarchyDao().reorderSites(ordered)
+                    }
+                }
+            },
+            isEditing = isEditing,
+            onToggleEdit = onToggleEdit
+        )
     }
     
     // Диалог добавления объекта
@@ -422,6 +317,15 @@ fun SitesScreen(
                                 createdByUserId = session?.userId
                             )
                             db.hierarchyDao().upsertSite(newSite)
+                            
+                            // Автоматически создаём membership для созданного объекта
+                            if (session?.userId != null) {
+                                ru.wassertech.client.data.UserMembershipHelper.createSiteMembership(
+                                    context = context,
+                                    siteId = newSite.id,
+                                    userId = session.userId
+                                )
+                            }
                         }
                             showAddDialog = false
                             newSiteName = ""
