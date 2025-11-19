@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit
 import ru.wassertech.core.network.TokenStorage
 import ru.wassertech.core.network.interceptor.AuthInterceptor
 import ru.wassertech.core.network.interceptor.ErrorInterceptor
+import ru.wassertech.core.network.interceptor.SessionExpiredCallback
 
 /**
  * API клиент для сетевых запросов
@@ -18,6 +19,12 @@ object ApiClient {
     internal var baseUrl: String = "https://api.example.com/"
     
     /**
+     * Глобальный callback для обработки истечения сессии.
+     * Устанавливается при инициализации приложения.
+     */
+    private var globalSessionExpiredCallback: SessionExpiredCallback? = null
+    
+    /**
      * Инициализация клиента с базовым URL
      */
     fun initialize(baseUrl: String) {
@@ -25,11 +32,20 @@ object ApiClient {
     }
     
     /**
+     * Устанавливает глобальный callback для обработки истечения сессии.
+     * Вызывается при инициализации приложения (например, в MainActivity).
+     */
+    fun setSessionExpiredCallback(callback: SessionExpiredCallback?) {
+        globalSessionExpiredCallback = callback
+    }
+    
+    /**
      * Создает OkHttpClient с interceptors
      */
     fun createOkHttpClient(
         tokenStorage: TokenStorage? = null,
-        enableLogging: Boolean = true
+        enableLogging: Boolean = true,
+        sessionExpiredCallback: SessionExpiredCallback? = null
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS) // Увеличено до 60 секунд
@@ -51,7 +67,9 @@ object ApiClient {
         }
         
         // Error interceptor (добавляем последним)
-        builder.addInterceptor(ErrorInterceptor())
+        // Используем переданный callback или глобальный
+        val callback = sessionExpiredCallback ?: globalSessionExpiredCallback
+        builder.addInterceptor(ErrorInterceptor(callback))
         
         return builder.build()
     }
@@ -76,9 +94,10 @@ object ApiClient {
     inline fun <reified T> createService(
         tokenStorage: TokenStorage? = null,
         baseUrl: String = this.baseUrl,
-        enableLogging: Boolean = true
+        enableLogging: Boolean = true,
+        sessionExpiredCallback: SessionExpiredCallback? = null
     ): T {
-        val okHttpClient = createOkHttpClient(tokenStorage, enableLogging)
+        val okHttpClient = createOkHttpClient(tokenStorage, enableLogging, sessionExpiredCallback)
         val retrofit = createRetrofit(okHttpClient, baseUrl)
         return retrofit.create(T::class.java)
     }

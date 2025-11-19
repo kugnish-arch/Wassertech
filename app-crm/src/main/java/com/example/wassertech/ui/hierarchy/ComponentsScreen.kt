@@ -268,7 +268,23 @@ fun ComponentsScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // Убираем системные отступы
-        // FAB теперь в shared-экране
+        floatingActionButton = {
+            // Показываем FAB только вне режима редактирования
+            if (!isEditing && uiState?.canAddComponent == true) {
+                AppFloatingActionButton(
+                    template = FABTemplate(
+                        icon = Icons.Filled.Add,
+                        containerColor = Color(0xFFD32F2F), // Красный цвет
+                        contentColor = Color.White,
+                        onClick = {
+                            showAdd = true
+                            newName = TextFieldValue("")
+                            selectedTemplate = allTemplates.firstOrNull()
+                        }
+                    )
+                )
+            }
+        },
         // Ботомбар убран - используется переключатель в топбаре
     ) { padding ->
         val layoutDirection = LocalLayoutDirection.current

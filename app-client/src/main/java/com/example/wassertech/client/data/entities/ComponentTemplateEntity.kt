@@ -12,6 +12,8 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "component_templates",
     indices = [
+        Index("dirtyFlag"),
+        Index("syncStatus"),
         Index("origin"),
         Index("created_by_user_id")
     ]
@@ -20,11 +22,18 @@ data class ComponentTemplateEntity(
     @PrimaryKey val id: String,
     val name: String,
     val category: String?,                  // e.g. "Filter", "Softener", "RO", "Valve"
-    val isArchived: Boolean = false,
-    val sortOrder: Int = 0,
     val defaultParamsJson: String? = null,  // JSON of default key-value params for instances
+    // Поля синхронизации (SyncMetaEntity)
     val createdAtEpoch: Long = System.currentTimeMillis(),
     val updatedAtEpoch: Long = System.currentTimeMillis(),
+    val isArchived: Boolean = false,
+    val archivedAtEpoch: Long? = null,
+    val deletedAtEpoch: Long? = null,
+    // Локальные поля для оффлайн-очереди (не отправляются на сервер)
+    val dirtyFlag: Boolean = false,
+    val syncStatus: Int = 0, // 0 = SYNCED, 1 = QUEUED, 2 = CONFLICT
+    // Другие поля
+    val sortOrder: Int = 0,
     // Поля для ролей и владения данными
     val ownerClientId: String? = null, // FK → clients.id
     val origin: String? = null, // "CRM" или "CLIENT"

@@ -1,14 +1,36 @@
 package ru.wassertech.core.network.interceptor
 
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
 
 /**
+ * Callback для обработки истечения сессии
+ */
+interface SessionExpiredCallback {
+    fun onSessionExpired()
+}
+
+/**
  * Interceptor для обработки ошибок сети
  */
-class ErrorInterceptor : Interceptor {
+class ErrorInterceptor(
+    private val sessionExpiredCallback: SessionExpiredCallback? = null
+) : Interceptor {
+    
+    companion object {
+        private const val TAG = "ErrorInterceptor"
+    }
+    
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var last401Time = 0L
+    private val minIntervalBetween401Events = 2000L // 2 секунды между событий
     
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -20,7 +42,14 @@ class ErrorInterceptor : Interceptor {
             when (response.code) {
                 401 -> {
                     // Unauthorized - токен истек или невалиден
-                    // Можно добавить логику обновления токена здесь
+                    val currentTime = System.currentTimeMillis()
+                    // Отправляем событие только если прошло достаточно времени с последнего события
+                    // чтобы избежать спама при серии запросов
+                    if (currentTime - last401Time > minIntervalBetween401Events) {
+                        last401Time = currentTime
+                        Log.w(TAG, "Получен HTTP 401, отправляем событие истечения сессии")
+                        sessionExpiredCallback?.onSessionExpired()
+                    }
                 }
                 403 -> {
                     // Forbidden

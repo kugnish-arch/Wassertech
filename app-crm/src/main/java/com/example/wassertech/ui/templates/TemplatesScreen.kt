@@ -25,6 +25,7 @@ import ru.wassertech.data.AppDatabase
 import ru.wassertech.data.entities.ComponentTemplateEntity
 import ru.wassertech.sync.SafeDeletionHelper
 import ru.wassertech.sync.markCreatedForSync
+import ru.wassertech.sync.markArchivedForSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -116,7 +117,14 @@ fun TemplatesScreen(
     // - в обычном режиме: только активные, порядок из БД
     // - в режиме редактирования: все (включая архив), но если локальный порядок непустой — показываем его
     val visibleTemplates = remember(dbOrdered, localOrder, isEditing) {
-        val base = if (isEditing) dbOrdered else dbOrdered.filter { it.isArchived != true }
+        val base = if (isEditing) {
+            dbOrdered
+        } else {
+            // Фильтруем архивные шаблоны (isArchived == true или null считается как false)
+            dbOrdered.filter { template -> 
+                !template.isArchived 
+            }
+        }
         if (isEditing && localOrder.isNotEmpty()) {
             // наложим локальный порядок, сохраняя элементы, которых вдруг нет в localOrder, в конец
             base.sortedBy { t ->
@@ -349,13 +357,17 @@ fun TemplatesScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            scope.launch {
+                            scope.launch(Dispatchers.IO) {
                                 try {
-                                    SafeDeletionHelper.deleteComponentTemplate(db, template.id)
+                                    // Архивируем шаблон вместо физического удаления
+                                    Log.d(TAG, "Архивирование шаблона для удаления: id=${template.id}, name=${template.name}")
+                                    // Используем markArchivedForSync для правильной установки всех полей
+                                    val updatedTemplate = template.markArchivedForSync()
+                                    dao.upsert(updatedTemplate)
+                                    Log.d(TAG, "Шаблон архивирован: id=${template.id}, isArchived=${updatedTemplate.isArchived}, dirtyFlag=${updatedTemplate.dirtyFlag}")
                                     deleteDialogState = null
-                                } catch (e: IllegalStateException) {
-                                    // Ошибка уже обработана выше
-                                    Log.e(TAG, "Ошибка удаления шаблона", e)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Ошибка архивирования шаблона", e)
                                 }
                             }
                         },

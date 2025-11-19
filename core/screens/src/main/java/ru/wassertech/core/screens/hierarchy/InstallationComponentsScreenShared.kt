@@ -69,24 +69,9 @@ fun InstallationComponentsScreenShared(
     // Состояние диалога удаления
     var deleteDialogState by remember { mutableStateOf<Pair<String, String>?>(null) }
     
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            if (!isEditing && state.canAddComponent) {
-                FloatingActionButton(
-                    onClick = onAddComponentClick,
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Добавить компонент")
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
             if (state.components.isEmpty() && !state.isLoading) {
                 AppEmptyState(
                     icon = Icons.Filled.Lightbulb,
@@ -134,8 +119,8 @@ fun InstallationComponentsScreenShared(
                 }
             }
         }
-    }
-    
+
+
     // Диалог подтверждения удаления
     deleteDialogState?.let { (componentId, componentName) ->
         AlertDialog(

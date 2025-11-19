@@ -7,10 +7,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import ru.wassertech.auth.UserAuthService
 import ru.wassertech.ui.AppNavHost
 import ru.wassertech.core.ui.splash.SplashRouteFixed
 import ru.wassertech.core.ui.theme.WassertechTheme
+import ru.wassertech.core.ui.dialogs.SessionExpiredDialog
+import ru.wassertech.core.ui.auth.SessionExpiredHandler
+import ru.wassertech.core.auth.SessionManager
+import ru.wassertech.core.network.ApiClient
 import ru.wassertech.feature.auth.AuthRoutes
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
@@ -33,8 +38,22 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MainContent() {
     var showSplash by remember { mutableStateOf(true) }
+    var showSessionExpiredDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
+    
+    // Устанавливаем глобальный callback для обработки истечения сессии
+    LaunchedEffect(Unit) {
+        ApiClient.setSessionExpiredCallback(SessionExpiredHandler)
+    }
+    
+    // Подписываемся на события истечения сессии
+    LaunchedEffect(Unit) {
+        SessionExpiredHandler.sessionExpiredEvent.collect {
+            showSessionExpiredDialog = true
+        }
+    }
     
     // Проверяем состояние входа после сплэша
     LaunchedEffect(showSplash) {
@@ -47,6 +66,26 @@ private fun MainContent() {
             }
         }
     }
+    
+    // Диалог истечения сессии
+    SessionExpiredDialog(
+        visible = showSessionExpiredDialog,
+        onDismissRequest = {
+            showSessionExpiredDialog = false
+        },
+        onNavigateToLogin = {
+            scope.launch {
+                // Очищаем сессию
+                SessionManager.getInstance(context).clearSession()
+                UserAuthService.logout(context)
+                showSessionExpiredDialog = false
+                navController.navigate(AuthRoutes.LOGIN) {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        }
+    )
     
     if (showSplash) {
         SplashRouteFixed(

@@ -188,7 +188,7 @@ fun SettingsScreen(
                 }
             }
             
-            // Кнопка "Отправить на сервер" (push + pull)
+            // Кнопка "Синхронизация с сервером" (push + pull)
             Button(
                 onClick = {
                     scope.launch {
@@ -236,69 +236,12 @@ fun SettingsScreen(
                     Text("Синхронизация...")
                 } else {
                     Icon(
-                        Icons.Outlined.CloudUpload,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Отправить на сервер")
-                }
-            }
-            
-            // Кнопка "Загрузить с сервера" (только pull)
-            Button(
-                onClick = {
-                    scope.launch {
-                        syncing = true
-                        syncMessage = null
-                        try {
-                            val syncEngine = SyncEngine(context)
-                            val result = withContext(Dispatchers.IO) {
-                                syncEngine.syncPull()
-                            }
-                            syncMessage = result.message
-                            if (result.success) {
-                                snackbarHostState.showSnackbar(
-                                    message = result.message,
-                                    duration = SnackbarDuration.Short
-                                )
-                            } else {
-                                snackbarHostState.showSnackbar(
-                                    message = result.message,
-                                    duration = SnackbarDuration.Long
-                                )
-                            }
-                        } catch (e: Exception) {
-                            val errorMsg = "Ошибка при загрузке: ${e.message}"
-                            syncMessage = errorMsg
-                            snackbarHostState.showSnackbar(
-                                message = errorMsg,
-                                duration = SnackbarDuration.Long
-                            )
-                        } finally {
-                            syncing = false
-                        }
-                    }
-                },
-                enabled = !syncing && !isOfflineMode,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (syncing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Загрузка...")
-                } else {
-                    Icon(
                         Icons.Outlined.CloudDownload,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Загрузить с сервера")
+                    Text("Синхронизация с сервером")
                 }
             }
             

@@ -63,7 +63,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ComponentsScreen(
     installationId: String,
-    onOpenMaintenanceHistory: (String) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onOpenMaintenanceHistory: (String) -> Unit, // Не используется, оставлен для совместимости
     onNavigateBack: (() -> Unit)? = null,
     paddingValues: PaddingValues = PaddingValues(0.dp)
 ) {
@@ -215,9 +215,8 @@ fun ComponentsScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            // Показываем FAB только если пользователь является создателем установки
-            val currentInstallation = installation
-            if (currentUser != null && currentInstallation != null && currentInstallation.createdByUserId == currentUser.userId) {
+            // Показываем FAB только если пользователь может добавлять компоненты
+            if (uiState?.canAddComponent == true) {
                 FloatingActionButton(
                     onClick = {
                         showAddDialog = true
@@ -294,18 +293,6 @@ fun ComponentsScreen(
                     color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
                     thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
                 )
-            }
-            
-            // Кнопка просмотра истории ТО (без кнопки "Провести ТО")
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { onOpenMaintenanceHistory(installationId) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                enabled = installation != null
-            ) {
-                Text("История ТО")
             }
             
             Spacer(Modifier.height(8.dp))

@@ -115,7 +115,14 @@ fun TemplatesScreen(
     // - в обычном режиме: только активные, порядок из БД
     // - в режиме редактирования: все (включая архив), но если локальный порядок непустой — показываем его
     val visibleTemplates = remember(dbOrdered, localOrder, isEditing) {
-        val base = if (isEditing) dbOrdered else dbOrdered.filter { it.isArchived != true }
+        val base = if (isEditing) {
+            dbOrdered
+        } else {
+            // Фильтруем архивные шаблоны (isArchived == true)
+            dbOrdered.filter { template -> 
+                !template.isArchived 
+            }
+        }
         if (isEditing && localOrder.isNotEmpty()) {
             // наложим локальный порядок, сохраняя элементы, которых вдруг нет в localOrder, в конец
             base.sortedBy { t ->
@@ -132,6 +139,9 @@ fun TemplatesScreen(
         visibleTemplates.associateBy { it.id }
     }
 
+    // Вычисляем отступ для FAB с учетом bottomBar из AppScaffold
+    val fabBottomPadding = paddingValues.calculateBottomPadding() + 16.dp // Высота bottomBar + зазор
+    
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0), // Убираем системные отступы
         floatingActionButton = {
@@ -141,7 +151,8 @@ fun TemplatesScreen(
                     showCreate = true
                 },
                 containerColor = Color(0xFFD32F2F), // Красный цвет
-                contentColor = Color.White
+                contentColor = Color.White,
+                modifier = Modifier.padding(bottom = fabBottomPadding) // Отступ снизу для учета высоты bottomBar
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Добавить шаблон")
             }
@@ -368,8 +379,21 @@ fun TemplatesScreen(
                                         Log.e(TAG, "Шаблон используется в компонентах, но диалог не показал это")
                                         return@launch
                                     }
-                                    // Удаляем шаблон
-                                    dao.delete(template)
+                                    // Архивируем шаблон вместо физического удаления
+                                    Log.d(TAG, "Архивирование шаблона для удаления: id=${template.id}, name=${template.name}")
+                                    // Используем setArchived с правильными параметрами для установки dirtyFlag и syncStatus
+                                    val currentTime = System.currentTimeMillis()
+                                    dao.setArchived(template.id, true, currentTime)
+                                    // Также обновляем через upsert для гарантированного обновления Flow
+                                    val updatedTemplate = template.copy(
+                                        isArchived = true,
+                                        archivedAtEpoch = template.archivedAtEpoch ?: currentTime,
+                                        updatedAtEpoch = currentTime,
+                                        dirtyFlag = true,
+                                        syncStatus = 1
+                                    )
+                                    dao.upsert(updatedTemplate)
+                                    Log.d(TAG, "Шаблон архивирован: id=${template.id}, isArchived=${updatedTemplate.isArchived}, dirtyFlag=${updatedTemplate.dirtyFlag}")
                                     deleteDialogState = null
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Ошибка удаления шаблона", e)

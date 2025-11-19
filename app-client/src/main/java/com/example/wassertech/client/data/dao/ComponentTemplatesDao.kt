@@ -22,8 +22,16 @@ interface ComponentTemplatesDao {
     @Update
     suspend fun update(item: ComponentTemplateEntity)
 
-    @Query("UPDATE component_templates SET isArchived = :arch WHERE id = :id")
-    suspend fun setArchived(id: String, arch: Boolean)
+    @Query("""
+        UPDATE component_templates 
+        SET isArchived = :arch, 
+            archivedAtEpoch = CASE WHEN :arch = 1 THEN COALESCE(archivedAtEpoch, :ts) ELSE NULL END,
+            updatedAtEpoch = :ts,
+            dirtyFlag = 1,
+            syncStatus = 1
+        WHERE id = :id
+    """)
+    suspend fun setArchived(id: String, arch: Boolean, ts: Long = System.currentTimeMillis())
 
     @Query("UPDATE component_templates SET sortOrder = :order WHERE id = :id")
     suspend fun setSortOrder(id: String, order: Int)
