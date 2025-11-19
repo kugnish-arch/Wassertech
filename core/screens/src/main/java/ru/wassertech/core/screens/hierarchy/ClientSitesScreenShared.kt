@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import ru.wassertech.core.screens.hierarchy.ui.ClientSitesUiState
 import ru.wassertech.core.screens.hierarchy.ui.SiteItemUi
 import ru.wassertech.core.ui.components.AppEmptyState
@@ -76,7 +77,8 @@ fun ClientSitesScreenShared(
             if (!isEditing && state.canAddSite) {
                 FloatingActionButton(
                     onClick = onAddSiteClick,
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape // Полностью круглый FAB
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Добавить объект")
                 }
@@ -255,7 +257,7 @@ private fun SiteRowShared(
             // Название объекта
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "${index + 1}. ${site.name}",
+                    site.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = if (site.isArchived) 
                         MaterialTheme.colorScheme.outline 

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 15,
-    "identityHash": "d728581edb8598fe83161bbd876f269e",
+    "identityHash": "44a13eef4ba024b1100b5e43c511fd3a",
     "entities": [
       {
         "tableName": "clients",
@@ -816,7 +816,7 @@
       },
       {
         "tableName": "component_templates",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT, `isArchived` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `defaultParamsJson` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `ownerClientId` TEXT, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT, `defaultParamsJson` TEXT, `createdAtEpoch` INTEGER NOT NULL, `updatedAtEpoch` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `archivedAtEpoch` INTEGER, `deletedAtEpoch` INTEGER, `dirtyFlag` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `ownerClientId` TEXT, `origin` TEXT, `created_by_user_id` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -837,18 +837,6 @@
             "notNull": false
           },
           {
-            "fieldPath": "isArchived",
-            "columnName": "isArchived",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sortOrder",
-            "columnName": "sortOrder",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
             "fieldPath": "defaultParamsJson",
             "columnName": "defaultParamsJson",
             "affinity": "TEXT",
@@ -863,6 +851,42 @@
           {
             "fieldPath": "updatedAtEpoch",
             "columnName": "updatedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpoch",
+            "columnName": "archivedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deletedAtEpoch",
+            "columnName": "deletedAtEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dirtyFlag",
+            "columnName": "dirtyFlag",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -892,6 +916,24 @@
           ]
         },
         "indices": [
+          {
+            "name": "index_component_templates_dirtyFlag",
+            "unique": false,
+            "columnNames": [
+              "dirtyFlag"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_templates_dirtyFlag` ON `${TABLE_NAME}` (`dirtyFlag`)"
+          },
+          {
+            "name": "index_component_templates_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_component_templates_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
           {
             "name": "index_component_templates_origin",
             "unique": false,
@@ -1961,7 +2003,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd728581edb8598fe83161bbd876f269e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '44a13eef4ba024b1100b5e43c511fd3a')"
     ]
   }
 }

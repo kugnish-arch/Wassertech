@@ -168,9 +168,11 @@ fun AppNavigation(
         ) { backStackEntry ->
             val templateId = backStackEntry.arguments?.getString("templateId") ?: return@composable
             AppScaffold(navController = navController) { paddingValues ->
-                // TODO: Добавить TemplateEditorScreen для app-client
-                // Пока просто возвращаемся назад
-                navController.popBackStack()
+                ru.wassertech.client.ui.templates.TemplateEditorScreen(
+                    templateId = templateId,
+                    onNavigateBack = { navController.popBackStack() },
+                    paddingValues = paddingValues
+                )
             }
         }
         

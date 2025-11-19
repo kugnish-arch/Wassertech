@@ -19,6 +19,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.WindowInsets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,6 +53,7 @@ import ru.wassertech.core.screens.hierarchy.InstallationComponentsScreenShared
 import ru.wassertech.core.screens.hierarchy.ui.InstallationComponentsUiState
 import ru.wassertech.client.ui.hierarchy.ClientHierarchyUiStateMapper
 import ru.wassertech.client.data.entities.toUserMembershipInfoList
+import ru.wassertech.client.ui.common.LocalEditingState
 import kotlinx.coroutines.withContext
 
 /**
@@ -72,6 +74,11 @@ fun ComponentsScreen(
     val iconRepository = remember { IconRepository(context) }
     val scope = rememberCoroutineScope()
     val layoutDir = LocalLayoutDirection.current
+    
+    // Получаем состояние редактирования из CompositionLocal
+    val editingState = LocalEditingState.current
+    val isEditing = editingState?.isEditing ?: false
+    val onToggleEdit = editingState?.onToggle
     
     // Получаем текущую сессию пользователя
     val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
@@ -212,6 +219,9 @@ fun ComponentsScreen(
     var iconPickerState by remember { mutableStateOf<IconPickerUiState?>(null) }
     var iconPickerComponentId by remember { mutableStateOf<String?>(null) }
     
+    // Вычисляем отступ для FAB с учетом bottomBar из AppScaffold
+    val fabBottomPadding = paddingValues.calculateBottomPadding() + 16.dp // Высота bottomBar + зазор
+    
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
@@ -224,7 +234,9 @@ fun ComponentsScreen(
                         selectedTemplate = templates.firstOrNull()
                     },
                     containerColor = Color(0xFFD32F2F),
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    shape = CircleShape, // Полностью круглый FAB
+                    modifier = Modifier.padding(bottom = fabBottomPadding) // Отступ снизу для учета высоты bottomBar
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Добавить компонент")
                 }
@@ -311,8 +323,16 @@ fun ComponentsScreen(
                             newComponentName = ""
                             selectedTemplate = templates.firstOrNull()
                         },
-                        onComponentArchive = { _ -> }, // Архивирование не используется для компонентов в app-client
-                        onComponentRestore = { _ -> }, // Восстановление не используется для компонентов в app-client
+                        onComponentArchive = { componentId ->
+                            scope.launch(Dispatchers.IO) {
+                                db.hierarchyDao().archiveComponent(componentId)
+                            }
+                        },
+                        onComponentRestore = { componentId ->
+                            scope.launch(Dispatchers.IO) {
+                                db.hierarchyDao().restoreComponent(componentId)
+                            }
+                        },
                         onComponentDelete = { componentId ->
                             deleteComponentId = componentId
                         },
@@ -373,8 +393,8 @@ fun ComponentsScreen(
                                 }
                             }
                         },
-                        isEditing = false,
-                        onToggleEdit = null
+                        isEditing = isEditing,
+                        onToggleEdit = onToggleEdit
                     )
                 }
             }

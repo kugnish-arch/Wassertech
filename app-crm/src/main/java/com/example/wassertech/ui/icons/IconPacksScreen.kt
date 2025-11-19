@@ -159,10 +159,10 @@ private fun IconPackItem(
     // Находим первую иконку пака для превью
     val previewIcon = allIcons.firstOrNull { it.packId == pack.id }
     
-    // Получаем локальный путь к превью-иконке, если она загружена
+    // Получаем локальный путь к миниатюре для превью (используем миниатюру вместо полноразмерной иконки)
     val previewIconLocalPath by remember(previewIcon?.id) {
         kotlinx.coroutines.flow.flow {
-            val path = previewIcon?.id?.let { iconRepository.getLocalIconPath(it) }
+            val path = previewIcon?.id?.let { iconRepository.getLocalThumbnailPath(it) }
             emit(path)
         }
     }.collectAsState(initial = null)

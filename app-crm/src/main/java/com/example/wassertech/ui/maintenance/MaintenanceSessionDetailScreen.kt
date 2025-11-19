@@ -220,8 +220,8 @@ fun MaintenanceSessionDetailScreen(
                         fileName = fileName
                     )
                     
-                    uploadResult.onSuccess { report ->
-                        Log.d("PDF", "Report uploaded successfully: id=${report.id}")
+                    uploadResult.onSuccess { reportEntity ->
+                        Log.d("PDF", "Report uploaded successfully: id=${reportEntity.id}, fileUrl=${reportEntity.fileUrl}")
                         // Показываем ненавязчивое сообщение об успешной загрузке
                         snackbarHostState.showSnackbar(
                             "Отчёт отправлен на сервер",

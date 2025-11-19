@@ -2,37 +2,21 @@ package ru.wassertech.client.ui.templates
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
-import ru.wassertech.client.data.AppDatabase
-import ru.wassertech.client.data.entities.ComponentTemplateEntity
-import ru.wassertech.core.ui.components.AppEmptyState
-import ru.wassertech.core.ui.components.EntityRowWithMenu
-import ru.wassertech.core.ui.reorderable.ReorderableLazyColumn
-import ru.wassertech.core.ui.reorderable.ReorderableState
-import ru.wassertech.client.ui.common.LocalEditingState
-import ru.wassertech.core.ui.R
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import ru.wassertech.client.data.AppDatabase
+import ru.wassertech.client.data.entities.ComponentTemplateEntity
+import ru.wassertech.client.ui.common.LocalEditingState
+import ru.wassertech.core.screens.templates.TemplatesScreenShared
+import ru.wassertech.core.screens.templates.ui.TemplatesUiState
+import ru.wassertech.core.screens.templates.ui.TemplateItemUi
 
 private const val TAG = "TemplatesScreen"
 
@@ -58,7 +42,6 @@ fun TemplatesScreen(
 
     // Диалог «Создать шаблон»
     var showCreate by remember { mutableStateOf(false) }
-    var newTitle by remember { mutableStateOf("") }
 
     // Локальный порядок для live-перестановки
     var localOrder by remember(templates, isEditing) { 
@@ -70,7 +53,6 @@ fun TemplatesScreen(
         if (!isEditing) {
             localOrder = templates.map { it.id }
         } else {
-            // При входе в режим редактирования фиксируем текущий порядок
             val allTemplatesOrdered = templates.sortedWith(
                 compareBy<ComponentTemplateEntity> { it.sortOrder }
                     .thenBy { it.name.lowercase() }
@@ -82,7 +64,6 @@ fun TemplatesScreen(
     // Сохранение порядка при выходе из режима редактирования
     LaunchedEffect(isEditing) {
         if (!isEditing && localOrder.isNotEmpty()) {
-            // сохранить локальный порядок в БД
             scope.launch {
                 Log.d(TAG, "Сохранение порядка шаблонов: количество=${localOrder.size}")
                 localOrder.forEachIndexed { index, id ->
@@ -91,17 +72,11 @@ fun TemplatesScreen(
             }
         }
     }
-    
-    // Сохранение порядка при изменении localOrder в режиме редактирования
-    fun onReorderTemplates(fromIndex: Int, toIndex: Int) {
-        val mutable = localOrder.toMutableList()
-        val item = mutable.removeAt(fromIndex)
-        mutable.add(toIndex, item)
-        localOrder = mutable
-    }
 
     // Диалог подтверждения удаления
     var deleteDialogState by remember { mutableStateOf<ComponentTemplateEntity?>(null) }
+    var installationsUsingTemplate by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isLoadingDeleteCheck by remember { mutableStateOf(false) }
 
     // Базовый порядок — как в БД (sortOrder ↑, затем name для стабильности)
     val dbOrdered = remember(templates) {
@@ -111,367 +86,136 @@ fun TemplatesScreen(
         )
     }
 
-    // Применяем фильтрацию по архиву и порядок
-    // - в обычном режиме: только активные, порядок из БД
-    // - в режиме редактирования: все (включая архив), но если локальный порядок непустой — показываем его
-    val visibleTemplates = remember(dbOrdered, localOrder, isEditing) {
-        val base = if (isEditing) {
-            dbOrdered
-        } else {
-            // Фильтруем архивные шаблоны (isArchived == true)
-            dbOrdered.filter { template -> 
-                !template.isArchived 
-            }
-        }
-        if (isEditing && localOrder.isNotEmpty()) {
-            // наложим локальный порядок, сохраняя элементы, которых вдруг нет в localOrder, в конец
-            base.sortedBy { t ->
-                val idx = localOrder.indexOf(t.id)
-                if (idx == -1) Int.MAX_VALUE else idx
-            }
-        } else {
-            base
-        }
-    }
-    
-    // Словарь для быстрого доступа по id
-    val templatesById = remember(visibleTemplates) {
-        visibleTemplates.associateBy { it.id }
-    }
-
-    // Вычисляем отступ для FAB с учетом bottomBar из AppScaffold
-    val fabBottomPadding = paddingValues.calculateBottomPadding() + 16.dp // Высота bottomBar + зазор
-    
-    Scaffold(
-        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0), // Убираем системные отступы
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    newTitle = ""
-                    showCreate = true
-                },
-                containerColor = Color(0xFFD32F2F), // Красный цвет
-                contentColor = Color.White,
-                modifier = Modifier.padding(bottom = fabBottomPadding) // Отступ снизу для учета высоты bottomBar
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Добавить шаблон")
-            }
-        }
-        // Ботомбар убран - используется переключатель в топбаре
-    ) { padding ->
-        val layoutDir = LocalLayoutDirection.current
-
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (visibleTemplates.isEmpty() && !isEditing) {
-                AppEmptyState(
-                    icon = Icons.Filled.Lightbulb,
-                    title = "Начните с шаблонов",
-                    description = "Создайте шаблон компонента, чтобы определить его поля и характеристики. После этого вы сможете использовать этот шаблон при создании компонентов в установках."
-                )
-            } else if (localOrder.isNotEmpty()) {
-                // Используем ReorderableLazyColumn всегда, чтобы detectReorderAfterLongPress мог работать
-                ReorderableLazyColumn(
-                    items = localOrder,
-                    onMove = { fromIndex, toIndex ->
-                        // Всегда обновляем локальное состояние для корректного отображения перетаскивания
-                        val mutable = localOrder.toMutableList()
-                        val item = mutable.removeAt(fromIndex)
-                        mutable.add(toIndex, item)
-                        localOrder = mutable
-                        // Изменения сохраняются в БД только в режиме редактирования
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    key = { it },
-                    contentPadding = PaddingValues(
-                        start = 12.dp,
-                        end = 12.dp,
-                        top = 8.dp,
-                        bottom = padding.calculateBottomPadding() + 12.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) { templateId, isDragging, reorderableState ->
-                    val template = templatesById[templateId] ?: return@ReorderableLazyColumn
-                    
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        TemplateRowWrapper(
-                            template = template,
-                            isEditing = isEditing,
-                            onArchive = {
-                                scope.launch {
-                                    Log.d(TAG, "Архивирование шаблона: id=${template.id}, name=${template.name}")
-                                    dao.setArchived(template.id, true)
-                                }
-                            },
-                            onRestore = {
-                                scope.launch {
-                                    Log.d(TAG, "Разархивирование шаблона: id=${template.id}, name=${template.name}")
-                                    dao.setArchived(template.id, false)
-                                }
-                            },
-                            onDelete = {
-                                deleteDialogState = template
-                            },
-                            onClick = {
-                                if (!isEditing) {
-                                    onOpenTemplate(template.id)
-                                }
-                            },
-                            reorderableState = reorderableState,
-                            isDragging = isDragging,
-                            onToggleEdit = onToggleEdit,
-                            modifier = Modifier.background(Color.White)
-                        )
-                    }
-                }
-            } else {
-                // Если список пуст, показываем пустое состояние
-                Box(modifier = Modifier.fillMaxSize()) {
-                    AppEmptyState(
-                        icon = Icons.Filled.Lightbulb,
-                        title = "Начните с шаблонов",
-                        description = "Создайте шаблон компонента, чтобы определить его поля и характеристики. После этого вы сможете использовать этот шаблон при создании компонентов в установках."
-                    )
-                }
-            }
-        }
-    }
-
-    // Диалог создания шаблона
-    if (showCreate) {
-        AlertDialog(
-            onDismissRequest = { showCreate = false },
-            title = { Text("Новый шаблон") },
-            text = {
-                OutlinedTextField(
-                    value = newTitle,
-                    onValueChange = { newTitle = it },
-                    singleLine = true,
-                    label = { Text("Название шаблона") },
-                    modifier = Modifier.fillMaxWidth()
+    // Преобразуем в UI State
+    val uiState = remember(dbOrdered, localOrder, isEditing) {
+        TemplatesUiState(
+            templates = dbOrdered.map { template ->
+                TemplateItemUi(
+                    id = template.id,
+                    name = template.name,
+                    category = template.category,
+                    isArchived = template.isArchived,
+                    sortOrder = template.sortOrder
                 )
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val title = newTitle.trim()
-                        if (title.isNotEmpty()) {
-                            scope.launch {
-                                val id = UUID.randomUUID().toString()
-                                val nextOrder =
-                                    (templates.maxOfOrNull { it.sortOrder } ?: -1) + 1
-                                val currentTime = System.currentTimeMillis()
-                                val entity = ComponentTemplateEntity(
-                                    id = id,
-                                    name = title,
-                                    category = null,
-                                    defaultParamsJson = null,
-                                    sortOrder = nextOrder,
-                                    isArchived = false,
-                                    createdAtEpoch = currentTime,
-                                    updatedAtEpoch = currentTime
-                                )
-                                Log.d(TAG, "Создание шаблона: id=$id, name=$title, " +
-                                        "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}")
-                                dao.upsert(entity)
-                                onOpenTemplate(id)
-                            }
-                            showCreate = false
-                        }
-                    },
-                    enabled = newTitle.trim().isNotEmpty()
-                ) {
-                    Text("Создать")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreate = false }) {
-                    Text("Отмена")
-                }
-            }
+            localOrder = localOrder,
+            isEditing = isEditing
         )
     }
 
-    // Диалог подтверждения удаления
-    deleteDialogState?.let { template ->
-        var installationsUsingTemplate by remember { mutableStateOf<List<String>>(emptyList()) }
-        var isLoading by remember { mutableStateOf(true) }
-        
-        LaunchedEffect(template.id) {
-            withContext(Dispatchers.IO) {
-                val components = db.hierarchyDao().getComponentsByTemplate(template.id)
-                val installationIds = components.map { it.installationId }.distinct()
-                val installations = installationIds.mapNotNull { id ->
-                    db.hierarchyDao().getInstallationNow(id)
-                }
-                installationsUsingTemplate = installations.map { "${it.name} (ID: ${it.id})" }
-                isLoading = false
+    // Загружаем список установок, использующих шаблон, для диалога удаления
+    LaunchedEffect(deleteDialogState?.id) {
+        val template = deleteDialogState ?: return@LaunchedEffect
+        isLoadingDeleteCheck = true
+        withContext(Dispatchers.IO) {
+            val components = db.hierarchyDao().getComponentsByTemplate(template.id)
+            val installationIds = components.map { it.installationId }.distinct()
+            val installations = installationIds.mapNotNull { id ->
+                db.hierarchyDao().getInstallationNow(id)
             }
-        }
-        
-        if (isLoading) {
-            AlertDialog(
-                onDismissRequest = { deleteDialogState = null },
-                title = { Text("Проверка использования") },
-                text = {
-                    Column {
-                        Text("Проверяем использование шаблона...")
-                        CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { deleteDialogState = null }) {
-                        Text("Отмена")
-                    }
-                }
-            )
-        } else if (installationsUsingTemplate.isNotEmpty()) {
-            AlertDialog(
-                onDismissRequest = { deleteDialogState = null },
-                title = { Text("Невозможно удалить шаблон") },
-                text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "Шаблон \"${template.name}\" используется в следующих установках:",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        installationsUsingTemplate.forEach { installationName ->
-                            Text(
-                                "• $installationName",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Сначала удалите компоненты из этих установок, затем можно будет удалить шаблон.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { deleteDialogState = null }) {
-                        Text("Понятно")
-                    }
-                }
-            )
-        } else {
-            AlertDialog(
-                onDismissRequest = { deleteDialogState = null },
-                title = { Text("Подтверждение удаления") },
-                text = {
-                    Text(
-                        "Вы уверены, что хотите удалить шаблон \"${template.name}\"?\n\nЭто действие нельзя отменить."
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    // Проверяем, используется ли шаблон в компонентах
-                                    val components = db.hierarchyDao().getComponentsByTemplate(template.id)
-                                    if (components.isNotEmpty()) {
-                                        // Это не должно произойти, так как мы уже проверили выше
-                                        Log.e(TAG, "Шаблон используется в компонентах, но диалог не показал это")
-                                        return@launch
-                                    }
-                                    // Архивируем шаблон вместо физического удаления
-                                    Log.d(TAG, "Архивирование шаблона для удаления: id=${template.id}, name=${template.name}")
-                                    // Используем setArchived с правильными параметрами для установки dirtyFlag и syncStatus
-                                    val currentTime = System.currentTimeMillis()
-                                    dao.setArchived(template.id, true, currentTime)
-                                    // Также обновляем через upsert для гарантированного обновления Flow
-                                    val updatedTemplate = template.copy(
-                                        isArchived = true,
-                                        archivedAtEpoch = template.archivedAtEpoch ?: currentTime,
-                                        updatedAtEpoch = currentTime,
-                                        dirtyFlag = true,
-                                        syncStatus = 1
-                                    )
-                                    dao.upsert(updatedTemplate)
-                                    Log.d(TAG, "Шаблон архивирован: id=${template.id}, isArchived=${updatedTemplate.isArchived}, dirtyFlag=${updatedTemplate.dirtyFlag}")
-                                    deleteDialogState = null
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Ошибка удаления шаблона", e)
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Удалить")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { deleteDialogState = null }) {
-                        Text("Отмена")
-                    }
-                }
-            )
+            installationsUsingTemplate = installations.map { "${it.name} (ID: ${it.id})" }
+            isLoadingDeleteCheck = false
         }
     }
-}
 
-// Wrapper для строки шаблона, использующий EntityRowWithMenu
-@Composable
-private fun TemplateRowWrapper(
-    template: ComponentTemplateEntity,
-    isEditing: Boolean,
-    onArchive: () -> Unit,
-    onRestore: () -> Unit,
-    onDelete: () -> Unit,
-    onClick: () -> Unit,
-    reorderableState: ReorderableState?,
-    isDragging: Boolean = false,
-    onToggleEdit: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    val isArchived = template.isArchived == true
-
-    ElevatedCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(bottom = 4.dp),
-        colors = CardDefaults.elevatedCardColors()
-    ) {
-        EntityRowWithMenu(
-            title = template.name,
-            subtitle = template.category?.takeIf { it.isNotBlank() },
-            leadingIcon = {
-                Image(
-                    painter = painterResource(id = R.drawable.ui_template_component),
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    contentScale = ContentScale.Fit
+    TemplatesScreenShared(
+        state = uiState,
+        onTemplateClick = { templateId ->
+            Log.d(TAG, "=== КЛИК ПО ШАБЛОНУ ===")
+            Log.d(TAG, "templateId=$templateId")
+            Log.d(TAG, "Вызов onOpenTemplate с templateId=$templateId")
+            onOpenTemplate(templateId)
+            Log.d(TAG, "onOpenTemplate вызван, ожидаем навигацию")
+        },
+        onCreateTemplateClick = { showCreate = true },
+        onTemplateArchive = { templateId ->
+            scope.launch {
+                Log.d(TAG, "Архивирование шаблона: id=$templateId")
+                dao.setArchived(templateId, true)
+            }
+        },
+        onTemplateRestore = { templateId ->
+            scope.launch {
+                Log.d(TAG, "Разархивирование шаблона: id=$templateId")
+                dao.setArchived(templateId, false)
+            }
+        },
+        onTemplateDelete = { templateId ->
+            val template = templates.find { it.id == templateId }
+            if (template != null) {
+                deleteDialogState = template
+            }
+        },
+        onTemplatesReordered = { newOrder ->
+            localOrder = newOrder
+        },
+        onToggleEdit = onToggleEdit,
+        showCreateDialog = showCreate,
+        onCreateDialogDismiss = { showCreate = false },
+        onCreateDialogConfirm = { title ->
+            scope.launch {
+                val id = UUID.randomUUID().toString()
+                val nextOrder = (templates.maxOfOrNull { it.sortOrder } ?: -1) + 1
+                val currentTime = System.currentTimeMillis()
+                val entity = ComponentTemplateEntity(
+                    id = id,
+                    name = title,
+                    category = null,
+                    defaultParamsJson = null,
+                    sortOrder = nextOrder,
+                    isArchived = false,
+                    createdAtEpoch = currentTime,
+                    updatedAtEpoch = currentTime
                 )
-            },
-            trailingIcon = if (!isEditing) {
-                {
-                    Icon(
-                        imageVector = ru.wassertech.core.ui.theme.NavigationIcons.NavigateIcon,
-                        contentDescription = "Открыть",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                Log.d(TAG, "Создание шаблона: id=$id, name=$title, " +
+                        "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}")
+                dao.upsert(entity)
+                showCreate = false
+                kotlinx.coroutines.delay(150)
+                Log.d(TAG, "Вызов onOpenTemplate с id=$id")
+                onOpenTemplate(id)
+            }
+        },
+        showDeleteDialog = deleteDialogState != null,
+        deleteDialogTemplate = deleteDialogState?.let { template ->
+            TemplateItemUi(
+                id = template.id,
+                name = template.name,
+                category = template.category,
+                isArchived = template.isArchived,
+                sortOrder = template.sortOrder
+            )
+        },
+        onDeleteDialogDismiss = { deleteDialogState = null },
+        onDeleteDialogConfirm = {
+            val template = deleteDialogState ?: return@TemplatesScreenShared
+            scope.launch {
+                try {
+                    val components = db.hierarchyDao().getComponentsByTemplate(template.id)
+                    if (components.isNotEmpty()) {
+                        Log.e(TAG, "Шаблон используется в компонентах, но диалог не показал это")
+                        return@launch
+                    }
+                    Log.d(TAG, "Архивирование шаблона для удаления: id=${template.id}, name=${template.name}")
+                    val currentTime = System.currentTimeMillis()
+                    dao.setArchived(template.id, true, currentTime)
+                    val updatedTemplate = template.copy(
+                        isArchived = true,
+                        archivedAtEpoch = template.archivedAtEpoch ?: currentTime,
+                        updatedAtEpoch = currentTime,
+                        dirtyFlag = true,
+                        syncStatus = 1
                     )
+                    dao.upsert(updatedTemplate)
+                    Log.d(TAG, "Шаблон архивирован: id=${template.id}, isArchived=${updatedTemplate.isArchived}, dirtyFlag=${updatedTemplate.dirtyFlag}")
+                    deleteDialogState = null
+                } catch (e: Exception) {
+                    Log.e(TAG, "Ошибка удаления шаблона", e)
                 }
-            } else null,
-            isEditMode = isEditing,
-            isArchived = isArchived,
-            onClick = onClick,
-            onRestore = onRestore,
-            onArchive = onArchive,
-            onDelete = onDelete,
-            modifier = Modifier.fillMaxWidth(),
-            reorderableState = reorderableState,
-            showDragHandle = isEditing && !isArchived,
-            isDragging = isDragging,
-            onToggleEdit = onToggleEdit
-        )
-    }
+            }
+        },
+        installationsUsingTemplate = installationsUsingTemplate,
+        isLoadingDeleteCheck = isLoadingDeleteCheck
+    )
 }
 

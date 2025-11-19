@@ -250,4 +250,22 @@ interface HierarchyDao {
         WHERE id IN (:ids)
     """)
     suspend fun clearComponentsDirtyFlag(ids: List<String>)
+    
+    // ---- Методы для архивации/восстановления компонентов ----
+    
+    /** Архивировать компонент */
+    @Query("""
+        UPDATE components
+        SET isArchived = 1, archivedAtEpoch = :timestamp, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :componentId
+    """)
+    suspend fun archiveComponent(componentId: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** Восстановить компонент из архива */
+    @Query("""
+        UPDATE components
+        SET isArchived = 0, archivedAtEpoch = NULL, updatedAtEpoch = :timestamp, dirtyFlag = 1, syncStatus = 1
+        WHERE id = :componentId
+    """)
+    suspend fun restoreComponent(componentId: String, timestamp: Long = System.currentTimeMillis())
 }

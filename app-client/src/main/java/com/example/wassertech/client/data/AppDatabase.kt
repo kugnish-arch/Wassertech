@@ -9,24 +9,8 @@ import ru.wassertech.client.data.dao.*
 import ru.wassertech.client.data.entities.*
 import ru.wassertech.client.data.entities.MaintenanceValueEntity
 
-// Импорты миграций =========================================
-import ru.wassertech.client.data.migrations.MIGRATION_1_2
-import ru.wassertech.client.data.migrations.MIGRATION_2_3
-import ru.wassertech.client.data.migrations.MIGRATION_3_4
-import ru.wassertech.client.data.migrations.MIGRATION_4_5
-import ru.wassertech.client.data.migrations.MIGRATION_5_6
-import ru.wassertech.client.data.migrations.MIGRATION_6_7   // ← Обновление ComponentType
-import ru.wassertech.client.data.migrations.MIGRATION_7_8   // ← Добавление таблицы settings
-import ru.wassertech.client.data.migrations.MIGRATION_8_9   // ← Добавление полей синхронизации
-import ru.wassertech.client.data.migrations.MIGRATION_9_10  // ← Обновление deleted_records
-import ru.wassertech.client.data.migrations.MIGRATION_10_11  // ← Добавление origin и created_by_user_id
-import ru.wassertech.client.data.migrations.MIGRATION_11_12  // ← Добавление поддержки иконок
-import ru.wassertech.client.data.migrations.MIGRATION_12_13  // ← Добавление поля folder в icon_packs
-import ru.wassertech.client.data.migrations.MIGRATION_13_14  // ← Добавление таблицы reports
-import ru.wassertech.client.data.migrations.MIGRATION_14_15  // ← Добавление таблицы user_membership
-
 @Database(
-    version = 15, // ← Обновлено: добавление таблицы user_membership
+    version = 17, // ← Обновлено: добавление полей filePath, fileSize, mimeType, createdByUserId в reports
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -74,28 +58,9 @@ abstract class AppDatabase : RoomDatabase() {
                 val db = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "wassertech_client_v1.db"  // ← Другое имя файла для app-client
+                    "wassertech_client_v1.db"
                 )
-                    // Подключаем миграции
-                    .addMigrations(
-                        MIGRATION_1_2,
-                        MIGRATION_2_3,
-                        MIGRATION_3_4,
-                        MIGRATION_4_5,
-                        MIGRATION_5_6,
-                        MIGRATION_6_7,    // ← Обновление ComponentType
-                        MIGRATION_7_8,   // ← Добавление таблицы settings
-                        MIGRATION_8_9,   // ← Добавление полей синхронизации
-                        MIGRATION_9_10,  // ← Обновление deleted_records
-                        MIGRATION_10_11,  // ← Добавление origin и created_by_user_id
-                        MIGRATION_11_12,  // ← Добавление поддержки иконок
-                        MIGRATION_12_13,  // ← Добавление поля folder в icon_packs
-                        MIGRATION_13_14,  // ← Добавление таблицы reports
-                        MIGRATION_14_15  // ← Добавление таблицы user_membership
-                    )
-                    // Fallback для очистки базы при ошибке миграции (для клиентского приложения это безопасно)
                     .fallbackToDestructiveMigration()
-                    .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = db
                 db

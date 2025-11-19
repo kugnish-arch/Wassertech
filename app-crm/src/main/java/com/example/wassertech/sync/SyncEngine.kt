@@ -21,6 +21,43 @@ import ru.wassertech.data.types.SyncStatus
 import ru.wassertech.core.network.dto.SyncIconPackDto
 import ru.wassertech.core.network.dto.SyncIconDto
 import ru.wassertech.core.network.dto.sync.SyncUserMembershipDto
+import ru.wassertech.api.ReportsApi
+import ru.wassertech.core.network.dto.ReportDto
+import ru.wassertech.data.entities.ReportEntity
+import ru.wassertech.data.entities.SettingsEntity
+
+/**
+ * Результат синхронизации
+ */
+data class SyncResult(
+    val success: Boolean,
+    val message: String,
+    val pushStats: SyncPushStats? = null,
+    val pullStats: SyncPullStats? = null
+)
+
+/**
+ * Статистика отправки
+ */
+data class SyncPushStats(
+    val inserted: Int,
+    val updated: Int,
+    val skipped: Int
+)
+
+/**
+ * Статистика получения
+ */
+data class SyncPullStats(
+    val clients: Int,
+    val sites: Int,
+    val installations: Int,
+    val components: Int,
+    val sessions: Int,
+    val values: Int,
+    val templates: Int,
+    val deleted: Int
+)
 
 /**
  * Движок синхронизации данных с сервером через REST API
@@ -39,9 +76,18 @@ class SyncEngine(private val context: Context) {
         )
     }
     
+    private val reportsApi: ReportsApi by lazy {
+        ApiClient.createService<ReportsApi>(
+            tokenStorage = tokenStorage,
+            baseUrl = ApiConfig.getBaseUrl(),
+            enableLogging = true
+        )
+    }
+    
     companion object {
         private const val TAG = "SyncEngine"
         private const val SETTINGS_KEY_LAST_SYNC_TIMESTAMP = "last_sync_timestamp"
+        private const val SETTINGS_KEY_LAST_REPORTS_SYNC_EPOCH = "last_reports_sync_epoch"
     }
     
     /**
@@ -743,6 +789,20 @@ class SyncEngine(private val context: Context) {
                 }
             }
             Log.d(TAG, "Обработано иконок: применено=$appliedCount, пропущено=$skippedCount")
+            
+            // Загружаем миниатюры для новых/обновлённых иконок в фоне
+            try {
+                val iconRepository = ru.wassertech.data.repository.IconRepository(context)
+                val downloadResult = iconRepository.downloadMissingThumbnails()
+                if (downloadResult.isSuccess) {
+                    Log.d(TAG, "Загружено миниатюр: ${downloadResult.getOrNull()}")
+                } else {
+                    Log.w(TAG, "Ошибка при загрузке миниатюр: ${downloadResult.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при загрузке миниатюр после синхронизации", e)
+                // Не прерываем синхронизацию из-за ошибок загрузки миниатюр
+            }
         }
         
         // Обрабатываем user_membership
@@ -1138,6 +1198,10 @@ class SyncEngine(private val context: Context) {
                 database.clientDao().deleteClient(recordId)
                 Log.d(TAG, "Удалён клиент: $recordId")
             }
+            "client_groups" -> {
+                database.clientDao().deleteGroup(recordId)
+                Log.d(TAG, "Удалена группа клиентов: $recordId")
+            }
             "sites" -> {
                 database.hierarchyDao().deleteSite(recordId)
                 Log.d(TAG, "Удалён объект: $recordId")
@@ -1391,6 +1455,7 @@ class SyncEngine(private val context: Context) {
             entityType = entityTypeValue,
             imageUrl = imageUrl,
             thumbnailUrl = thumbnailUrl,
+            thumbnailLocalPath = null, // Будет заполнено после загрузки миниатюры
             androidResName = androidResName,
             isActive = isActive,
             origin = origin ?: "CRM", // По умолчанию CRM для старых данных
@@ -1506,39 +1571,107 @@ class SyncEngine(private val context: Context) {
         dirtyFlag = false, // При получении с сервера - не dirty
         syncStatus = SyncStatus.SYNCED.value
     )
+    
+    /**
+     * Синхронизация отчётов с сервером.
+     * Отчёты синхронизируются через отдельный API GET /reports с инкрементальной загрузкой.
+     */
+    suspend fun syncReports(): Result<Int> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Начало синхронизации отчётов")
+                
+                // Получаем timestamp последней синхронизации отчётов
+                val lastSyncEpoch = settingsDao.getValueSync(SETTINGS_KEY_LAST_REPORTS_SYNC_EPOCH)?.toLongOrNull() ?: 0L
+                
+                // Если в БД есть отчёты, используем максимальный updatedAtEpoch
+                val maxUpdatedAtEpoch = database.reportDao().getMaxUpdatedAtEpoch()
+                val sinceUpdatedAtEpoch = if (maxUpdatedAtEpoch != null && maxUpdatedAtEpoch > lastSyncEpoch) {
+                    maxUpdatedAtEpoch
+                } else {
+                    lastSyncEpoch
+                }
+                
+                Log.d(TAG, "Синхронизация отчётов с sinceUpdatedAtEpoch=$sinceUpdatedAtEpoch")
+                
+                // Запрашиваем отчёты с сервера
+                // Для app-crm используем GET /reports без фильтров (получаем все доступные отчёты)
+                val response = reportsApi.getReports(
+                    sessionId = null,
+                    installationId = null,
+                    limit = null,
+                    offset = null
+                )
+                
+                if (!response.isSuccessful) {
+                    val error = HttpException(response)
+                    Log.e(TAG, "Ошибка получения отчётов: HTTP ${response.code()}")
+                    return@withContext Result.failure(error)
+                }
+                
+                val reportsDto = response.body()
+                if (reportsDto == null) {
+                    Log.w(TAG, "Пустой ответ при получении отчётов")
+                    return@withContext Result.success(0)
+                }
+                
+                // Фильтруем отчёты по sinceUpdatedAtEpoch (на клиенте, так как сервер может не поддерживать этот параметр в GET /reports)
+                val filteredReports = if (sinceUpdatedAtEpoch > 0) {
+                    reportsDto.filter { report ->
+                        val updatedAt = report.updatedAtEpoch ?: report.createdAtEpoch
+                        updatedAt > sinceUpdatedAtEpoch
+                    }
+                } else {
+                    reportsDto
+                }
+                
+                Log.d(TAG, "Получено ${filteredReports.size} отчётов (из ${reportsDto.size} всего)")
+                
+                if (filteredReports.isEmpty()) {
+                    Log.d(TAG, "Нет новых отчётов для синхронизации")
+                    return@withContext Result.success(0)
+                }
+                
+                // Преобразуем DTO в Entity и сохраняем в БД
+                val reportsEntity = filteredReports.map { dto ->
+                    ReportEntity(
+                        id = dto.id,
+                        sessionId = dto.sessionId,
+                        clientId = dto.clientId,
+                        siteId = dto.siteId,
+                        installationId = dto.installationId,
+                        fileName = dto.fileName,
+                        fileUrl = dto.fileUrl,
+                        filePath = dto.filePath,
+                        fileSize = dto.fileSize,
+                        mimeType = dto.mimeType,
+                        createdAtEpoch = dto.createdAtEpoch,
+                        updatedAtEpoch = dto.updatedAtEpoch ?: dto.createdAtEpoch,
+                        createdByUserId = dto.createdByUserId,
+                        isArchived = dto.isArchived != 0
+                    )
+                }
+                
+                database.reportDao().insertOrUpdateReports(reportsEntity)
+                Log.d(TAG, "Сохранено ${reportsEntity.size} отчётов в БД")
+                
+                // Обновляем timestamp последней синхронизации
+                val maxUpdatedAt = reportsEntity.maxOfOrNull { it.updatedAtEpoch ?: it.createdAtEpoch } ?: sinceUpdatedAtEpoch
+                settingsDao.setValue(
+                    SettingsEntity(
+                        key = SETTINGS_KEY_LAST_REPORTS_SYNC_EPOCH,
+                        value = maxUpdatedAt.toString()
+                    )
+                )
+                Log.d(TAG, "Обновлён timestamp последней синхронизации отчётов: $maxUpdatedAt")
+                
+                Result.success(reportsEntity.size)
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при синхронизации отчётов", e)
+                Result.failure(e)
+            }
+        }
+    }
 }
-
-/**
- * Результат синхронизации
- */
-data class SyncResult(
-    val success: Boolean,
-    val message: String,
-    val pushStats: SyncPushStats? = null,
-    val pullStats: SyncPullStats? = null
-)
-
-/**
- * Статистика отправки
- */
-data class SyncPushStats(
-    val inserted: Int,
-    val updated: Int,
-    val skipped: Int
-)
-
-/**
- * Статистика получения
- */
-data class SyncPullStats(
-    val clients: Int,
-    val sites: Int,
-    val installations: Int,
-    val components: Int,
-    val sessions: Int,
-    val values: Int,
-    val templates: Int,
-    val deleted: Int
-)
 
 

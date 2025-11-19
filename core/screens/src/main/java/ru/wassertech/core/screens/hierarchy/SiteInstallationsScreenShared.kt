@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import ru.wassertech.core.screens.hierarchy.ui.SiteInstallationsUiState
 import ru.wassertech.core.screens.hierarchy.ui.InstallationItemUi
 import ru.wassertech.core.ui.components.AppEmptyState
@@ -17,7 +18,6 @@ import ru.wassertech.core.ui.reorderable.ReorderableState
 import ru.wassertech.core.ui.reorderable.detectReorder
 import ru.wassertech.core.ui.icons.IconResolver
 import ru.wassertech.core.ui.icons.IconEntityType
-import ru.wassertech.core.ui.theme.SegmentedButtonStyle
 
 /**
  * Shared-экран для отображения списка установок объекта.
@@ -80,7 +80,8 @@ fun SiteInstallationsScreenShared(
             if (!isEditing && state.canAddInstallation) {
                 FloatingActionButton(
                     onClick = onAddInstallationClick,
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape // Полностью круглый FAB
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Добавить установку")
                 }
@@ -211,9 +212,6 @@ private fun InstallationRowShared(
         }
     }
     
-    // Состояние для сегментированных кнопок ТО
-    var selectedButton by remember(installation.id) { mutableStateOf<Int?>(null) }
-    
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
@@ -273,7 +271,7 @@ private fun InstallationRowShared(
                 
                 // Название установки
                 Text(
-                    "${index + 1}. ${installation.name}",
+                    installation.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = if (installation.isArchived) 
                         MaterialTheme.colorScheme.outline 
@@ -332,44 +330,6 @@ private fun InstallationRowShared(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                        }
-                    }
-                }
-            }
-            
-            // Сегментированные кнопки для ТО (только вне режима редактирования)
-            if (!isEditing && !installation.isArchived && 
-                (onStartMaintenance != null || onOpenMaintenanceHistory != null)) {
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (onStartMaintenance != null) {
-                        SegmentedButton(
-                            selected = selectedButton == 0,
-                            onClick = {
-                                selectedButton = 0
-                                onStartMaintenance()
-                            },
-                            shape = SegmentedButtonStyle.getShape(index = 0, count = 2),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Провести ТО")
-                        }
-                    }
-                    if (onOpenMaintenanceHistory != null) {
-                        SegmentedButton(
-                            selected = selectedButton == 1,
-                            onClick = {
-                                selectedButton = 1
-                                onOpenMaintenanceHistory()
-                            },
-                            shape = SegmentedButtonStyle.getShape(
-                                index = if (onStartMaintenance != null) 1 else 0, 
-                                count = if (onStartMaintenance != null) 2 else 1
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("История ТО")
                         }
                     }
                 }

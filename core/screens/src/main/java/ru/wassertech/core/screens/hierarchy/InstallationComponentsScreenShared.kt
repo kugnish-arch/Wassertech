@@ -239,7 +239,7 @@ private fun ComponentRowShared(
             // Название и тип компонента
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "${index + 1}. ${component.name}",
+                    component.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = if (component.isArchived) 
                         MaterialTheme.colorScheme.outline 

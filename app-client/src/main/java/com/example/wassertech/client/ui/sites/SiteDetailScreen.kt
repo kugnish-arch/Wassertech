@@ -57,6 +57,7 @@ import ru.wassertech.core.screens.hierarchy.ui.InstallationItemUi
 import ru.wassertech.client.ui.hierarchy.ClientHierarchyUiStateMapper
 import ru.wassertech.client.data.entities.toUserMembershipInfoList
 import ru.wassertech.core.auth.HierarchyPermissionChecker
+import ru.wassertech.client.ui.common.LocalEditingState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -77,6 +78,11 @@ fun SiteDetailScreen(
     val iconRepository = remember { IconRepository(context) }
     val scope = rememberCoroutineScope()
     val layoutDir = LocalLayoutDirection.current
+    
+    // Получаем состояние редактирования из CompositionLocal
+    val editingState = LocalEditingState.current
+    val isEditing = editingState?.isEditing ?: false
+    val onToggleEdit = editingState?.onToggle
     
     // Получаем текущую сессию пользователя
     val currentUser = remember { SessionManager.getInstance(context).getCurrentSession() }
@@ -453,8 +459,8 @@ fun SiteDetailScreen(
                 },
                 onStartMaintenance = null,
                 onOpenMaintenanceHistory = null,
-                isEditing = false,
-                onToggleEdit = null
+                isEditing = isEditing,
+                onToggleEdit = onToggleEdit
             )
         }
     }

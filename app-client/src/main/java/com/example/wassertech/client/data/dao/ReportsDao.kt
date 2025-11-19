@@ -47,11 +47,31 @@ interface ReportsDao {
     suspend fun getReportsForClient(clientId: String): List<ReportEntity>
     
     /**
+     * Получить все неархивные отчёты для указанной установки.
+     */
+    @Query("""
+        SELECT * FROM reports 
+        WHERE installationId = :installationId AND isArchived = 0
+        ORDER BY createdAtEpoch DESC
+    """)
+    suspend fun getReportsForInstallation(installationId: String): List<ReportEntity>
+    
+    /**
+     * Получить все неархивные отчёты для указанной сессии ТО.
+     */
+    @Query("""
+        SELECT * FROM reports 
+        WHERE sessionId = :sessionId AND isArchived = 0
+        ORDER BY createdAtEpoch DESC
+    """)
+    suspend fun getReportsForSession(sessionId: String): List<ReportEntity>
+    
+    /**
      * Получить максимальный updatedAtEpoch для указанного клиента.
      * Используется для инкрементальной синхронизации.
      */
     @Query("""
-        SELECT MAX(updatedAtEpoch) FROM reports 
+        SELECT MAX(COALESCE(updatedAtEpoch, createdAtEpoch)) FROM reports 
         WHERE clientId = :clientId AND isArchived = 0
     """)
     suspend fun getMaxUpdatedAtEpoch(clientId: String): Long?

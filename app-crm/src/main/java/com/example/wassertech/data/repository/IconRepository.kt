@@ -87,6 +87,27 @@ class IconRepository(private val context: Context) : IconDataSource {
     }
     
     /**
+     * Получить локальный путь к миниатюре иконки по ID.
+     */
+    suspend fun getLocalThumbnailPath(iconId: String): String? {
+        val icon = iconDao.getById(iconId)
+        // Сначала проверяем сохранённый путь в БД
+        if (!icon?.thumbnailLocalPath.isNullOrBlank()) {
+            val file = File(icon!!.thumbnailLocalPath!!)
+            if (file.exists()) {
+                return file.absolutePath
+            }
+        }
+        // Если путь в БД отсутствует или файл не найден, проверяем стандартное расположение
+        val file = getIconFile(iconId, "thumbnail")
+        return if (file.exists()) {
+            file.absolutePath
+        } else {
+            null
+        }
+    }
+    
+    /**
      * Проверить, загружена ли иконка локально.
      */
     override suspend fun isIconDownloaded(iconId: String): Boolean {
@@ -103,6 +124,68 @@ class IconRepository(private val context: Context) : IconDataSource {
             IllegalArgumentException("imageUrl is null for icon ${icon.id}")
         )
         return downloadIconImage(icon.id, imageUrl)
+    }
+    
+    /**
+     * Загрузить миниатюру иконки с сервера и сохранить локально.
+     */
+    suspend fun downloadThumbnail(iconId: String, thumbnailUrl: String): Result<File> = withContext(Dispatchers.IO) {
+        try {
+            // Исправляем путь: заменяем publicuploads или public/uploads на uploads
+            val correctedUrl = thumbnailUrl
+                .replace("/publicuploads/", "/uploads/")
+                .replace("/public/uploads/", "/uploads/")
+            
+            val fullUrl = if (correctedUrl.startsWith("http://") || correctedUrl.startsWith("https://")) {
+                // Абсолютный URL
+                correctedUrl
+            } else {
+                // Относительный URL - добавляем базовый URL
+                val base = baseUrl.removeSuffix("/")
+                val path = if (correctedUrl.startsWith("/")) correctedUrl else "/$correctedUrl"
+                "$base$path"
+            }
+            
+            Log.d(TAG, "Загрузка миниатюры иконки $iconId с URL: $fullUrl (исходный: $thumbnailUrl)")
+            
+            val okHttpClient = ApiClient.createOkHttpClient(tokenStorage, enableLogging = false)
+            val request = Request.Builder()
+                .url(fullUrl)
+                .get()
+                .build()
+            
+            val response = okHttpClient.newCall(request).execute()
+            
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(
+                    Exception("HTTP ${response.code}: ${response.message}")
+                )
+            }
+            
+            val body = response.body ?: return@withContext Result.failure(
+                Exception("Response body is null")
+            )
+            
+            val file = getIconFile(iconId, "thumbnail")
+            body.byteStream().use { input ->
+                FileOutputStream(file).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            // Обновляем путь в БД
+            val icon = iconDao.getById(iconId)
+            if (icon != null) {
+                val updatedIcon = icon.copy(thumbnailLocalPath = file.absolutePath)
+                iconDao.upsert(updatedIcon)
+            }
+            
+            Log.d(TAG, "Миниатюра иконки $iconId загружена: ${file.absolutePath}")
+            Result.success(file)
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при загрузке миниатюры иконки $iconId", e)
+            Result.failure(e)
+        }
     }
     
     /**
@@ -353,6 +436,62 @@ class IconRepository(private val context: Context) : IconDataSource {
     }
     
     /**
+     * Загрузить миниатюры для всех иконок, у которых есть thumbnailUrl, но нет локальной миниатюры.
+     * Используется при синхронизации для предварительной загрузки миниатюр.
+     */
+    suspend fun downloadMissingThumbnails(): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            // Получаем все иконки (включая неактивные) для загрузки миниатюр
+            // Используем getAllActive() для получения только активных, так как миниатюры нужны только для активных иконок
+            val allIcons = iconDao.getAllActive()
+            var downloadedCount = 0
+            var skippedCount = 0
+            
+            allIcons.forEach { icon ->
+                // Пропускаем иконки без thumbnailUrl
+                if (icon.thumbnailUrl.isNullOrBlank()) {
+                    skippedCount++
+                    return@forEach
+                }
+                
+                // Пропускаем иконки с androidResName (встроенные ресурсы)
+                if (!icon.androidResName.isNullOrBlank()) {
+                    skippedCount++
+                    return@forEach
+                }
+                
+                // Проверяем, есть ли уже локальная миниатюра
+                val existingPath = getLocalThumbnailPath(icon.id)
+                if (existingPath != null) {
+                    // Если путь есть в БД, но файл отсутствует, обновляем БД
+                    val file = File(existingPath)
+                    if (!file.exists()) {
+                        val updatedIcon = icon.copy(thumbnailLocalPath = null)
+                        iconDao.upsert(updatedIcon)
+                    } else {
+                        skippedCount++
+                        return@forEach
+                    }
+                }
+                
+                // Загружаем миниатюру
+                val result = downloadThumbnail(icon.id, icon.thumbnailUrl!!)
+                if (result.isSuccess) {
+                    downloadedCount++
+                } else {
+                    Log.w(TAG, "Не удалось загрузить миниатюру иконки ${icon.id}: ${result.exceptionOrNull()?.message}")
+                }
+            }
+            
+            Log.d(TAG, "Загрузка миниатюр завершена: загружено=$downloadedCount, пропущено=$skippedCount")
+            Result.success(downloadedCount)
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при загрузке миниатюр", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * Удалить локальные файлы иконок пака.
      */
     override suspend fun clearPackImages(packId: String) {
@@ -367,6 +506,11 @@ class IconRepository(private val context: Context) : IconDataSource {
                     val thumbFile = getIconFile(icon.id, "thumbnail")
                     if (thumbFile.exists()) {
                         thumbFile.delete()
+                    }
+                    // Очищаем путь в БД
+                    if (icon.thumbnailLocalPath != null) {
+                        val updatedIcon = icon.copy(thumbnailLocalPath = null)
+                        iconDao.upsert(updatedIcon)
                     }
                 }
                 

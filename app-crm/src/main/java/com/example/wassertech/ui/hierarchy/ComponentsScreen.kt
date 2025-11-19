@@ -447,8 +447,12 @@ fun ComponentsScreen(
                             newName = TextFieldValue("")
                             selectedTemplate = allTemplates.firstOrNull()
                         },
-                        onComponentArchive = { _ -> }, // Архивирование не используется для компонентов в CRM
-                        onComponentRestore = { _ -> }, // Восстановление не используется для компонентов в CRM
+                        onComponentArchive = { componentId ->
+                            vm.archiveComponent(componentId)
+                        },
+                        onComponentRestore = { componentId ->
+                            vm.restoreComponent(componentId)
+                        },
                         onComponentDelete = { componentId ->
                             pendingDeleteId = componentId
                         },

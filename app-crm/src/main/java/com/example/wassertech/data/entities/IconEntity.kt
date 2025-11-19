@@ -40,6 +40,7 @@ data class IconEntity(
     @ColumnInfo(name = "entityType") val entityType: String, // Тип сущности: "SITE", "INSTALLATION", "COMPONENT", "ANY"
     @ColumnInfo(name = "imageUrl") val imageUrl: String? = null, // URL изображения иконки (для загрузки с сервера)
     @ColumnInfo(name = "thumbnailUrl") val thumbnailUrl: String? = null, // URL миниатюры
+    @ColumnInfo(name = "thumbnailLocalPath") val thumbnailLocalPath: String? = null, // Локальный путь к сохранённой миниатюре
     @ColumnInfo(name = "androidResName") val androidResName: String? = null, // Имя ресурса Android (например, "ic_site_default")
     @ColumnInfo(name = "isActive") val isActive: Boolean = true, // Активна ли иконка (для фильтрации)
     // Поля для ролей и владения данными

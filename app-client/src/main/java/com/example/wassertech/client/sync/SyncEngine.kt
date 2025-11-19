@@ -331,6 +331,20 @@ class SyncEngine(private val context: Context) {
                 }
             }
             Log.d(TAG, "Обработано иконок: применено=$appliedCount, пропущено=$skippedCount")
+            
+            // Загружаем миниатюры для новых/обновлённых иконок в фоне
+            try {
+                val iconRepository = ru.wassertech.client.data.repository.IconRepository(context)
+                val downloadResult = iconRepository.downloadMissingThumbnails()
+                if (downloadResult.isSuccess) {
+                    Log.d(TAG, "Загружено миниатюр: ${downloadResult.getOrNull()}")
+                } else {
+                    Log.w(TAG, "Ошибка при загрузке миниатюр: ${downloadResult.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при загрузке миниатюр после синхронизации", e)
+                // Не прерываем синхронизацию из-за ошибок загрузки миниатюр
+            }
         }
         
         // Обрабатываем удаления
@@ -881,6 +895,7 @@ class SyncEngine(private val context: Context) {
             entityType = validEntityType,
             imageUrl = imageUrl,
             thumbnailUrl = thumbnailUrl,
+            thumbnailLocalPath = null, // Будет заполнено после загрузки миниатюры
             androidResName = androidResName,
             isActive = isActive,
             origin = origin ?: "CRM", // По умолчанию CRM для старых данных

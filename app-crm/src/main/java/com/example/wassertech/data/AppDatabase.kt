@@ -26,9 +26,11 @@ import ru.wassertech.data.migrations.MIGRATION_13_14  // ← Добавлени�
 import ru.wassertech.data.migrations.MIGRATION_14_15  // ← Добавление таблицы icon_pack_sync_status
 import ru.wassertech.data.migrations.MIGRATION_15_16  // ← Добавление поля folder в icon_packs
 import ru.wassertech.data.migrations.MIGRATION_16_17  // ← Добавление таблицы user_membership
+import ru.wassertech.data.migrations.MIGRATION_17_18  // ← Добавление поля thumbnailLocalPath в icons
+import ru.wassertech.data.migrations.MIGRATION_18_19  // ← Добавление таблицы reports
 
 @Database(
-    version = 17, // ← Обновлено: добавление таблицы user_membership
+    version = 19, // ← Обновлено: добавление таблицы reports
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -47,7 +49,8 @@ import ru.wassertech.data.migrations.MIGRATION_16_17  // ← Добавлени�
         IconPackEntity::class, // ← Новая сущность для паков иконок
         IconEntity::class, // ← Новая сущность для иконок
         IconPackSyncStatusEntity::class, // ← Сущность для отслеживания статуса загрузки
-        UserMembershipEntity::class // ← Сущность для контроля доступа пользователей
+        UserMembershipEntity::class, // ← Сущность для контроля доступа пользователей
+        ReportEntity::class // ← Сущность для PDF-отчётов
     ]
 )
 @TypeConverters(Converters::class)
@@ -67,6 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun iconDao(): ru.wassertech.data.dao.IconDao
     abstract fun iconPackSyncStatusDao(): ru.wassertech.data.dao.IconPackSyncStatusDao
     abstract fun userMembershipDao(): ru.wassertech.data.dao.UserMembershipDao
+    abstract fun reportDao(): ru.wassertech.data.dao.ReportDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -95,7 +99,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_13_14,  // ← Добавление поддержки иконок
                         MIGRATION_14_15,  // ← Добавление таблицы icon_pack_sync_status
                         MIGRATION_15_16,  // ← Добавление поля folder в icon_packs
-                        MIGRATION_16_17  // ← Добавление таблицы user_membership
+                        MIGRATION_16_17,  // ← Добавление таблицы user_membership
+                        MIGRATION_17_18,  // ← Добавление поля thumbnailLocalPath в icons
+                        MIGRATION_18_19  // ← Добавление таблицы reports
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

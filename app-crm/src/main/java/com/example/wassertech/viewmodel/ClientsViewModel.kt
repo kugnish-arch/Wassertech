@@ -285,11 +285,17 @@ class ClientsViewModel(
         }
 
     // --- Удаление (только для архивных элементов) ---
-    // Теперь удаление = архивирование (помечаем как архивный для синхронизации)
+    // Если клиент уже архивирован - удаляем физически, иначе архивируем
     fun deleteClient(clientId: String) = viewModelScope.launch(Dispatchers.IO) {
-        val client = clientDao.getClientNow(clientId)
-        val archivedClient = client.markArchivedForSync()
-        clientDao.upsertClient(archivedClient)
+        val client = clientDao.getClientByIdNow(clientId) ?: return@launch
+        if (client.isArchived == true) {
+            // Клиент уже архивирован - удаляем физически
+            SafeDeletionHelper.deleteClient(db, clientId)
+        } else {
+            // Клиент не архивирован - архивируем
+            val archivedClient = client.markArchivedForSync()
+            clientDao.upsertClient(archivedClient)
+        }
         reloadClients()
     }
 

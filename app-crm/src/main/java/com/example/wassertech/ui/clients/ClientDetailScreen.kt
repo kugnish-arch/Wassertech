@@ -38,6 +38,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import ru.wassertech.ui.common.EditDoneBottomBar
 import ru.wassertech.ui.common.BarAction
 import ru.wassertech.data.entities.SiteEntity
@@ -424,23 +426,26 @@ fun ClientDetailScreen(
     }
 
     // Получаем все установки заранее для всех сайтов (включая архивные в режиме редактирования)
-    var allInstallations by remember {
-        mutableStateOf<Map<String, List<InstallationEntity>>>(
-            emptyMap()
-        )
-    }
-    LaunchedEffect(sitesToShow, includeArchived, isEditing) {
-        scope.launch(Dispatchers.IO) {
-            val installationsMap = mutableMapOf<String, List<InstallationEntity>>()
-            val shouldIncludeArchived = includeArchived || isEditing
-            sitesToShow.forEach { site ->
-                val installations =
-                    vm.installations(site.id, includeArchived = shouldIncludeArchived).first()
-                installationsMap[site.id] = installations
+    // Используем Flow для автоматического обновления после операций
+    val shouldIncludeArchived = includeArchived || isEditing
+    val allInstallationsFlow = remember(sitesToShow.map { it.id }, shouldIncludeArchived) {
+        if (sitesToShow.isEmpty()) {
+            flowOf(emptyMap<String, List<InstallationEntity>>())
+        } else {
+            combine(
+                sitesToShow.map { site ->
+                    vm.installations(site.id, includeArchived = shouldIncludeArchived)
+                }
+            ) { installationsList ->
+                sitesToShow.mapIndexedNotNull { index, site ->
+                    if (index < installationsList.size) {
+                        site.id to installationsList[index]
+                    } else null
+                }.toMap()
             }
-            allInstallations = installationsMap
         }
     }
+    val allInstallations by allInstallationsFlow.collectAsState(initial = emptyMap())
     
     // Загружаем иконки для всех сайтов
     var siteIcons by remember {

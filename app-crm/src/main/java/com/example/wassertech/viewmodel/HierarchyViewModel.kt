@@ -315,6 +315,20 @@ class HierarchyViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
     
+    /** Архивировать компонент. */
+    fun archiveComponent(componentId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            hierarchyDao.archiveComponent(componentId)
+        }
+    }
+    
+    /** Восстановить компонент из архива. */
+    fun restoreComponent(componentId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            hierarchyDao.restoreComponent(componentId)
+        }
+    }
+    
     // ---------------------------------------------------------------------
     // 5) ИКОНКИ (Icons)
     // ---------------------------------------------------------------------

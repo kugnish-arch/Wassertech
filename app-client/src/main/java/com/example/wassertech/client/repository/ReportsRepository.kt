@@ -95,8 +95,12 @@ class ReportsRepository(private val context: Context) {
                             installationId = dto.installationId,
                             fileName = dto.fileName,
                             fileUrl = dto.fileUrl,
+                            filePath = dto.filePath,
+                            fileSize = dto.fileSize,
+                            mimeType = dto.mimeType,
                             createdAtEpoch = dto.createdAtEpoch,
                             updatedAtEpoch = dto.updatedAtEpoch ?: dto.createdAtEpoch,
+                            createdByUserId = dto.createdByUserId,
                             isArchived = dto.isArchived != 0,
                             localFilePath = null, // На этом шаге файл ещё не скачан
                             isDownloaded = false

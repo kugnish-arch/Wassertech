@@ -264,6 +264,13 @@ class IconPacksViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     /**
+     * Получает локальный путь к миниатюре иконки.
+     */
+    suspend fun getLocalThumbnailPath(icon: IconEntity): String? {
+        return iconRepository.getLocalThumbnailPath(icon.id)
+    }
+    
+    /**
      * Проверяет, загружена ли иконка локально.
      */
     suspend fun isIconDownloaded(iconId: String): Boolean {

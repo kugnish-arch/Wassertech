@@ -168,13 +168,14 @@ fun IconPackDetailScreen(
                         var iconUiModels by remember(filteredIcons) { mutableStateOf<List<IconUiModel>>(emptyList()) }
                         LaunchedEffect(filteredIcons) {
                             iconUiModels = filteredIcons.map { icon ->
-                                val localPath = viewModel.getLocalIconPath(icon)
+                                // Используем миниатюру вместо полноразмерного изображения
+                                val localPath = viewModel.getLocalThumbnailPath(icon)
                                 IconUiModel(
                                     id = icon.id,
                                     title = icon.label,
                                     entityType = icon.entityType,
                                     androidResName = icon.androidResName,
-                                    imageUrl = icon.imageUrl,
+                                    imageUrl = icon.thumbnailUrl, // Используем thumbnailUrl вместо imageUrl
                                     localImagePath = localPath
                                 )
                             }
