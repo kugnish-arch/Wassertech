@@ -22,10 +22,12 @@ import ru.wassertech.client.data.AppDatabase
 import ru.wassertech.client.data.entities.SiteEntity
 import ru.wassertech.client.data.entities.InstallationEntity
 import ru.wassertech.client.data.entities.ComponentEntity
+import ru.wassertech.client.data.entities.ComponentTemplateEntity
 import ru.wassertech.client.data.entities.SettingsEntity
 import ru.wassertech.client.data.entities.UserMembershipEntity
 import ru.wassertech.client.data.types.ComponentType
 import ru.wassertech.core.network.dto.sync.SyncUserMembershipDto
+import ru.wassertech.core.network.dto.SyncComponentTemplateDto
 
 /**
  * Движок синхронизации для app-client.
@@ -284,6 +286,29 @@ class SyncEngine(private val context: Context) {
         response.components.forEachIndexed { index, dto ->
             Log.d(TAG, "  [$index] Применяю компонент: id=${dto.id}, name='${dto.name}', installationId=${dto.installationId}")
             applyComponentToRoom(dto)
+        }
+        
+        // Обрабатываем шаблоны компонентов
+        if (response.component_templates.isNotEmpty()) {
+            Log.d(TAG, "Получено шаблонов компонентов с сервера: ${response.component_templates.size}")
+            var appliedCount = 0
+            var skippedCount = 0
+            response.component_templates.forEach { dto ->
+                val before = database.componentTemplatesDao().getById(dto.id)
+                applyComponentTemplateToRoom(dto)
+                val after = database.componentTemplatesDao().getById(dto.id)
+                if (after != null) {
+                    appliedCount++
+                    if (before == null) {
+                        Log.d(TAG, "  - Создан шаблон: id=${dto.id}, name=${dto.name}")
+                    } else {
+                        Log.d(TAG, "  - Обновлён шаблон: id=${dto.id}, name=${dto.name}")
+                    }
+                } else {
+                    skippedCount++
+                }
+            }
+            Log.d(TAG, "Обработано шаблонов компонентов: применено=$appliedCount, пропущено=$skippedCount")
         }
         
         // Обрабатываем user_membership
@@ -558,6 +583,27 @@ class SyncEngine(private val context: Context) {
         }
     }
     
+    private suspend fun applyComponentTemplateToRoom(dto: SyncComponentTemplateDto) {
+        val existing = database.componentTemplatesDao().getById(dto.id)
+        val entity = dto.toEntity()
+        val dtoUpdatedAt = dto.updatedAtEpoch
+        
+        Log.d(TAG, "  → Шаблон компонента: id=${dto.id}, name='${dto.name}', origin=${dto.origin}, existing=${existing != null}")
+        
+        if (existing == null) {
+            database.componentTemplatesDao().upsert(entity)
+            Log.d(TAG, "  ✓ Создан шаблон компонента в Room: ${dto.name} (id: ${dto.id})")
+        } else {
+            val existingUpdatedAt = existing.updatedAtEpoch
+            if (dtoUpdatedAt >= existingUpdatedAt) {
+                database.componentTemplatesDao().upsert(entity)
+                Log.d(TAG, "  ✓ Обновлён шаблон компонента в Room: ${dto.name} (id: ${dto.id})")
+            } else {
+                Log.d(TAG, "  ⊘ Пропущен шаблон компонента: ${dto.name} (id: ${dto.id}) - локальная версия новее (локальная: ${existingUpdatedAt}, сервер: ${dtoUpdatedAt})")
+            }
+        }
+    }
+    
     private suspend fun handleDeletedRecord(entityName: String?, recordId: String) {
         when (entityName) {
             "sites" -> {
@@ -571,6 +617,12 @@ class SyncEngine(private val context: Context) {
             "components" -> {
                 database.hierarchyDao().deleteComponent(recordId)
                 Log.d(TAG, "Удалён компонент: $recordId")
+            }
+            "component_templates" -> {
+                database.componentTemplatesDao().delete(
+                    database.componentTemplatesDao().getById(recordId) ?: return
+                )
+                Log.d(TAG, "Удалён шаблон компонента: $recordId")
             }
             else -> {
                 Log.w(TAG, "Неизвестный тип сущности для удаления: $entityName")
@@ -741,6 +793,16 @@ class SyncEngine(private val context: Context) {
             Log.d(TAG, "Найдено dirty user_membership записей для отправки: ${userMembership.size}")
         }
         
+        // Собираем dirty шаблоны компонентов
+        val componentTemplates = database.componentTemplatesDao().getDirtyComponentTemplatesNow().map { it.toSyncDto() }
+        
+        if (componentTemplates.isNotEmpty()) {
+            Log.d(TAG, "Найдено dirty шаблонов компонентов для отправки: ${componentTemplates.size}")
+            componentTemplates.forEach { template ->
+                Log.d(TAG, "  - Шаблон компонента: id=${template.id}, name=${template.name}")
+            }
+        }
+        
         return SyncPushRequest(
             clients = emptyList(), // Клиенты не создаются в app-client
             sites = sites,
@@ -748,7 +810,7 @@ class SyncEngine(private val context: Context) {
             components = components,
             maintenance_sessions = emptyList(), // Пока не реализовано
             maintenance_values = emptyList(), // Пока не реализовано
-            component_templates = emptyList(), // Пока не реализовано
+            component_templates = componentTemplates,
             component_template_fields = emptyList(), // Пока не реализовано
             userMembership = userMembership,
             deleted = emptyList() // Пока не реализовано
@@ -819,6 +881,19 @@ class SyncEngine(private val context: Context) {
             val errorCount = request.userMembership.size - successCount
             Log.d(TAG, "Обработано user_membership: успешно=$successCount, ошибок=$errorCount")
         }
+        
+        // Component templates
+        val templateIds = request.component_templates.map { it.id }
+        val templateErrorIds = errorIdsByType["component_templates"] ?: emptySet()
+        val templateSuccessIds = templateIds.filter { it !in templateErrorIds }
+        if (templateSuccessIds.isNotEmpty()) {
+            database.componentTemplatesDao().markComponentTemplatesAsSynced(templateSuccessIds)
+            Log.d(TAG, "Помечено как синхронизировано шаблонов компонентов: ${templateSuccessIds.size}")
+        }
+        if (templateErrorIds.isNotEmpty()) {
+            database.componentTemplatesDao().markComponentTemplatesAsConflict(templateErrorIds.toList())
+            Log.w(TAG, "Помечено как конфликт шаблонов компонентов: ${templateErrorIds.size}")
+        }
     }
     
     // Вспомогательные методы для преобразования Entity -> DTO
@@ -865,6 +940,36 @@ class SyncEngine(private val context: Context) {
         origin = origin,
         created_by_user_id = createdByUserId,
         iconId = iconId
+    )
+    
+    private fun ComponentTemplateEntity.toSyncDto() = SyncComponentTemplateDto(
+        id = id,
+        name = name,
+        category = category,
+        sortOrder = sortOrder,
+        defaultParamsJson = defaultParamsJson,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch,
+        isArchived = isArchived,
+        archivedAtEpoch = archivedAtEpoch,
+        origin = origin,
+        created_by_user_id = createdByUserId
+    )
+    
+    private fun SyncComponentTemplateDto.toEntity() = ComponentTemplateEntity(
+        id = id,
+        name = name,
+        category = category,
+        sortOrder = sortOrder,
+        defaultParamsJson = defaultParamsJson,
+        createdAtEpoch = createdAtEpoch,
+        updatedAtEpoch = updatedAtEpoch,
+        isArchived = isArchived,
+        archivedAtEpoch = archivedAtEpoch,
+        dirtyFlag = false, // Данные с сервера уже синхронизированы
+        syncStatus = 0, // SYNCED
+        origin = origin ?: "CRM", // По умолчанию CRM для старых данных
+        createdByUserId = created_by_user_id
     )
     
     private fun SyncIconPackDto.toEntity() = ru.wassertech.client.data.entities.IconPackEntity(

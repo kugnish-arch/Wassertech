@@ -64,58 +64,59 @@ fun HomeScreen(
         }
     }
     
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-    ) {
-            when (selectedTabIndex) {
-                0 -> {
-                    // Экран списка объектов
-                    if (clientId != null) {
-                        SitesScreen(
-                            clientId = clientId,
-                            onOpenSite = { siteId ->
-                                navController?.navigate(AppRoutes.siteDetail(siteId))
-                            }
+    when (selectedTabIndex) {
+        0 -> {
+            // Экран списка объектов
+            if (clientId != null) {
+                // Для SitesScreen передаем paddingValues напрямую, так как он сам применяет их к заголовку
+                SitesScreen(
+                    clientId = clientId,
+                    onOpenSite = { siteId ->
+                        navController?.navigate(AppRoutes.siteDetail(siteId))
+                    },
+                    paddingValues = paddingValues
+                )
+            } else {
+                // Если нет clientId (например, для ADMIN/ENGINEER), показываем сообщение
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = if (currentUser?.isAdmin() == true || currentUser?.isEngineer() == true) {
+                                "Приложение предназначено для клиентов.\nДля работы с системой используйте CRM-приложение."
+                            } else {
+                                "Ошибка: не удалось определить ID клиента"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
                         )
-                    } else {
-                        // Если нет clientId (например, для ADMIN/ENGINEER), показываем сообщение
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Text(
-                                    text = if (currentUser?.isAdmin() == true || currentUser?.isEngineer() == true) {
-                                        "Приложение предназначено для клиентов.\nДля работы с системой используйте CRM-приложение."
-                                    } else {
-                                        "Ошибка: не удалось определить ID клиента"
-                                    },
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
                     }
                 }
-                1 -> SettingsScreen(
-                    navController = navController as? NavHostController,
-                    onLogout = {
-                        // Навигация на экран логина с очисткой стека
-                        (navController as? NavHostController)?.navigate(AuthRoutes.LOGIN) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                )
             }
         }
+        1 -> Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            SettingsScreen(
+                navController = navController as? NavHostController,
+                onLogout = {
+                    // Навигация на экран логина с очисткой стека
+                    (navController as? NavHostController)?.navigate(AuthRoutes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
     }
-
-
-
+}

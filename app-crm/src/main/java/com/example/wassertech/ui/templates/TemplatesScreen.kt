@@ -39,21 +39,30 @@ fun TemplatesScreen(
     var showCreate by remember { mutableStateOf(false) }
 
     // Локальный порядок для live-перестановки
-    var localOrder by remember(templates, isEditing) { 
-        mutableStateOf(templates.map { it.id }) 
+    // Инициализируем из отсортированных шаблонов
+    var localOrder by remember { 
+        mutableStateOf<List<String>>(emptyList()) 
     }
     
-    // Синхронизируем локальный порядок при изменении состояния редактирования
+    // Синхронизируем локальный порядок при изменении шаблонов или состояния редактирования
     LaunchedEffect(isEditing, templates) {
-        if (!isEditing) {
-            localOrder = templates.map { it.id }
-        } else {
-            // При входе в режим редактирования фиксируем текущий порядок
-            val allTemplatesOrdered = templates.sortedWith(
+        if (templates.isEmpty()) {
+            localOrder = emptyList()
+        } else if (!isEditing) {
+            // В обычном режиме показываем только неархивные, отсортированные по sortOrder
+            val nonArchived = templates.filter { !it.isArchived }
+            val sorted = nonArchived.sortedWith(
                 compareBy<ComponentTemplateEntity> { it.sortOrder }
                     .thenBy { it.name.lowercase() }
             )
-            localOrder = allTemplatesOrdered.map { it.id }
+            localOrder = sorted.map { it.id }
+        } else {
+            // В режиме редактирования показываем все, отсортированные по sortOrder
+            val sorted = templates.sortedWith(
+                compareBy<ComponentTemplateEntity> { it.sortOrder }
+                    .thenBy { it.name.lowercase() }
+            )
+            localOrder = sorted.map { it.id }
         }
     }
     

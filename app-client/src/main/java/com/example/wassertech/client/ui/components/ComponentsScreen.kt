@@ -219,8 +219,11 @@ fun ComponentsScreen(
     var iconPickerState by remember { mutableStateOf<IconPickerUiState?>(null) }
     var iconPickerComponentId by remember { mutableStateOf<String?>(null) }
     
-    // Вычисляем отступ для FAB с учетом bottomBar из AppScaffold
-    val fabBottomPadding = paddingValues.calculateBottomPadding() + 16.dp // Высота bottomBar + зазор
+    // Вычисляем отступы для контента и FAB с учетом внешних отступов от AppScaffold
+    // paddingValues содержит отступы от topBar и bottomBar
+    val topPadding = paddingValues.calculateTopPadding()
+    val bottomPadding = paddingValues.calculateBottomPadding()
+    val fabBottomPadding = bottomPadding + 16.dp // Высота bottomBar + зазор
     
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -249,8 +252,8 @@ fun ComponentsScreen(
                 .padding(
                     start = padding.calculateStartPadding(layoutDir),
                     end = padding.calculateEndPadding(layoutDir),
-                    top = 0.dp,
-                    bottom = padding.calculateBottomPadding()
+                    top = topPadding + 8.dp, // Используем paddingValues для topPadding
+                    bottom = bottomPadding // Используем paddingValues для bottomPadding
                 )
         ) {
             // Заголовок установки

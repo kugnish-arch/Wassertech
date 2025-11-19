@@ -180,93 +180,140 @@ fun SitesScreen(
         }
     }
     
-    // Используем shared-экран
-    uiState?.let { state ->
-        ClientSitesScreenShared(
-            state = state,
-            onSiteClick = onOpenSite,
-            onAddSiteClick = {
-                showAddDialog = true
-                newSiteName = ""
-                newSiteAddress = ""
-            },
-            onSiteArchive = { siteId ->
-                scope.launch(Dispatchers.IO) {
-                    db.hierarchyDao().archiveSite(siteId)
+    // Используем shared-экран с черным заголовком
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        // Черный заголовок клиента
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = ru.wassertech.core.ui.theme.HeaderCardStyle.backgroundColor
+                ),
+                shape = ru.wassertech.core.ui.theme.HeaderCardStyle.shape
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(ru.wassertech.core.ui.theme.HeaderCardStyle.padding),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Выбираем иконку клиента в зависимости от типа
+                    val clientIconRes =
+                        if (isCorporate) R.drawable.person_client_corporate_blue else R.drawable.person_client_blue
+                    Image(
+                        painter = painterResource(id = clientIconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(ru.wassertech.core.ui.theme.HeaderCardStyle.iconSize * 2),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        clientName,
+                        style = ru.wassertech.core.ui.theme.HeaderCardStyle.titleTextStyle,
+                        color = ru.wassertech.core.ui.theme.HeaderCardStyle.textColor
+                    )
                 }
-            },
-            onSiteRestore = { siteId ->
-                scope.launch(Dispatchers.IO) {
-                    db.hierarchyDao().restoreSite(siteId)
-                }
-            },
-            onSiteDelete = { siteId ->
-                deleteSiteId = siteId
-            },
-            onChangeSiteIcon = { siteId ->
-                if (currentUser != null) {
-                    val site = sites.find { it.id == siteId }
-                    if (site != null && canChangeIconForSite(currentUser, site)) {
+            }
+            HorizontalDivider(
+                color = ru.wassertech.core.ui.theme.HeaderCardStyle.borderColor,
+                thickness = ru.wassertech.core.ui.theme.HeaderCardStyle.borderThickness
+            )
+        }
+        
+        // Shared-экран со списком объектов
+        uiState?.let { state ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                ClientSitesScreenShared(
+                    state = state,
+                    onSiteClick = onOpenSite,
+                    onAddSiteClick = {
+                        showAddDialog = true
+                        newSiteName = ""
+                        newSiteAddress = ""
+                    },
+                    onSiteArchive = { siteId ->
                         scope.launch(Dispatchers.IO) {
-                            val packs = db.iconPackDao().getAll()
-                            val allIcons = db.iconDao().getAllActive()
-                            val filteredIcons = allIcons.filter { icon ->
-                                icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
-                            }
-                            val iconsByPack = filteredIcons.groupBy { it.packId }
-                            
-                            val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
-                                icons.map { icon ->
-                                    var localPath = iconRepository.getLocalIconPath(icon.id)
+                            db.hierarchyDao().archiveSite(siteId)
+                        }
+                    },
+                    onSiteRestore = { siteId ->
+                        scope.launch(Dispatchers.IO) {
+                            db.hierarchyDao().restoreSite(siteId)
+                        }
+                    },
+                    onSiteDelete = { siteId ->
+                        deleteSiteId = siteId
+                    },
+                    onChangeSiteIcon = { siteId ->
+                        if (currentUser != null) {
+                            val site = sites.find { it.id == siteId }
+                            if (site != null && canChangeIconForSite(currentUser, site)) {
+                                scope.launch(Dispatchers.IO) {
+                                    val packs = db.iconPackDao().getAll()
+                                    val allIcons = db.iconDao().getAllActive()
+                                    val filteredIcons = allIcons.filter { icon ->
+                                        icon.entityType == "ANY" || icon.entityType == IconEntityType.SITE.name
+                                    }
+                                    val iconsByPack = filteredIcons.groupBy { it.packId }
                                     
-                                    if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
-                                        val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
-                                        if (downloadResult.isSuccess) {
-                                            localPath = iconRepository.getLocalIconPath(icon.id)
+                                    val iconsByPackWithPaths = iconsByPack.mapValues { (_, icons) ->
+                                        icons.map { icon ->
+                                            var localPath = iconRepository.getLocalIconPath(icon.id)
+                                            
+                                            if (localPath == null && !icon.imageUrl.isNullOrBlank() && icon.androidResName.isNullOrBlank()) {
+                                                val downloadResult = iconRepository.downloadIconImage(icon.id, icon.imageUrl)
+                                                if (downloadResult.isSuccess) {
+                                                    localPath = iconRepository.getLocalIconPath(icon.id)
+                                                }
+                                            }
+                                            
+                                            ru.wassertech.core.ui.components.IconUiData(
+                                                id = icon.id,
+                                                packId = icon.packId,
+                                                label = icon.label,
+                                                entityType = icon.entityType,
+                                                androidResName = icon.androidResName,
+                                                code = icon.code,
+                                                localImagePath = localPath
+                                            )
                                         }
                                     }
                                     
-                                    ru.wassertech.core.ui.components.IconUiData(
-                                        id = icon.id,
-                                        packId = icon.packId,
-                                        label = icon.label,
-                                        entityType = icon.entityType,
-                                        androidResName = icon.androidResName,
-                                        code = icon.code,
-                                        localImagePath = localPath
+                                    iconPickerState = IconPickerUiState(
+                                        packs = packs.map { 
+                                            ru.wassertech.core.ui.components.IconPackUiData(
+                                                id = it.id,
+                                                name = it.name
+                                            )
+                                        },
+                                        iconsByPack = iconsByPackWithPaths
                                     )
+                                    iconPickerSiteId = siteId
+                                    isIconPickerVisible = true
                                 }
                             }
-                            
-                            iconPickerState = IconPickerUiState(
-                                packs = packs.map { 
-                                    ru.wassertech.core.ui.components.IconPackUiData(
-                                        id = it.id,
-                                        name = it.name
-                                    )
-                                },
-                                iconsByPack = iconsByPackWithPaths
-                            )
-                            iconPickerSiteId = siteId
-                            isIconPickerVisible = true
                         }
-                    }
-                }
-            },
-            onSitesReordered = { newOrder ->
-                scope.launch(Dispatchers.IO) {
-                    val currentSites = db.hierarchyDao().observeSitesIncludingArchived(clientId).first()
-                    val ordered = newOrder.mapIndexedNotNull { idx, id ->
-                        currentSites.firstOrNull { it.id == id }?.copy(orderIndex = idx)
-                    }
-                    if (ordered.isNotEmpty()) {
-                        db.hierarchyDao().reorderSites(ordered)
-                    }
-                }
-            },
-            isEditing = isEditing,
-            onToggleEdit = onToggleEdit
-        )
+                    },
+                    onSitesReordered = { newOrder ->
+                        scope.launch(Dispatchers.IO) {
+                            val currentSites = db.hierarchyDao().observeSitesIncludingArchived(clientId).first()
+                            val ordered = newOrder.mapIndexedNotNull { idx, id ->
+                                currentSites.firstOrNull { it.id == id }?.copy(orderIndex = idx)
+                            }
+                            if (ordered.isNotEmpty()) {
+                                db.hierarchyDao().reorderSites(ordered)
+                            }
+                        }
+                    },
+                    isEditing = isEditing,
+                    onToggleEdit = onToggleEdit
+                )
+            }
+        }
     }
     
     // Диалог добавления объекта

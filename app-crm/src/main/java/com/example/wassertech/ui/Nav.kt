@@ -121,7 +121,7 @@ fun AppTopBar(
         when {
             route == "login" -> "Вход"
             route.startsWith("clients") -> "Клиенты"
-            route.startsWith("templates") -> "Шаблоны компонентов"
+            route.startsWith("templates") -> "Шаблоны"
             route.startsWith("template_editor") -> "Редактор шаблона"
             route.startsWith("client/") -> "Клиент"
             route.startsWith("site/") -> "Объект"

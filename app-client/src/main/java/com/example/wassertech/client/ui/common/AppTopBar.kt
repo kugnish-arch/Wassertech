@@ -53,7 +53,7 @@ fun AppTopBar(
             route.startsWith("installation/") -> "Установка"
             route.startsWith("session_detail/") -> "Детали обслуживания"
             route.startsWith("maintenance_history/") -> "История обслуживания"
-            route.startsWith("templates") -> "Шаблоны компонентов"
+            route.startsWith("templates") -> "Шаблоны"
             route.startsWith("template_editor/") -> "Редактор шаблона"
             route == AppRoutes.CLIENT_ICON_PACKS || route.startsWith("client_icon_packs") -> "Икон паки"
             else -> "Wassertech Client"

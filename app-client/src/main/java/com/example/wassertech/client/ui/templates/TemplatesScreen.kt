@@ -36,28 +36,55 @@ fun TemplatesScreen(
     val isEditing = editingState?.isEditing ?: false
     val onToggleEdit = editingState?.onToggle
     
+    // Получаем ID текущего пользователя для фильтрации шаблонов
+    // Используем LaunchedEffect для обновления при изменении сессии
+    var currentUserId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        currentUserId = ru.wassertech.core.auth.SessionManager.getInstance(context).getCurrentSession()?.userId
+    }
+    
     val templatesFlow: kotlinx.coroutines.flow.Flow<List<ComponentTemplateEntity>> =
         remember { dao.observeAll() }
-    val templates by templatesFlow.collectAsState(initial = emptyList())
+    val allTemplates by templatesFlow.collectAsState(initial = emptyList())
+    
+    // Фильтруем шаблоны по текущему пользователю
+    val templates = remember(allTemplates, currentUserId) {
+        if (currentUserId != null) {
+            allTemplates.filter { it.createdByUserId == currentUserId }
+        } else {
+            // Если пользователь не авторизован, показываем пустой список
+            emptyList()
+        }
+    }
 
     // Диалог «Создать шаблон»
     var showCreate by remember { mutableStateOf(false) }
 
     // Локальный порядок для live-перестановки
-    var localOrder by remember(templates, isEditing) { 
-        mutableStateOf(templates.map { it.id }) 
+    // Инициализируем из отсортированных шаблонов
+    var localOrder by remember { 
+        mutableStateOf<List<String>>(emptyList()) 
     }
     
-    // Синхронизируем локальный порядок при изменении состояния редактирования
+    // Синхронизируем локальный порядок при изменении шаблонов или состояния редактирования
     LaunchedEffect(isEditing, templates) {
-        if (!isEditing) {
-            localOrder = templates.map { it.id }
-        } else {
-            val allTemplatesOrdered = templates.sortedWith(
+        if (templates.isEmpty()) {
+            localOrder = emptyList()
+        } else if (!isEditing) {
+            // В обычном режиме показываем только неархивные, отсортированные по sortOrder
+            val nonArchived = templates.filter { !it.isArchived }
+            val sorted = nonArchived.sortedWith(
                 compareBy<ComponentTemplateEntity> { it.sortOrder }
                     .thenBy { it.name.lowercase() }
             )
-            localOrder = allTemplatesOrdered.map { it.id }
+            localOrder = sorted.map { it.id }
+        } else {
+            // В режиме редактирования показываем все, отсортированные по sortOrder
+            val sorted = templates.sortedWith(
+                compareBy<ComponentTemplateEntity> { it.sortOrder }
+                    .thenBy { it.name.lowercase() }
+            )
+            localOrder = sorted.map { it.id }
         }
     }
     
@@ -67,7 +94,20 @@ fun TemplatesScreen(
             scope.launch {
                 Log.d(TAG, "Сохранение порядка шаблонов: количество=${localOrder.size}")
                 localOrder.forEachIndexed { index, id ->
-                    dao.setSortOrder(id, index)
+                    // Обновляем sortOrder и помечаем как dirty для синхронизации
+                    val template = dao.getById(id)
+                    template?.let {
+                        val updatedTemplate = it.copy(
+                            sortOrder = index,
+                            updatedAtEpoch = System.currentTimeMillis(),
+                            dirtyFlag = true,
+                            syncStatus = 1
+                        )
+                        dao.upsert(updatedTemplate)
+                    } ?: run {
+                        // Если не нашли по ID, используем старый метод (он тоже помечает как dirty)
+                        dao.setSortOrder(id, index)
+                    }
                 }
             }
         }
@@ -127,6 +167,7 @@ fun TemplatesScreen(
             onOpenTemplate(templateId)
             Log.d(TAG, "onOpenTemplate вызван, ожидаем навигацию")
         },
+        externalPaddingValues = paddingValues,
         onCreateTemplateClick = { showCreate = true },
         onTemplateArchive = { templateId ->
             scope.launch {
@@ -165,10 +206,15 @@ fun TemplatesScreen(
                     sortOrder = nextOrder,
                     isArchived = false,
                     createdAtEpoch = currentTime,
-                    updatedAtEpoch = currentTime
+                    updatedAtEpoch = currentTime,
+                    dirtyFlag = true, // Помечаем как dirty для синхронизации
+                    syncStatus = 1, // QUEUED
+                    origin = "CLIENT", // Указываем, что шаблон создан в client-приложении
+                    createdByUserId = currentUserId // Сохраняем ID создателя
                 )
                 Log.d(TAG, "Создание шаблона: id=$id, name=$title, " +
-                        "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}")
+                        "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}, " +
+                        "createdByUserId=${entity.createdByUserId}, dirtyFlag=${entity.dirtyFlag}")
                 dao.upsert(entity)
                 showCreate = false
                 kotlinx.coroutines.delay(150)

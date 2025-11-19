@@ -38,4 +38,26 @@ interface ComponentTemplatesDao {
 
     @Delete
     suspend fun delete(item: ComponentTemplateEntity)
+    
+    // ========== Методы синхронизации ==========
+    
+    /** Получить все "грязные" шаблоны компонентов */
+    @Query("SELECT * FROM component_templates WHERE dirtyFlag = 1")
+    fun getDirtyComponentTemplatesNow(): List<ComponentTemplateEntity>
+    
+    /** Пометить шаблоны компонентов как синхронизированные */
+    @Query("""
+        UPDATE component_templates 
+        SET dirtyFlag = 0, syncStatus = 0 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markComponentTemplatesAsSynced(ids: List<String>)
+    
+    /** Пометить шаблоны компонентов как конфликтные */
+    @Query("""
+        UPDATE component_templates 
+        SET dirtyFlag = 0, syncStatus = 2 
+        WHERE id IN (:ids)
+    """)
+    suspend fun markComponentTemplatesAsConflict(ids: List<String>)
 }
