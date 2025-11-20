@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -22,15 +23,13 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
-    }
 }
 
 dependencies {
     // Core modules
     implementation(project(":core:ui"))
     implementation(project(":core:auth"))
+    implementation(project(":core:network"))
     
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
@@ -49,5 +48,8 @@ dependencies {
     
     // Coroutines для Flow
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    
+    // Vico для графиков (совместима с Kotlin 2.0.21)
+    implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
 }
 

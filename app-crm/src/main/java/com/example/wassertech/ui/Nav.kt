@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.EditNote
 import ru.wassertech.core.ui.theme.EditButtonStyle
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -182,6 +183,25 @@ fun AppTopBar(
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("templates") {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Мониторинг") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.DeviceThermostat,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("remote_monitor") {
                                         launchSingleTop = true
                                     }
                                 },
@@ -653,6 +673,18 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                 TemplateEditorScreen(
                     templateId = id,
                     onSaved = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = "remote_monitor",
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) {
+                ru.wassertech.ui.remote.RemoteMonitorScreen(
+                    onBackClick = { navController.popBackStack() }
                 )
             }
 
