@@ -333,3 +333,6 @@ SyncIndicator(state = syncState)
 **Автор:** AI Assistant (Cursor)  
 **Дата:** 2025-01-13
 
+
+
+

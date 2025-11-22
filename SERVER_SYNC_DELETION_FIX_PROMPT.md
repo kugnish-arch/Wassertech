@@ -92,3 +92,6 @@
 - `app-crm/src/main/java/com/example/wassertech/sync/SafeDeletionHelper.kt` - удаление сущностей
 - `app-crm/src/main/java/com/example/wassertech/sync/DeletionTracker.kt` - отслеживание удалений
 
+
+
+

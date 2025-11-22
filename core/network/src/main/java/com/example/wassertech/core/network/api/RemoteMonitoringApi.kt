@@ -15,12 +15,14 @@ interface RemoteMonitoringApi {
      * @param deviceId ID устройства
      * @param from Начальная дата и время в формате "YYYY-MM-DD+HH:MM:SS" (плюс вместо пробела)
      * @param to Конечная дата и время в формате "YYYY-MM-DD+HH:MM:SS" (плюс вместо пробела)
+     * @param limit Максимальное количество точек (опционально, для получения самых новых точек)
      */
     @GET("sensors/temperature/get.php")
     suspend fun getTemperatureLogs(
         @Query("device_id") deviceId: String,
         @Query("from") from: String,
-        @Query("to") to: String
+        @Query("to") to: String,
+        @Query("limit") limit: Int? = null
     ): Response<TemperatureLogResponseDto>
 }
 

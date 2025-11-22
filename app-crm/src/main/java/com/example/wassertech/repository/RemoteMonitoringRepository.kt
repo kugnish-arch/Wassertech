@@ -51,7 +51,8 @@ class RemoteMonitoringRepository(private val context: Context) {
         try {
             Log.d(TAG, "Загрузка логов температуры: deviceId=$deviceId, from=$from, to=$to")
             
-            val response = api.getTemperatureLogs(deviceId, from, to)
+            // Запрашиваем последние 1000 точек (самые новые), чтобы гарантированно получить все данные
+            val response = api.getTemperatureLogs(deviceId, from, to, limit = 1000)
             
             if (response.isSuccessful) {
                 val dto = response.body()

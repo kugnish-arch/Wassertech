@@ -17,9 +17,9 @@ fun RemoteMonitorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
-    // Запускаем мониторинг при заходе на экран
-    LaunchedEffect(deviceId) {
-        viewModel.startMonitoring(deviceId)
+    // Запускаем мониторинг обоих устройств при заходе на экран
+    LaunchedEffect(Unit) {
+        viewModel.startMonitoring()
     }
     
     RemoteMonitorSharedScreen(

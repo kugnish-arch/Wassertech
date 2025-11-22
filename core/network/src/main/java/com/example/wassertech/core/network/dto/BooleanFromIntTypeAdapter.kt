@@ -47,3 +47,6 @@ class BooleanFromIntTypeAdapter : TypeAdapter<Boolean>() {
 }
 
 
+
+
+

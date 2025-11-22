@@ -6,6 +6,7 @@ package ru.wassertech.core.network.dto
 data class SyncPushResponse(
     val success: Boolean,
     val processed: ProcessedCounts? = null,
+    val result: PushResult? = null,
     val errors: List<SyncError> = emptyList()
 )
 
@@ -24,6 +25,29 @@ data class ProcessedCounts(
 )
 
 /**
+ * Результат обработки запроса push с детализацией по типам операций
+ */
+data class PushResult(
+    val clients: EntityResult? = null,
+    val sites: EntityResult? = null,
+    val installations: EntityResult? = null,
+    val components: EntityResult? = null,
+    val maintenance_sessions: EntityResult? = null,
+    val maintenance_values: EntityResult? = null,
+    val component_templates: EntityResult? = null,
+    val component_template_fields: EntityResult? = null
+)
+
+/**
+ * Результат обработки сущностей одного типа
+ */
+data class EntityResult(
+    val inserted: List<String> = emptyList(),
+    val updated: List<String> = emptyList(),
+    val skipped: List<String> = emptyList()
+)
+
+/**
  * Ошибка при синхронизации конкретной записи
  */
 data class SyncError(
@@ -31,3 +55,7 @@ data class SyncError(
     val entityId: String,
     val message: String
 )
+
+
+
+

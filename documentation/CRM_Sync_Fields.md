@@ -208,3 +208,6 @@ clientDao.markClientsAsSynced(syncedIds)
 - Поле `synced` в `MaintenanceSessionEntity` оставлено для обратной совместимости, но рекомендуется использовать `syncStatus`
 
 
+
+
+

@@ -24,3 +24,6 @@ data class IconPackSyncStatusEntity(
     @ColumnInfo(name = "downloadedIcons") val downloadedIcons: Int = 0 // Количество загруженных иконок
 )
 
+
+
+
