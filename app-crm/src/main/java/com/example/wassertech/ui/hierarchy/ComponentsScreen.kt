@@ -2,6 +2,7 @@
 
 package ru.wassertech.ui.hierarchy
 
+import android.util.Log
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -41,6 +42,7 @@ import ru.wassertech.viewmodel.TemplatesViewModel
 import ru.wassertech.data.entities.ComponentTemplateEntity
 import ru.wassertech.data.types.ComponentType
 import ru.wassertech.data.AppDatabase
+import ru.wassertech.core.screens.templates.ComponentTemplateCategory
 import ru.wassertech.ui.common.EditDoneBottomBar
 import ru.wassertech.ui.common.CommonAddDialog
 import ru.wassertech.viewmodel.ClientsViewModel
@@ -62,6 +64,7 @@ import ru.wassertech.core.screens.hierarchy.InstallationComponentsScreenShared
 import ru.wassertech.core.screens.hierarchy.ui.InstallationComponentsUiState
 import ru.wassertech.ui.hierarchy.HierarchyUiStateMapper
 import ru.wassertech.data.repository.IconRepository
+import ru.wassertech.repository.RemoteMonitoringRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -74,12 +77,14 @@ fun ComponentsScreen(
     onStartMaintenance: (String) -> Unit, // пока не используем для одиночного компонента
     onStartMaintenanceAll: (siteId: String, installationName: String) -> Unit,
     onOpenMaintenanceHistoryForInstallation: (String) -> Unit = {},   // навигация в историю ТО
+    onOpenRemoteMonitor: ((String) -> Unit)? = null, // Навигация на экран мониторинга для SENSOR компонента
     vm: HierarchyViewModel = viewModel(),
     templatesVm: TemplatesViewModel = viewModel() // оставлено для совместимости
 ) {
     // --- Templates из БД без VM ---
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
+    val remoteMonitoringRepository = remember { RemoteMonitoringRepository(context) }
     val allTemplatesFlow: Flow<List<ComponentTemplateEntity>> =
         remember { db.templatesDao().observeAllTemplates() }
     val allTemplates by allTemplatesFlow.collectAsState(initial = emptyList())
@@ -238,18 +243,95 @@ fun ComponentsScreen(
         }
     }
     
+    // Проверяем, есть ли SENSOR компоненты для периодического обновления
+    val hasSensorComponents = remember(components) {
+        components.any { it.type == ComponentType.SENSOR }
+    }
+    
+    // Периодическое обновление температуры для SENSOR компонентов (1 раз в минуту)
+    var refreshKey by remember { mutableStateOf(0) }
+    LaunchedEffect(hasSensorComponents) {
+        if (hasSensorComponents && !isEditing) {
+            while (true) {
+                kotlinx.coroutines.delay(60_000) // 1 минута
+                refreshKey++
+            }
+        }
+    }
+    
+    // Сохраняем коды датчиков для каждого SENSOR компонента
+    var sensorCodesMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    
     // Преобразуем в UI State для shared-экрана
     var uiState by remember {
         mutableStateOf<InstallationComponentsUiState?>(null)
     }
-    LaunchedEffect(components, componentIcons, templateTitleById) {
+    LaunchedEffect(components, componentIcons, templateTitleById, allTemplates, refreshKey) {
         scope.launch(Dispatchers.IO) {
+            val templateFieldsDao = db.componentTemplateFieldsDao()
+            
+            // Вычисляем коды датчиков для каждого SENSOR компонента
+            val codesMap = mutableMapOf<String, String>()
+            components.filter { it.type == ComponentType.SENSOR && it.templateId != null }.forEach { component ->
+                val fields = templateFieldsDao.getFieldsForTemplate(component.templateId!!)
+                val sensorField = fields.find { it.key == "Имя датчика" } ?: fields.firstOrNull()
+                val sensorCode = sensorField?.label
+                if (sensorCode != null && sensorCode.isNotBlank()) {
+                    codesMap[component.id] = sensorCode
+                }
+            }
+            sensorCodesMap = codesMap
+            
             val items = components.map { component ->
                 val icon = componentIcons[component.id]
                 val templateName = component.templateId?.let { templateTitleById[it] }
+                
+                Log.d("ComponentsScreen", "=== Обработка компонента: id=${component.id}, name=${component.name}, type=${component.type.name}, templateId=${component.templateId} ===")
+                
+                // Для SENSOR компонентов загружаем температуру через API
+                var temperatureValue: Double? = null
+                if (component.type == ComponentType.SENSOR && component.templateId != null) {
+                    Log.d("ComponentsScreen", "Компонент ${component.id} является SENSOR, загружаем температуру через API...")
+                    
+                    // Получаем код датчика из шаблона (поле с key="Имя датчика")
+                    val fields = templateFieldsDao.getFieldsForTemplate(component.templateId)
+                    Log.d("ComponentsScreen", "Поля шаблона для компонента ${component.id}: количество=${fields.size}, поля=${fields.map { "key=${it.key}, label=${it.label}" }}")
+                    
+                    val sensorField = fields.find { it.key == "Имя датчика" } ?: fields.firstOrNull()
+                    val sensorCode = sensorField?.label
+                    Log.d("ComponentsScreen", "Код датчика для компонента ${component.id}: sensorCode=$sensorCode (из поля key=${sensorField?.key})")
+                    
+                    if (sensorCode != null && sensorCode.isNotBlank()) {
+                        try {
+                            // Загружаем последнее значение температуры через API
+                            Log.d("ComponentsScreen", "Запрос последнего значения температуры через API для device_id='$sensorCode'")
+                            temperatureValue = remoteMonitoringRepository.getLatestTemperature(sensorCode)
+                            Log.d("ComponentsScreen", "Результат запроса температуры через API для компонента ${component.id} (device_id='$sensorCode'): temperatureValue=$temperatureValue")
+                        } catch (e: Exception) {
+                            Log.e("ComponentsScreen", "Ошибка при запросе температуры через API для device_id='$sensorCode'", e)
+                            temperatureValue = null
+                        }
+                    } else {
+                        Log.w("ComponentsScreen", "Код датчика пустой или null для компонента ${component.id}: sensorCode='$sensorCode'")
+                    }
+                } else {
+                    if (component.type == ComponentType.SENSOR) {
+                        Log.w("ComponentsScreen", "SENSOR компонент ${component.id} не имеет templateId")
+                    }
+                }
+                
                 withContext(Dispatchers.IO) {
+                    Log.d("ComponentsScreen", "Создание ComponentItemUi для компонента ${component.id}: передаем temperatureValue=$temperatureValue")
                     HierarchyUiStateMapper.run {
-                        component.toComponentItemUi(iconRepository, icon, templateName)
+                        val itemUi = component.toComponentItemUi(
+                            iconRepository, 
+                            icon, 
+                            templateName,
+                            sensorCode = null, // Не используется в UI, только для отладки
+                            temperatureValue = temperatureValue
+                        )
+                        Log.d("ComponentsScreen", "ComponentItemUi создан для компонента ${component.id}: temperatureValue=${itemUi.temperatureValue}, type=${itemUi.type}")
+                        itemUi
                     }
                 }
             }
@@ -441,7 +523,13 @@ fun ComponentsScreen(
                 Box(modifier = Modifier.weight(1f)) {
                     InstallationComponentsScreenShared(
                         state = state,
-                        onComponentClick = null, // Компоненты не кликабельны в CRM
+                        onComponentClick = { componentId ->
+                            // Для SENSOR компонентов открываем экран мониторинга
+                            val sensorCode = sensorCodesMap[componentId]
+                            if (sensorCode != null && onOpenRemoteMonitor != null) {
+                                onOpenRemoteMonitor(sensorCode)
+                            }
+                        },
                         onAddComponentClick = {
                             showAdd = true
                             newName = TextFieldValue("")
@@ -600,10 +688,20 @@ fun ComponentsScreen(
                 val tmpl = selectedTemplate
                 val compName = if (newName.text.isNotBlank()) newName.text.trim()
                 else tmpl?.name ?: "Компонент"
+                // Определяем тип компонента на основе категории шаблона
+                val componentType = if (tmpl != null) {
+                    val category = ComponentTemplateCategory.fromString(tmpl.category)
+                    when (category) {
+                        ComponentTemplateCategory.SENSOR -> ComponentType.SENSOR
+                        else -> ComponentType.COMMON // Для COMPONENT и по умолчанию
+                    }
+                } else {
+                    ComponentType.COMMON
+                }
                 vm.addComponentFromTemplate(
                     installationId = installationId,
                     name = compName,
-                    type = ComponentType.COMMON, // дефолтный тип
+                    type = componentType,
                     templateId = tmpl?.id
                 )
                 showAdd = false

@@ -33,6 +33,8 @@ fun TemplateEditorScreen(
 
     var templateName by remember { mutableStateOf<String>("Шаблон") }
     var isHeadComponent by remember { mutableStateOf<Boolean>(false) }
+    var templateCategory by remember { mutableStateOf<String?>("COMPONENT") } // "COMPONENT" или "SENSOR"
+    var sensorCode by remember { mutableStateOf<String>("") } // Код датчика для SENSOR шаблонов
     var isLoading by remember { mutableStateOf(true) }
 
     // Поля шаблона (пока пустой список, так как в app-client нет DAO для полей)
@@ -65,11 +67,13 @@ fun TemplateEditorScreen(
         }
     }
 
-    val uiState = remember(templateId, templateName, isHeadComponent, fields, localFieldOrder) {
+    val uiState = remember(templateId, templateName, isHeadComponent, templateCategory, sensorCode, fields, localFieldOrder) {
         TemplateEditorUiState(
             templateId = templateId,
             templateName = templateName,
             isHeadComponent = isHeadComponent,
+            category = templateCategory,
+            sensorCode = sensorCode,
             fields = fields,
             localFieldOrder = localFieldOrder
         )

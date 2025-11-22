@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import ru.wassertech.core.screens.hierarchy.ui.InstallationComponentsUiState
 import ru.wassertech.core.screens.hierarchy.ui.ComponentItemUi
@@ -263,6 +264,21 @@ private fun ComponentRowShared(
                         )
                     }
                 }
+            }
+            
+            // Отображение температуры для SENSOR компонентов (справа крупными зелеными цифрами)
+            if (component.type == "SENSOR" && !isEditing) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = component.temperatureValue?.let { 
+                        String.format(java.util.Locale.getDefault(), "%.1f°C", it)
+                    } ?: "—°C",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    color = Color(0xFF4CAF50), // Зеленый цвет
+                    modifier = Modifier.padding(end = 4.dp)
+                )
             }
             
             // Кнопки действий (только в режиме редактирования)

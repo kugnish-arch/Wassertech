@@ -28,9 +28,10 @@ import ru.wassertech.data.migrations.MIGRATION_15_16  // ← Добавлени�
 import ru.wassertech.data.migrations.MIGRATION_16_17  // ← Добавление таблицы user_membership
 import ru.wassertech.data.migrations.MIGRATION_17_18  // ← Добавление поля thumbnailLocalPath в icons
 import ru.wassertech.data.migrations.MIGRATION_18_19  // ← Добавление таблицы reports
+import ru.wassertech.data.migrations.MIGRATION_19_20  // ← Добавление таблицы sensor_temperature_logs
 
 @Database(
-    version = 19, // ← Обновлено: добавление таблицы reports
+    version = 20, // ← Обновлено: добавление таблицы sensor_temperature_logs
     exportSchema = true,
     entities = [
         ClientEntity::class,
@@ -50,7 +51,8 @@ import ru.wassertech.data.migrations.MIGRATION_18_19  // ← Добавлени�
         IconEntity::class, // ← Новая сущность для иконок
         IconPackSyncStatusEntity::class, // ← Сущность для отслеживания статуса загрузки
         UserMembershipEntity::class, // ← Сущность для контроля доступа пользователей
-        ReportEntity::class // ← Сущность для PDF-отчётов
+        ReportEntity::class, // ← Сущность для PDF-отчётов
+        SensorTemperatureLogEntity::class // ← Сущность для логов температуры датчиков
     ]
 )
 @TypeConverters(Converters::class)
@@ -71,6 +73,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun iconPackSyncStatusDao(): ru.wassertech.data.dao.IconPackSyncStatusDao
     abstract fun userMembershipDao(): ru.wassertech.data.dao.UserMembershipDao
     abstract fun reportDao(): ru.wassertech.data.dao.ReportDao
+    abstract fun sensorTemperatureLogsDao(): SensorTemperatureLogsDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -101,7 +104,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_15_16,  // ← Добавление поля folder в icon_packs
                         MIGRATION_16_17,  // ← Добавление таблицы user_membership
                         MIGRATION_17_18,  // ← Добавление поля thumbnailLocalPath в icons
-                        MIGRATION_18_19  // ← Добавление таблицы reports
+                        MIGRATION_18_19,  // ← Добавление таблицы reports
+                        MIGRATION_19_20  // ← Добавление таблицы sensor_temperature_logs
                     )
                     // В проде обычно не используем destructive-опции, оставляю как у тебя:
                     //.fallbackToDestructiveMigration()

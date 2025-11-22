@@ -677,6 +677,22 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
             }
 
             composable(
+                route = "remote_monitor/{deviceId}",
+                arguments = listOf(navArgument("deviceId") { type = NavType.StringType }),
+                enterTransition = { fadeInTransition() },
+                exitTransition = { fadeOutTransition() },
+                popEnterTransition = { fadeInTransition() },
+                popExitTransition = { fadeOutTransition() }
+            ) { backStackEntry ->
+                val deviceId = backStackEntry.arguments?.getString("deviceId")
+                ru.wassertech.ui.remote.RemoteMonitorScreen(
+                    deviceId = deviceId,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            
+            // Старый маршрут для обратной совместимости (два устройства)
+            composable(
                 route = "remote_monitor",
                 enterTransition = { fadeInTransition() },
                 exitTransition = { fadeOutTransition() },
@@ -684,6 +700,7 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                 popExitTransition = { fadeOutTransition() }
             ) {
                 ru.wassertech.ui.remote.RemoteMonitorScreen(
+                    deviceId = null,
                     onBackClick = { navController.popBackStack() }
                 )
             }
@@ -744,6 +761,9 @@ private fun AppScaffold(navController: NavHostController, onLogout: (() -> Unit)
                     },
                     onOpenMaintenanceHistoryForInstallation = { id ->
                         navController.navigate("maintenance_history/$id")
+                    },
+                    onOpenRemoteMonitor = { deviceId ->
+                        navController.navigate("remote_monitor/$deviceId")
                     }
                 )
             }

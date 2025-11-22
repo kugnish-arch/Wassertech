@@ -1,5 +1,6 @@
 package ru.wassertech.ui.hierarchy
 
+import android.util.Log
 import ru.wassertech.data.entities.*
 import ru.wassertech.core.screens.hierarchy.ui.*
 import ru.wassertech.data.repository.IconRepository
@@ -82,17 +83,22 @@ object HierarchyUiStateMapper {
     
     /**
      * Преобразует ComponentEntity в ComponentItemUi.
+     * Для SENSOR компонентов загружает последнее значение температуры.
      */
     suspend fun ComponentEntity.toComponentItemUi(
         iconRepository: IconRepository,
         icon: IconEntity? = null,
-        templateName: String? = null
+        templateName: String? = null,
+        sensorCode: String? = null, // Код датчика для SENSOR компонентов
+        temperatureValue: Double? = null // Последнее значение температуры
     ): ComponentItemUi {
         val localImagePath = icon?.id?.let { 
             withContext(Dispatchers.IO) { 
                 iconRepository.getLocalIconPath(it) 
             } 
         }
+        
+        Log.d("HierarchyUiStateMapper", "toComponentItemUi: componentId=${this.id}, type=${this.type.name}, temperatureValue=$temperatureValue")
         
         return ComponentItemUi(
             id = this.id,
@@ -107,12 +113,15 @@ object HierarchyUiStateMapper {
             installationId = this.installationId,
             origin = this.origin,
             createdByUserId = this.createdByUserId,
+            temperatureValue = temperatureValue, // Передаем значение температуры
             // В CRM все права доступа разрешены
             canEdit = true,
             canDelete = true,
             canChangeIcon = true,
             canReorder = true
-        )
+        ).also {
+            Log.d("HierarchyUiStateMapper", "ComponentItemUi создан: id=${it.id}, temperatureValue=${it.temperatureValue}")
+        }
     }
 }
 

@@ -47,6 +47,8 @@ data class TemplateEditorUiState(
     val templateId: String,
     val templateName: String,
     val isHeadComponent: Boolean,
+    val category: String?, // "COMPONENT" или "SENSOR" (строковое представление ComponentTemplateCategory)
+    val sensorCode: String = "", // Код датчика для SENSOR шаблонов
     val fields: List<TemplateFieldUi>,
     val localFieldOrder: List<String>, // Локальный порядок полей для drag-and-drop
     val isLoading: Boolean = false,

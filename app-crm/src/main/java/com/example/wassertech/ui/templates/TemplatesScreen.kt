@@ -14,6 +14,7 @@ import ru.wassertech.data.entities.ComponentTemplateEntity
 import ru.wassertech.sync.SafeDeletionHelper
 import ru.wassertech.sync.markCreatedForSync
 import ru.wassertech.core.screens.templates.TemplatesScreenShared
+import ru.wassertech.core.screens.templates.ComponentTemplateCategory
 import ru.wassertech.core.screens.templates.ui.TemplatesUiState
 import ru.wassertech.core.screens.templates.ui.TemplateItemUi
 
@@ -126,7 +127,25 @@ fun TemplatesScreen(
     TemplatesScreenShared(
         state = uiState,
         onTemplateClick = onOpenTemplate,
-        onCreateTemplateClick = { showCreate = true },
+        onCreateTemplateWithCategory = { category ->
+            scope.launch {
+                val id = UUID.randomUUID().toString()
+                val nextOrder = (templates.maxOfOrNull { it.sortOrder } ?: -1) + 1
+                val categoryString = ComponentTemplateCategory.toString(ComponentTemplateCategory.fromString(category))
+                val entity = ComponentTemplateEntity(
+                    id = id,
+                    name = if (category == "SENSOR") "Новый датчик" else "Новый шаблон",
+                    category = categoryString,
+                    defaultParamsJson = null,
+                    sortOrder = nextOrder
+                ).markCreatedForSync(context)
+                Log.d(TAG, "Создание шаблона: id=$id, name=${entity.name}, category=$categoryString, " +
+                        "dirtyFlag=${entity.dirtyFlag}, syncStatus=${entity.syncStatus}, " +
+                        "createdAtEpoch=${entity.createdAtEpoch}, updatedAtEpoch=${entity.updatedAtEpoch}")
+                dao.upsert(entity)
+                onOpenTemplate(id)
+            }
+        },
         onTemplateArchive = { templateId ->
             scope.launch {
                 Log.d(TAG, "Архивирование шаблона: id=$templateId")

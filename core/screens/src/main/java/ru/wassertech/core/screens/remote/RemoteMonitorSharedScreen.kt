@@ -1,7 +1,9 @@
 package ru.wassertech.core.screens.remote
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeviceThermostat
@@ -11,17 +13,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
 import com.patrykandpatrick.vico.compose.chart.Chart
 import com.patrykandpatrick.vico.compose.chart.line.lineChart
-import com.patrykandpatrick.vico.compose.chart.line.lineSpec
-import com.patrykandpatrick.vico.compose.style.currentChartStyle
 import com.patrykandpatrick.vico.core.axis.AxisPosition
 import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
 import com.patrykandpatrick.vico.core.chart.DefaultPointConnector
 import com.patrykandpatrick.vico.core.chart.line.LineChart
+import com.patrykandpatrick.vico.core.component.shape.ShapeComponent
+import com.patrykandpatrick.vico.core.component.shape.Shapes
 import com.patrykandpatrick.vico.core.entry.ChartEntryModelProducer
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 import ru.wassertech.core.ui.components.AppEmptyState
@@ -41,17 +50,7 @@ fun RemoteMonitorSharedScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Мониторинг температуры") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Назад"
-                        )
-                    }
-                }
-            )
+            // Заголовок убран, используется заголовок внешнего экрана
         }
     ) { paddingValues ->
         Box(
@@ -106,136 +105,234 @@ fun RemoteMonitorSharedScreen(
                 }
 
                 else -> {
-                    // Два графика температуры
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // График первого устройства
-                        Card(
+                    // График(и) температуры
+                    if (uiState.isSingleDeviceMode) {
+                        // Режим с одним графиком
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
+                                .fillMaxSize()
+                                .padding(16.dp)
                         ) {
-                            Column(
+                            Card(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(12.dp)
+                                    .fillMaxWidth()
+                                    .weight(1f)
                             ) {
-                                // Заголовок с именем датчика и текущим значением
-                                Row(
+                                Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .fillMaxSize()
+                                        .padding(12.dp)
                                 ) {
-                                    Text(
-                                        text = uiState.deviceId1,
-                                        style = MaterialTheme.typography.titleSmall
-                                    )
-                                    // Текущее значение температуры
-                                    if (uiState.points1.isNotEmpty()) {
-                                        val lastValue = uiState.points1.lastOrNull()?.valueCelsius
-                                        if (lastValue != null) {
-                                            Text(
-                                                text = String.format(
-                                                    Locale.getDefault(),
-                                                    "%.1f°C",
-                                                    lastValue
-                                                ),
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = Color(0xFF4CAF50) // Ярко-зеленый цвет
-                                            )
-                                        }
-                                    }
-                                }
-                                if (uiState.points1.isEmpty()) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
+                                    // Заголовок с именем датчика и текущим значением
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Нет данных",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = "${uiState.deviceId1} (${uiState.points1.size})",
+                                            style = MaterialTheme.typography.titleSmall
                                         )
-                                    }
-                                } else {
-                                    TemperatureChart(
-                                        points = uiState.points1,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                    )
-                                }
-                            }
-                        }
-
-                        // График второго устройства
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(12.dp)
-                            ) {
-                                // Заголовок с именем датчика и текущим значением
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = uiState.deviceId2,
-                                        style = MaterialTheme.typography.titleSmall
-                                    )
-                                    // Текущее значение температуры
-                                    if (uiState.points2.isNotEmpty()) {
-                                        val lastValue = uiState.points2.lastOrNull()?.valueCelsius
-                                        if (lastValue != null) {
-                                            Text(
-                                                text = String.format(
-                                                    Locale.getDefault(),
-                                                    "%.1f°C",
-                                                    lastValue
-                                                ),
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = Color(0xFF4CAF50) // Ярко-зеленый цвет
-                                            )
+                                        // Текущее значение температуры
+                                        if (uiState.points1.isNotEmpty()) {
+                                            val lastValue = uiState.points1.lastOrNull()?.valueCelsius
+                                            if (lastValue != null) {
+                                                Text(
+                                                    text = String.format(
+                                                        Locale.getDefault(),
+                                                        "%.1f°C",
+                                                        lastValue
+                                                    ),
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    ),
+                                                    color = Color(0xFF4CAF50), // Ярко-зеленый цвет
+                                                    modifier = Modifier
+                                                        .background(
+                                                            Color.White,
+                                                            RoundedCornerShape(4.dp)
+                                                        )
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                if (uiState.points2.isEmpty()) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Нет данных",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    if (uiState.points1.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "Нет данных",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        TemperatureChart(
+                                            points = uiState.points1,
+                                            modifier = Modifier
+                                                .fillMaxSize()
                                         )
                                     }
-                                } else {
-                                    TemperatureChart(
-                                        points = uiState.points2,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                    )
                                 }
                             }
+                            
+                            if (uiState.isLoading) {
+                                // Индикатор загрузки при обновлении
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
                         }
+                    } else {
+                        // Режим с двумя графиками
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // График первого устройства
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(12.dp)
+                                ) {
+                                    // Заголовок с именем датчика и текущим значением
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${uiState.deviceId1} (${uiState.points1.size})",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        // Текущее значение температуры
+                                        if (uiState.points1.isNotEmpty()) {
+                                            val lastValue = uiState.points1.lastOrNull()?.valueCelsius
+                                            if (lastValue != null) {
+                                                Text(
+                                                    text = String.format(
+                                                        Locale.getDefault(),
+                                                        "%.1f°C",
+                                                        lastValue
+                                                    ),
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    ),
+                                                    color = Color(0xFF4CAF50), // Ярко-зеленый цвет
+                                                    modifier = Modifier
+                                                        .background(
+                                                            Color.White,
+                                                            RoundedCornerShape(4.dp)
+                                                        )
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (uiState.points1.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "Нет данных",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        TemperatureChart(
+                                            points = uiState.points1,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                        )
+                                    }
+                                }
+                            }
 
-                        if (uiState.isLoading) {
-                            // Индикатор загрузки при обновлении
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            // График второго устройства
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(12.dp)
+                                ) {
+                                    // Заголовок с именем датчика и текущим значением
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${uiState.deviceId2} (${uiState.points2.size})",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        // Текущее значение температуры
+                                        if (uiState.points2.isNotEmpty()) {
+                                            val lastValue = uiState.points2.lastOrNull()?.valueCelsius
+                                            if (lastValue != null) {
+                                                Text(
+                                                    text = String.format(
+                                                        Locale.getDefault(),
+                                                        "%.1f°C",
+                                                        lastValue
+                                                    ),
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    ),
+                                                    color = Color(0xFF4CAF50), // Ярко-зеленый цвет
+                                                    modifier = Modifier
+                                                        .background(
+                                                            Color.White,
+                                                            RoundedCornerShape(4.dp)
+                                                        )
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (uiState.points2.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "Нет данных",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        TemperatureChart(
+                                            points = uiState.points2,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (uiState.isLoading) {
+                                // Индикатор загрузки при обновлении
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
                         }
                     }
                 }
@@ -265,11 +362,11 @@ fun TemperatureChart(
         return
     }
 
-    // Мемоизируем отсортированные точки и ограничиваем до последних 50 точек для хранения
-    // Но для отображения показываем только последние 30 точек, чтобы автоматически видеть последние данные
+    // Мемоизируем отсортированные точки и ограничиваем до последних 1000 точек (самые новые)
+    // Это ограничение нужно только для оптимизации памяти, так как сервер может вернуть больше данных
     val sortedPoints = remember(points) {
         val sorted = points.sortedBy { it.timestampMillis }
-        val allLimited = sorted.takeLast(50) // Храним последние 50 для истории
+        val allLimited = sorted.takeLast(1000) // Храним последние 1000 точек (самые новые)
         android.util.Log.e(
             "TemperatureChart",
             "=== ОГРАНИЧЕНИЕ ТОЧЕК: было=${sorted.size}, храним=${allLimited.size} ==="
@@ -277,9 +374,9 @@ fun TemperatureChart(
         allLimited
     }
 
-    // Для отображения берем только последние 30 точек, чтобы автоматически показывать последние данные
+    // Для отображения берем только последние 60 точек, чтобы автоматически показывать последние данные
     val displayPoints = remember(sortedPoints) {
-        sortedPoints.takeLast(30) // Показываем только последние 30 точек
+        sortedPoints.takeLast(48) // Показываем только последние 60 точек
     }
 
     // Вычисляем диапазон оси Y: от min - 2 до max + 2 градуса (на основе отображаемых точек)
@@ -321,21 +418,9 @@ fun TemperatureChart(
         }
     }
 
-    // Разделяем entries: основная линия без последней точки и отдельная линия только с последней точкой
-    val mainEntries = remember(entries) {
-        if (entries.size > 1) {
-            entries.dropLast(1)
-        } else {
-            emptyList()
-        }
-    }
-
-    val lastEntry = remember(entries) {
-        if (entries.isNotEmpty()) {
-            listOf(entries.last())
-        } else {
-            emptyList()
-        }
+    // Используем все entries для одной линии, но последнюю точку выделим отдельно
+    val allEntries = remember(entries) {
+        entries
     }
 
     // Значение последней точки для подписи (если понадобится)
@@ -348,10 +433,12 @@ fun TemperatureChart(
         // Producer создаём ОДИН РАЗ
         val chartEntryModelProducer = remember { ChartEntryModelProducer() }
 
-        // Обновляем данные при изменении entries - используем points как ключ для стабильности
+        // Обновляем данные при изменении entries - используем более надежный ключ для обновления
         LaunchedEffect(
+            entries.size,
+            entries.firstOrNull()?.y,
+            entries.lastOrNull()?.y,
             points.size,
-            points.firstOrNull()?.timestampMillis,
             points.lastOrNull()?.timestampMillis
         ) {
             android.util.Log.e(
@@ -360,20 +447,18 @@ fun TemperatureChart(
                         "sortedPoints=${sortedPoints.size}, entries=${entries.size} ==="
             )
 
-            // Устанавливаем две линии: основную и последнюю точку отдельно
+            // Устанавливаем одну линию со всеми точками
             val linesToSet = mutableListOf<List<FloatEntry>>()
-            if (mainEntries.isNotEmpty()) {
-                linesToSet.add(mainEntries)
-            }
-            if (lastEntry.isNotEmpty()) {
-                linesToSet.add(lastEntry)
+            if (allEntries.isNotEmpty()) {
+                // Одна линия со всеми точками
+                linesToSet.add(allEntries)
             }
 
             if (linesToSet.isNotEmpty()) {
                 chartEntryModelProducer.setEntries(linesToSet)
                 android.util.Log.d(
                     "TemperatureChart",
-                    "Entries set successfully, main=${mainEntries.size}, last=${lastEntry.size}"
+                    "Entries set successfully, all=${allEntries.size}"
                 )
             } else {
                 android.util.Log.w("TemperatureChart", "Entries is empty!")
@@ -392,20 +477,20 @@ fun TemperatureChart(
                 } else {
                     minY
                 }
-                val intValue = realValue.toInt()
-                String.format(Locale.getDefault(), "%d°C", intValue)
+                String.format(Locale.getDefault(), "%.1f°C", realValue)
             }
         }
 
-        // Форматтер оси X - показываем метки только каждые 4 точки (1 через 3)
+        // Форматтер оси X - показываем метки каждые 5 точек, считая справа (от последней точки)
         val xAxisFormatter = remember(displayPoints) {
             AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
                 val index = value.toInt()
                 if (index in displayPoints.indices) {
-                    // Показываем метку только каждые 4 точки (index % 4 == 0), плюс первую и последнюю
-                    val shouldShow = index == 0 ||
-                            index == displayPoints.size - 1 ||
-                            index % 4 == 0
+                    val totalPoints = displayPoints.size
+                    // Вычисляем расстояние от последней точки (справа)
+                    val distanceFromEnd = totalPoints - 1 - index
+                    // Показываем метку, если это последняя точка или каждая 3-я точка, считая справа
+                    val shouldShow = distanceFromEnd % 3 == 0
 
                     if (shouldShow) {
                         val point = displayPoints[index]
@@ -431,55 +516,53 @@ fun TemperatureChart(
             labelRotationDegrees = 270f
         )
 
-        // Стиль графика (нужен, чтобы взять дефолтный point-компонент)
-        val chartStyle = currentChartStyle
-
-        // Создаём две линии: основная (тонкая) и последняя точка (ярко-зеленая, крупная)
-        val lineSpecs = remember(mainEntries, lastEntry, chartStyle) {
-            val specs = mutableListOf<LineChart.LineSpec>()
-
-            // Общий point-компонент из текущего стиля (чтобы точки реально рисовались)
-            val defaultPointComponent = chartStyle.lineChart.lines.firstOrNull()?.point
-
-            // Основная линия без последней точки
-            if (mainEntries.isNotEmpty()) {
-                specs.add(
-                    lineSpec(
-                        lineColor = MaterialTheme.colorScheme.primary,
-                        lineThickness = 2.dp,
-                        point = defaultPointComponent,
-                        pointSize = 6.dp,
+        // Получаем цвета в Composable контексте
+        val primaryColorArgb = MaterialTheme.colorScheme.primary.toArgb()
+        
+        // Создаём одну линию со всеми точками (все точки красные) с градиентом под линией
+        val lineSpecs = remember(allEntries, primaryColorArgb) {
+            if (allEntries.isNotEmpty()) {
+                // Создаём градиент от цвета линии до прозрачного
+                val gradientStartColor = Color(primaryColorArgb).copy(alpha = 0.3f).toArgb()
+                val gradientEndColor = Color(primaryColorArgb).copy(alpha = 0f).toArgb()
+                
+                listOf(
+                    LineChart.LineSpec(
+                        lineColor = primaryColorArgb,
+                        lineThicknessDp = 2f,
+                        point = ShapeComponent(
+                            shape = Shapes.pillShape,
+                            color = primaryColorArgb
+                        ),
+                        pointSizeDp = 4f,
                         pointConnector = DefaultPointConnector(cubicStrength = 0f)
+                        // Примечание: В Vico 1.13.1 градиент под линией может не поддерживаться
+                        // через lineBackgroundShader. Если градиент не отображается, 
+                        // потребуется обновление библиотеки до более новой версии.
                     )
                 )
+            } else {
+                emptyList()
             }
-
-            // Последняя точка - ярко-зеленая и крупная (линии нет, только точка)
-            if (lastEntry.isNotEmpty()) {
-                specs.add(
-                    lineSpec(
-                        lineColor = Color(0xFF4CAF50),
-                        lineThickness = 0.dp,
-                        point = defaultPointComponent,
-                        pointSize = 12.dp,
-                        pointConnector = DefaultPointConnector(cubicStrength = 0f)
-                    )
-                )
-            }
-
-            specs
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
             Chart(
                 chart = lineChart(
                     lines = lineSpecs,
-                    spacing = 8.dp
+                    spacing = 2.67.dp // Уменьшили spacing еще в 1.5 раза для устранения скролла
                 ),
                 chartModelProducer = chartEntryModelProducer,
                 startAxis = startAxis,
                 bottomAxis = bottomAxis,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Блокируем горизонтальный скролл и зум жестами
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures { _, _ ->
+                            // Игнорируем горизонтальные жесты для блокировки скролла
+                        }
+                    }
             )
         }
     }

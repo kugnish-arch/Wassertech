@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -31,7 +33,8 @@ import ru.wassertech.core.screens.templates.ui.TemplateItemUi
  * 
  * @param state UI State с данными шаблонов
  * @param onTemplateClick Коллбек при клике на шаблон
- * @param onCreateTemplateClick Коллбек при клике на создание шаблона
+ * @param onCreateTemplateClick Коллбек при клике на создание шаблона (старая сигнатура для обратной совместимости)
+ * @param onCreateTemplateWithCategory Коллбек при создании шаблона с указанной категорией (принимает category: String - "COMPONENT" или "SENSOR"). Если null, используется обычная FAB.
  * @param onTemplateArchive Коллбек для архивации шаблона
  * @param onTemplateRestore Коллбек для восстановления шаблона
  * @param onTemplateDelete Коллбек для удаления шаблона
@@ -53,7 +56,8 @@ import ru.wassertech.core.screens.templates.ui.TemplateItemUi
 fun TemplatesScreenShared(
     state: TemplatesUiState,
     onTemplateClick: (String) -> Unit,
-    onCreateTemplateClick: () -> Unit,
+    onCreateTemplateClick: () -> Unit = {},
+    onCreateTemplateWithCategory: ((String) -> Unit)? = null, // category: "COMPONENT" или "SENSOR"
     onTemplateArchive: (String) -> Unit = {},
     onTemplateRestore: (String) -> Unit = {},
     onTemplateDelete: (String) -> Unit = {},
@@ -105,17 +109,50 @@ fun TemplatesScreenShared(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             if (!state.isEditing) {
-                FloatingActionButton(
-                    onClick = {
-                        newTitle = ""
-                        onCreateTemplateClick()
-                    },
-                    containerColor = Color(0xFFD32F2F),
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    modifier = Modifier.padding(bottom = fabBottomPadding)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Добавить шаблон")
+                // Используем ExpandableFAB, если есть onCreateTemplateWithCategory, иначе обычную FAB
+                if (onCreateTemplateWithCategory != null) {
+                    ExpandableFAB(
+                        template = ExpandableFABTemplate(
+                            icon = Icons.Filled.Add,
+                            containerColor = Color(0xFFD32F2F),
+                            contentColor = Color.White,
+                            onClick = {
+                                // Если используется ExpandableFAB, основной onClick не используется
+                            },
+                            options = listOf(
+                                ExpandableFABOption(
+                                    label = "Компонент",
+                                    icon = Icons.Filled.Settings,
+                                    onClick = {
+                                        onCreateTemplateWithCategory("COMPONENT")
+                                    }
+                                ),
+                                ExpandableFABOption(
+                                    label = "Датчик",
+                                    icon = Icons.Filled.Science,
+                                    onClick = {
+                                        onCreateTemplateWithCategory("SENSOR")
+                                    }
+                                )
+                            ),
+                            optionsColor = Color(0xFF1E1E1E)
+                        ),
+                        modifier = Modifier.padding(bottom = fabBottomPadding)
+                    )
+                } else {
+                    // Обратная совместимость: обычная FAB
+                    FloatingActionButton(
+                        onClick = {
+                            newTitle = ""
+                            onCreateTemplateClick()
+                        },
+                        containerColor = Color(0xFFD32F2F),
+                        contentColor = Color.White,
+                        shape = CircleShape,
+                        modifier = Modifier.padding(bottom = fabBottomPadding)
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Добавить шаблон")
+                    }
                 }
             }
         }

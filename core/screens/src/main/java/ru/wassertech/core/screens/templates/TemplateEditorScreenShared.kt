@@ -44,6 +44,7 @@ import ru.wassertech.core.screens.templates.ui.TemplateFieldUi
  * @param onFieldAdd Коллбек при добавлении нового поля
  * @param onFieldsReordered Коллбек при изменении порядка полей (принимает новый порядок fieldId)
  * @param onSaveClick Коллбек при сохранении шаблона
+ * @param onSensorCodeChange Коллбек при изменении кода датчика (только для SENSOR шаблонов)
  * @param translitFunction Функция транслитерации для автоматического генерации ключа (опционально)
  * @param externalPaddingValues Внешние отступы (например, от topBar/bottomBar), используемые для позиционирования контента и FAB
  */
@@ -53,6 +54,7 @@ fun TemplateEditorScreenShared(
     state: TemplateEditorUiState,
     onNameChange: (String) -> Unit,
     onIsHeadComponentChange: (Boolean) -> Unit,
+    onSensorCodeChange: (String) -> Unit = {}, // Для SENSOR шаблонов
     onFieldLabelChange: (String, String, String) -> Unit, // fieldId, newLabel, autoKey
     onFieldKeyChange: (String, String) -> Unit = { _, _ -> }, // fieldId, newKey
     onFieldTypeChange: (String, String) -> Unit, // fieldId, type (as String: "TEXT", "CHECKBOX", "NUMBER")
@@ -111,6 +113,9 @@ fun TemplateEditorScreenShared(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Ветвление логики по типу шаблона
+            val isSensor = state.category?.uppercase() == "SENSOR"
+            
             // Поле для редактирования имени шаблона и переключатель "Заглавный компонент"
             item {
                 ElevatedCard(
@@ -134,126 +139,158 @@ fun TemplateEditorScreenShared(
                             singleLine = true
                         )
                         
-                        // Переключатель "Заглавный компонент"
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        // Переключатель "Заглавный компонент" - только для COMPONENT шаблонов
+                        if (!isSensor) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    "Заглавный компонент",
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                                IconButton(
-                                    onClick = { 
-                                        infoIconBounds?.let { rect ->
-                                            val position = Offset(rect.center.x, rect.top)
-                                            globalHeadComponentInfoPosition = position
-                                            globalShowHeadComponentInfo = true
-                                        }
-                                    },
-                                    modifier = Modifier.size(20.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Info,
-                                        contentDescription = "Информация",
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .onGloballyPositioned { coordinates ->
-                                                val position = coordinates.localToWindow(Offset.Zero)
-                                                val size = coordinates.size
-                                                val bounds = androidx.compose.ui.geometry.Rect(
-                                                    position.x,
-                                                    position.y,
-                                                    position.x + size.width,
-                                                    position.y + size.height
-                                                )
-                                                infoIconBounds = bounds
-                                            },
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    Text(
+                                        "Заглавный компонент",
+                                        style = MaterialTheme.typography.labelMedium
                                     )
+                                    IconButton(
+                                        onClick = { 
+                                            infoIconBounds?.let { rect ->
+                                                val position = Offset(rect.center.x, rect.top)
+                                                globalHeadComponentInfoPosition = position
+                                                globalShowHeadComponentInfo = true
+                                            }
+                                        },
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Info,
+                                            contentDescription = "Информация",
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .onGloballyPositioned { coordinates ->
+                                                    val position = coordinates.localToWindow(Offset.Zero)
+                                                    val size = coordinates.size
+                                                    val bounds = androidx.compose.ui.geometry.Rect(
+                                                        position.x,
+                                                        position.y,
+                                                        position.x + size.width,
+                                                        position.y + size.height
+                                                    )
+                                                    infoIconBounds = bounds
+                                                },
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
+                                Switch(
+                                    checked = state.isHeadComponent,
+                                    onCheckedChange = onIsHeadComponentChange
+                                )
                             }
-                            Switch(
-                                checked = state.isHeadComponent,
-                                onCheckedChange = onIsHeadComponentChange
-                            )
                         }
                     }
                 }
             }
+            
+            if (isSensor) {
+                // Для SENSOR шаблонов: показываем только поле "Код датчика"
+                item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = Color(0xFFFFFFFF)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = state.sensorCode,
+                                onValueChange = onSensorCodeChange,
+                                label = { Text("Код датчика") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                placeholder = { Text("Введите код датчика") }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Для COMPONENT шаблонов: обычный список полей
+                // Список полей с использованием ReorderableLazyColumn
+                item {
+                    if (state.localFieldOrder.isEmpty()) {
+                        EmptyGroupPlaceholder(text = "Поля отсутствуют", indent = 16.dp)
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 800.dp)
+                        ) {
+                            ReorderableLazyColumn(
+                                items = state.localFieldOrder,
+                                onMove = { fromIndex, toIndex ->
+                                    val mutable = state.localFieldOrder.toMutableList()
+                                    val item = mutable.removeAt(fromIndex)
+                                    mutable.add(toIndex, item)
+                                    onFieldsReordered?.invoke(mutable)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                key = { it },
+                                contentPadding = PaddingValues(0.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) { fieldId, isDragging, reorderableState ->
+                                val field = state.fields.find { it.id == fieldId } ?: return@ReorderableLazyColumn
+                                val index = state.localFieldOrder.indexOf(fieldId)
+                                
+                                FieldCard(
+                                    field = field,
+                                    index = index,
+                                    reorderableState = reorderableState,
+                                    onLabelChange = { newLabel ->
+                                        val autoKey = translitFunction?.invoke(newLabel) ?: ""
+                                        onFieldLabelChange(field.id, newLabel, autoKey)
+                                    },
+                                    onTypeChange = { newType -> onFieldTypeChange(field.id, newType) }, // newType is String
+                                    onIsCharacteristicChange = { isChar -> onFieldIsCharacteristicChange(field.id, isChar) },
+                                    onUnitChange = { newUnit -> onFieldUnitChange(field.id, newUnit) },
+                                    onMinChange = { newMin -> onFieldMinChange(field.id, newMin) },
+                                    onMaxChange = { newMax -> onFieldMaxChange(field.id, newMax) },
+                                    onRemove = { onFieldRemove(field.id) },
+                                    onInfoClick = { rect ->
+                                        val position = Offset(rect.center.x, rect.top)
+                                        globalShowCharacteristicInfo = Pair(field.id, position)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
-            // Список полей с использованием ReorderableLazyColumn
-            item {
-                if (state.localFieldOrder.isEmpty()) {
-                    EmptyGroupPlaceholder(text = "Поля отсутствуют", indent = 16.dp)
-                } else {
-                    Column(
+                // Кнопка "Добавить поле" внизу списка (только для COMPONENT)
+                item {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 800.dp)
+                            .padding(horizontal = 12.dp, vertical = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        ReorderableLazyColumn(
-                            items = state.localFieldOrder,
-                            onMove = { fromIndex, toIndex ->
-                                val mutable = state.localFieldOrder.toMutableList()
-                                val item = mutable.removeAt(fromIndex)
-                                mutable.add(toIndex, item)
-                                onFieldsReordered?.invoke(mutable)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            key = { it },
-                            contentPadding = PaddingValues(0.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) { fieldId, isDragging, reorderableState ->
-                            val field = state.fields.find { it.id == fieldId } ?: return@ReorderableLazyColumn
-                            val index = state.localFieldOrder.indexOf(fieldId)
-                            
-                            FieldCard(
-                                field = field,
-                                index = index,
-                                reorderableState = reorderableState,
-                                onLabelChange = { newLabel ->
-                                    val autoKey = translitFunction?.invoke(newLabel) ?: ""
-                                    onFieldLabelChange(field.id, newLabel, autoKey)
-                                },
-                                onTypeChange = { newType -> onFieldTypeChange(field.id, newType) }, // newType is String
-                                onIsCharacteristicChange = { isChar -> onFieldIsCharacteristicChange(field.id, isChar) },
-                                onUnitChange = { newUnit -> onFieldUnitChange(field.id, newUnit) },
-                                onMinChange = { newMin -> onFieldMinChange(field.id, newMin) },
-                                onMaxChange = { newMax -> onFieldMaxChange(field.id, newMax) },
-                                onRemove = { onFieldRemove(field.id) },
-                                onInfoClick = { rect ->
-                                    val position = Offset(rect.center.x, rect.top)
-                                    globalShowCharacteristicInfo = Pair(field.id, position)
-                                }
-                            )
+                        Button(
+                            onClick = onFieldAdd,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFE53935),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Добавить поле")
                         }
-                    }
-                }
-            }
-
-            // Кнопка "Добавить поле" внизу списка
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Button(
-                        onClick = onFieldAdd,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE53935),
-                            contentColor = Color.White
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Добавить поле")
                     }
                 }
             }

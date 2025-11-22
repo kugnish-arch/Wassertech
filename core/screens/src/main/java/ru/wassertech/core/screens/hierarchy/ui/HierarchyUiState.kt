@@ -61,6 +61,7 @@ data class ComponentItemUi(
     val installationId: String,
     val origin: String?,
     val createdByUserId: String?,
+    val temperatureValue: Double? = null, // Последнее значение температуры для SENSOR компонентов
     // Права доступа
     val canEdit: Boolean,
     val canDelete: Boolean,

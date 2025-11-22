@@ -52,17 +52,32 @@ class RemoteMonitorViewModel(application: Application) : AndroidViewModel(applic
      * Начинает мониторинг температуры для обоих устройств
      */
     fun startMonitoring() {
-        android.util.Log.e(TAG, "=== startMonitoring() ВЫЗВАН - запускаем мониторинг обоих устройств ===")
+        startMonitoring(DEVICE_ID_1, DEVICE_ID_2)
+    }
+    
+    /**
+     * Начинает мониторинг температуры для одного или двух устройств
+     */
+    fun startMonitoring(deviceId1: String, deviceId2: String? = null) {
+        android.util.Log.e(TAG, "=== startMonitoring() ВЫЗВАН - deviceId1=$deviceId1, deviceId2=$deviceId2 ===")
         stopMonitoring()
+
+        // Обновляем состояние с новыми deviceId
+        _state.update { 
+            it.copy(
+                deviceId1 = deviceId1,
+                deviceId2 = deviceId2
+            )
+        }
 
         // Запускаем мониторинг первого устройства
         monitoringJob1 = viewModelScope.launch(Dispatchers.IO) {
-            android.util.Log.e(TAG, "=== Job1 ЗАПУЩЕН для $DEVICE_ID_1 ===")
+            android.util.Log.e(TAG, "=== Job1 ЗАПУЩЕН для $deviceId1 ===")
             while (isActive) {
                 try {
                     _state.update { it.copy(isLoading = true, errorMessage = null) }
 
-                    val points = loadTemperaturePoints(DEVICE_ID_1)
+                    val points = loadTemperaturePoints(deviceId1)
 
                     _state.update {
                         it.copy(
@@ -72,11 +87,11 @@ class RemoteMonitorViewModel(application: Application) : AndroidViewModel(applic
                         )
                     }
 
-                    Log.d(TAG, "Загружено ${points.size} точек температуры для $DEVICE_ID_1")
+                    Log.d(TAG, "Загружено ${points.size} точек температуры для $deviceId1")
 
                 } catch (e: Exception) {
-                    val errorMessage = e.message ?: "Ошибка загрузки данных для $DEVICE_ID_1"
-                    Log.e(TAG, "Ошибка при загрузке данных для $DEVICE_ID_1", e)
+                    val errorMessage = e.message ?: "Ошибка загрузки данных для $deviceId1"
+                    Log.e(TAG, "Ошибка при загрузке данных для $deviceId1", e)
                     _state.update {
                         it.copy(
                             isLoading = false,
@@ -89,31 +104,33 @@ class RemoteMonitorViewModel(application: Application) : AndroidViewModel(applic
             }
         }
 
-        // Запускаем мониторинг второго устройства
-        monitoringJob2 = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                android.util.Log.e(TAG, "=== Job2 ЗАПУЩЕН для $DEVICE_ID_2 ===")
-                while (isActive) {
-                    try {
-                        val points = loadTemperaturePoints(DEVICE_ID_2)
+        // Запускаем мониторинг второго устройства только если оно указано
+        if (deviceId2 != null) {
+            monitoringJob2 = viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    android.util.Log.e(TAG, "=== Job2 ЗАПУЩЕН для $deviceId2 ===")
+                    while (isActive) {
+                        try {
+                            val points = loadTemperaturePoints(deviceId2)
 
-                        _state.update {
-                            it.copy(
-                                points2 = points
-                            )
+                            _state.update {
+                                it.copy(
+                                    points2 = points
+                                )
+                            }
+
+                            Log.d(TAG, "Загружено ${points.size} точек температуры для $deviceId2")
+
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Ошибка при загрузке данных для $deviceId2", e)
+                            // Не обновляем errorMessage для второго устройства, чтобы не перекрывать ошибки первого
                         }
 
-                        Log.d(TAG, "Загружено ${points.size} точек температуры для $DEVICE_ID_2")
-
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Ошибка при загрузке данных для $DEVICE_ID_2", e)
-                        // Не обновляем errorMessage для второго устройства, чтобы не перекрывать ошибки первого
+                        delay(POLLING_INTERVAL_DEVICE2_MS)
                     }
-
-                    delay(POLLING_INTERVAL_DEVICE2_MS)
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "=== Job2 УПАЛ С ОШИБКОЙ: ${e.message} ===", e)
                 }
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "=== Job2 УПАЛ С ОШИБКОЙ: ${e.message} ===", e)
             }
         }
     }
@@ -138,12 +155,6 @@ class RemoteMonitorViewModel(application: Application) : AndroidViewModel(applic
         return repository.loadTemperaturePoints(deviceId, fromStr, toStr)
     }
 
-    /**
-     * Начинает мониторинг температуры для указанного устройства (для обратной совместимости)
-     */
-    fun startMonitoring(deviceId: String) {
-        startMonitoring()
-    }
 
     /**
      * Останавливает мониторинг

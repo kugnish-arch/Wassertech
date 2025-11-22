@@ -11,15 +11,21 @@ import ru.wassertech.viewmodel.RemoteMonitorViewModel
  */
 @Composable
 fun RemoteMonitorScreen(
-    deviceId: String = "esp-test-01",
+    deviceId: String? = null, // Если null, используется режим с двумя устройствами
     onBackClick: () -> Unit,
     viewModel: RemoteMonitorViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
-    // Запускаем мониторинг обоих устройств при заходе на экран
-    LaunchedEffect(Unit) {
-        viewModel.startMonitoring()
+    // Запускаем мониторинг при заходе на экран
+    LaunchedEffect(deviceId) {
+        if (deviceId != null) {
+            // Режим с одним устройством
+            viewModel.startMonitoring(deviceId, null)
+        } else {
+            // Режим с двумя устройствами (по умолчанию)
+            viewModel.startMonitoring()
+        }
     }
     
     RemoteMonitorSharedScreen(

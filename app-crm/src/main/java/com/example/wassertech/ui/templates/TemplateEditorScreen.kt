@@ -10,12 +10,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 import ru.wassertech.data.AppDatabase
+import ru.wassertech.data.entities.ComponentTemplateFieldEntity
 import ru.wassertech.data.types.FieldType
 import ru.wassertech.util.Translit
 import ru.wassertech.viewmodel.TemplatesViewModel
+import ru.wassertech.sync.markCreatedForSync
 import ru.wassertech.sync.markUpdatedForSync
 import ru.wassertech.core.screens.templates.TemplateEditorScreenShared
+import ru.wassertech.core.screens.templates.ComponentTemplateCategory
 import ru.wassertech.core.screens.templates.ui.TemplateEditorUiState
 import ru.wassertech.core.screens.templates.ui.TemplateFieldUi
 
@@ -35,6 +39,8 @@ fun TemplateEditorScreen(
 
     var templateName by remember { mutableStateOf<String>("Шаблон") }
     var isHeadComponent by remember { mutableStateOf<Boolean>(false) }
+    var templateCategory by remember { mutableStateOf<String?>(null) } // "COMPONENT" или "SENSOR"
+    var sensorCode by remember { mutableStateOf<String>("") } // Код датчика для SENSOR шаблонов
 
     // Локальный порядок полей для drag-and-drop
     var localFieldOrder by remember(fields.size) {
@@ -59,6 +65,19 @@ fun TemplateEditorScreen(
                 template?.let {
                     templateName = it.name
                     isHeadComponent = it.isHeadComponent
+                    // Определяем category из шаблона или используем COMPONENT по умолчанию
+                    val category = ComponentTemplateCategory.fromString(it.category)
+                    templateCategory = ComponentTemplateCategory.toString(category)
+                    
+                    // Для SENSOR шаблонов загружаем код датчика из полей
+                    if (category == ComponentTemplateCategory.SENSOR) {
+                        val fields = db.componentTemplateFieldsDao().getFieldsForTemplate(templateId)
+                        // Ищем поле с key="Имя датчика" (поле "Имя датчика")
+                        // Если не найдено, берем первое поле (для обратной совместимости)
+                        val sensorField = fields.find { it.key == "Имя датчика" } 
+                            ?: fields.firstOrNull()
+                        sensorCode = sensorField?.label ?: ""
+                    }
                 }
             } catch (_: Throwable) {
             }
@@ -83,11 +102,13 @@ fun TemplateEditorScreen(
         }
     }
 
-    val uiState = remember(templateId, templateName, isHeadComponent, fieldsUi, localFieldOrder) {
+    val uiState = remember(templateId, templateName, isHeadComponent, templateCategory, sensorCode, fieldsUi, localFieldOrder) {
         TemplateEditorUiState(
             templateId = templateId,
             templateName = templateName,
             isHeadComponent = isHeadComponent,
+            category = templateCategory,
+            sensorCode = sensorCode,
             fields = fieldsUi,
             localFieldOrder = localFieldOrder
         )
@@ -97,6 +118,7 @@ fun TemplateEditorScreen(
         state = uiState,
         onNameChange = { templateName = it },
         onIsHeadComponentChange = { isHeadComponent = it },
+        onSensorCodeChange = { sensorCode = it },
         onFieldLabelChange = { fieldId, newLabel, autoKey ->
             val prevAuto = Translit.ruToEnKey(fields.find { it.id == fieldId }?.label ?: "")
             val field = fields.find { it.id == fieldId } ?: return@TemplateEditorScreenShared
@@ -144,23 +166,62 @@ fun TemplateEditorScreen(
         onSaveClick = {
             scope.launch {
                 Log.d(TAG, "Сохранение шаблона: templateId=$templateId")
-                vm.saveAll(localFieldOrder)
+                val category = ComponentTemplateCategory.fromString(templateCategory)
+                
                 withContext(Dispatchers.IO) {
                     try {
                         val template = db.componentTemplatesDao().getById(templateId)
                         template?.let { currentTemplate ->
-                            if (currentTemplate.name != templateName || currentTemplate.isHeadComponent != isHeadComponent) {
-                                val updatedTemplate = currentTemplate.copy(
-                                    name = templateName,
-                                    isHeadComponent = isHeadComponent
-                                ).markUpdatedForSync()
-                                Log.d(TAG, "Обновление шаблона: templateId=$templateId, " +
-                                        "oldName=${currentTemplate.name}, newName=$templateName, " +
-                                        "oldIsHeadComponent=${currentTemplate.isHeadComponent}, newIsHeadComponent=$isHeadComponent, " +
-                                        "dirtyFlag=${updatedTemplate.dirtyFlag}, syncStatus=${updatedTemplate.syncStatus}, " +
-                                        "updatedAtEpoch=${updatedTemplate.updatedAtEpoch}")
-                                db.componentTemplatesDao().upsert(updatedTemplate)
+                            // Обновляем шаблон
+                            val updatedTemplate = currentTemplate.copy(
+                                name = templateName,
+                                isHeadComponent = isHeadComponent,
+                                category = ComponentTemplateCategory.toString(category)
+                            ).markUpdatedForSync()
+                            db.componentTemplatesDao().upsert(updatedTemplate)
+                            
+                            // Для SENSOR шаблонов - особая логика сохранения полей
+                            if (category == ComponentTemplateCategory.SENSOR) {
+                                val fieldsDao = db.componentTemplateFieldsDao()
+                                
+                                // Удаляем все существующие поля шаблона
+                                val existingFields = fieldsDao.getFieldsForTemplate(templateId)
+                                existingFields.forEach { field ->
+                                    fieldsDao.deleteField(field.id)
+                                }
+                                
+                                // Создаём единственное поле с name="Имя датчика" и label=код датчика
+                                if (sensorCode.isNotBlank()) {
+                                    val sensorField = ComponentTemplateFieldEntity(
+                                        id = UUID.randomUUID().toString(),
+                                        templateId = templateId,
+                                        key = "Имя датчика", // name = "Имя датчика" (жёстко зашитое значение)
+                                        label = sensorCode, // Код датчика из UI
+                                        type = FieldType.TEXT,
+                                        unit = null,
+                                        isCharacteristic = false,
+                                        isRequired = false,
+                                        defaultValueText = null,
+                                        defaultValueNumber = null,
+                                        defaultValueBool = null,
+                                        min = null,
+                                        max = null,
+                                        sortOrder = 0
+                                    ).markCreatedForSync()
+                                    
+                                    fieldsDao.upsertField(sensorField)
+                                    Log.d(TAG, "Создано поле датчика: key=Имя датчика, label=$sensorCode")
+                                }
+                            } else {
+                                // Для COMPONENT шаблонов - обычная логика сохранения полей
+                                vm.saveAll(localFieldOrder)
                             }
+                            
+                            Log.d(TAG, "Обновление шаблона: templateId=$templateId, " +
+                                    "oldName=${currentTemplate.name}, newName=$templateName, " +
+                                    "category=${updatedTemplate.category}, " +
+                                    "dirtyFlag=${updatedTemplate.dirtyFlag}, syncStatus=${updatedTemplate.syncStatus}, " +
+                                    "updatedAtEpoch=${updatedTemplate.updatedAtEpoch}")
                         }
                     } catch (e: Throwable) {
                         Log.e(TAG, "Ошибка при сохранении шаблона", e)
